@@ -1,0 +1,20 @@
+{
+    "version": 1,
+    "id": "foo",
+    "description": "Gemini 1.5 Pro with image",
+    "provider": "gemini",
+    "model": "gemini-1.5-pro-latest",
+    "prompt": {
+        "contents": [
+            {
+                "parts": [
+                    {"text": "What is in this image?"},
+                    {"inlineData": {
+                        "mimeType": "{{image.mimeType}}",
+                        "data": "{{image.base64}}"
+                    }}
+                ]
+            }
+        ]
+    }
+}

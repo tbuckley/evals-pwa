@@ -1,0 +1,8 @@
+{
+    "version": 1,
+    "id": "bar",
+    "description": "Puppy",
+    "vars": {
+        "image": "puppy.jpg"
+    }
+}

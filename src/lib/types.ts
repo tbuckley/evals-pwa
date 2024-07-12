@@ -29,6 +29,7 @@ export const promptSchema = z.object({
 	version: z.literal(1),
 
 	// Required
+	id: z.string(),
 	provider: z.string(),
 	model: z.string(),
 	prompt: z.unknown(),
@@ -44,6 +45,7 @@ export const testCaseSchema = z.object({
 	version: z.literal(1),
 
 	// Required
+	id: z.string(),
 	vars: z.record(z.string(), varSchema),
 
 	// Optional
@@ -71,6 +73,7 @@ export const runSchema = z.object({
 	version: z.literal(1),
 
 	// Required
+	id: z.string(),
 	timestamp: z.number(),
 	prompts: z.array(promptSchema),
 	tests: z.array(testCaseSchema),
@@ -89,4 +92,9 @@ export interface StorageProvider {
 
 	addRun(run: Run): Promise<void>;
 	reload(): Promise<void>;
+}
+
+export interface ModelProvider {
+	run(prompt: unknown): Promise<unknown>;
+	extractOutput(response: unknown): string;
 }
