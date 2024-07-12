@@ -1,24 +1,26 @@
-import {
-	promptSchema,
-	runSchema,
-	testCaseSchema,
-	type Prompt,
-	type Run,
-	type StorageProvider,
-	type TestCase
-} from '$lib/types';
+import { type Run, type StorageProvider, type Config, runSchema, configSchema } from '$lib/types';
 import type { ZodSchema } from 'zod';
+import * as yaml from 'yaml';
 
 export class FileSystemStorage implements StorageProvider {
 	constructor(public dir: FileSystemDirectoryHandle) {}
 
-	async getAllPrompts(): Promise<Prompt[]> {
-		const dir = await this.dir.getDirectoryHandle('prompts', { create: true });
-		return loadJsonFromDirectoryWithSchema(dir, promptSchema);
-	}
-	async getAllTestCases(): Promise<TestCase[]> {
-		const dir = await this.dir.getDirectoryHandle('tests', { create: true });
-		return loadJsonFromDirectoryWithSchema(dir, testCaseSchema);
+	async getConfig(): Promise<Config> {
+		console.log('getting config...');
+		for await (const entry of this.dir.values()) {
+			console.log(entry.kind, entry.name);
+		}
+		const configHandle = await this.dir.getFileHandle('config.yaml', { create: false });
+		console.log('got config file');
+		const file = await configHandle.getFile();
+		const text = await file.text();
+		const data = yaml.parse(text);
+		const res = configSchema.safeParse(data);
+		if (!res.success) {
+			console.log(res.error.errors);
+			throw new Error('Invalid config file');
+		}
+		return res.data;
 	}
 	async getAllRuns(): Promise<Run[]> {
 		const dir = await this.dir.getDirectoryHandle('runs', { create: true });

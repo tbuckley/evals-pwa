@@ -1,0 +1,19 @@
+description: foo
+
+providers:
+  - gemini:gemini-1.5-pro-latest
+  - gemini:gemini-1.5-flash-latest
+
+prompts:
+  - '{{image}} You are a pirate. Answer the following question about this image: {{question}}'
+
+tests:
+  - description: Simple test
+    vars:
+      image: file:///files/puppy.png
+      question: What is in this picture?
+    assert:
+      - description: Contains a puppy
+        type: contains
+        args:
+          needle: puppy

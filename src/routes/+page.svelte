@@ -1,9 +1,9 @@
 <script lang="ts">
 	import Button from '$lib/components/ui/button/button.svelte';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
-	import { loadStateFromStorage } from '$lib/state/actions';
+	import { loadStateFromStorage, runTests } from '$lib/state/actions';
 	import { envStore } from '$lib/state/env';
-	import { promptStore, storageStore, testStore } from '$lib/state/stores';
+	import { configStore, runStore, storageStore } from '$lib/state/stores';
 	import { FileSystemStorage } from '$lib/storage/fileSystemStorage';
 
 	async function chooseFolder() {
@@ -24,9 +24,6 @@
 		await loadStateFromStorage();
 	}
 
-	function runTests() {
-		alert('Not implemented');
-	}
 	async function reload() {
 		await loadStateFromStorage();
 	}
@@ -39,26 +36,14 @@
 	<Textarea bind:value={$envStore}></Textarea>
 
 	<Button on:click={chooseFolder}>Choose folder</Button>
-	{#if $storageStore !== null}
+	{#if $configStore !== null}
 		<Button on:click={runTests}>Run tests</Button>
 		<Button on:click={reload}>Reload</Button>
 
-		<h2>Prompts</h2>
-		<ul>
-			{#each $promptStore as prompt}
-				<li>{prompt.description ?? prompt.id}</li>
-			{:else}
-				<li>No prompts found</li>
-			{/each}
-		</ul>
-
-		<h2>Test Cases</h2>
-		<ul>
-			{#each $testStore as test}
-				<li>{test.description ?? test.id}</li>
-			{:else}
-				<li>No test cases found</li>
-			{/each}
-		</ul>
+		<pre>{JSON.stringify($configStore, null, 2)}</pre>
 	{/if}
+
+	{#each $runStore as run}
+		<pre>{JSON.stringify(run, null, 2)}</pre>
+	{/each}
 </article>

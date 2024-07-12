@@ -60,19 +60,19 @@ export const generateContentResponseSchema = z.object({
 	candidates: z.array(
 		z.object({
 			content: contentSchema,
-			finishReason: z.string().optional(), // TODO use enum
-			tokenCount: z.number().int(),
-			index: z.number().int(),
+			finishReason: z.string().optional() // TODO use enum
+			// tokenCount: z.number().int()
+			// index: z.number().int()
 
-			safetyRatings: z.unknown(), // TODO declare
-			citationMetadata: z.unknown(), // TODO declare
-			groundingAttributions: z.array(z.unknown()) // TODO declare
+			// safetyRatings: z.unknown(), // TODO declare
+			// citationMetadata: z.unknown(), // TODO declare
+			// groundingAttributions: z.array(z.unknown()) // TODO declare
 		})
 	),
-	promptFeedback: z.unknown(), // TODO declare
+	// promptFeedback: z.unknown(), // TODO declare
 	usageMetadata: z.object({
 		promptTokenCount: z.number().int(),
-		cachedContentTokenCount: z.number().int(),
+		cachedContentTokenCount: z.number().int().optional(),
 		candidatesTokenCount: z.number().int(),
 		totalTokenCount: z.number().int()
 	})
@@ -86,8 +86,8 @@ export class GeminiProvider implements ModelProvider {
 		public apiKey: string
 	) {}
 
-	async run(prompt: unknown): Promise<unknown> {
-		const request = requestSchema.parse(prompt);
+	async run(prompt: string): Promise<unknown> {
+		// const request = requestSchema.parse(prompt);
 		const resp = await fetch(
 			`https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`,
 			{
@@ -95,7 +95,9 @@ export class GeminiProvider implements ModelProvider {
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify(request)
+				body: JSON.stringify({
+					contents: [{ parts: [{ text: prompt }] }]
+				})
 			}
 		);
 		if (!resp.ok) {

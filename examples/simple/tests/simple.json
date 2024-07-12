@@ -3,6 +3,6 @@
     "id": "bar",
     "description": "Puppy",
     "vars": {
-        "image": "puppy.jpg"
+        "image": "file:///files/puppy.jpg"
     }
 }
