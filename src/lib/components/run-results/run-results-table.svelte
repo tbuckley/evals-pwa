@@ -1,8 +1,9 @@
 <script lang="ts">
 	import type { Prompt, Provider, Run } from '$lib/types';
-	import { createTable, Render, Subscribe } from 'svelte-headless-table';
+	import { createRender, createTable, Render, Subscribe } from 'svelte-headless-table';
 	import { readable } from 'svelte/store';
 	import * as Table from '../ui/table/';
+	import RunResultsCell from './run-results-cell.svelte';
 
 	export let run: Run;
 
@@ -30,7 +31,8 @@
 				header: getColumnName(env),
 				accessor: (row) => row[index],
 				cell: ({ value }) => {
-					return `${value.pass ? '[PASS]' : '[FAIL]'}: ${value.error ?? value.output ?? ''}`;
+					// return `${value.pass ? '[PASS]' : '[FAIL]'}: ${value.error ?? value.output ?? ''}`;
+					return createRender(RunResultsCell, { testResult: value });
 				}
 			})
 		)
@@ -62,7 +64,7 @@
 					<Table.Row {...rowAttrs}>
 						{#each row.cells as cell (cell.id)}
 							<Subscribe attrs={cell.attrs()} let:attrs>
-								<Table.Cell {...attrs}>
+								<Table.Cell {...attrs} class="align-top">
 									<Render of={cell.render()} />
 								</Table.Cell>
 							</Subscribe>
