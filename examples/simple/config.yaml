@@ -15,5 +15,5 @@ tests:
     assert:
       - description: Contains a puppy
         type: contains
-        args:
+        vars:
           needle: puppy

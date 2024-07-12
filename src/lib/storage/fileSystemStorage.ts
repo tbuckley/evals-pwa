@@ -57,9 +57,8 @@ export class FileSystemStorage implements StorageProvider {
 		// TODO format as datetime string
 		const handle = await dir.getFileHandle(`${run.timestamp}.json`, { create: true });
 		const writable = await handle.createWritable();
-		writable.write(JSON.stringify(run));
-
-		throw new Error('Method not implemented.');
+		await writable.write(JSON.stringify(run));
+		await writable.close();
 	}
 }
 

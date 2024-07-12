@@ -1,4 +1,5 @@
 <script lang="ts">
+	import RunResultsTable from '$lib/components/run-results/run-results-table.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 	import { loadStateFromStorage, runTests } from '$lib/state/actions';
@@ -44,6 +45,7 @@
 	{/if}
 
 	{#each $runStore as run}
-		<pre>{JSON.stringify(run, null, 2)}</pre>
+		<h2>{run.timestamp}</h2>
+		<RunResultsTable {run} />
 	{/each}
 </article>

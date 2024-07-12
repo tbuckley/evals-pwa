@@ -1,6 +1,7 @@
 import { get } from 'svelte/store';
 import { configStore, runStore, storageStore } from './stores';
 import type {
+	AssertionResult,
 	ModelProvider,
 	Prompt,
 	Provider,
@@ -103,12 +104,26 @@ export async function runTests() {
 			runner.enqueue(async () => {
 				// TODO should this be safeRun if it will catch all errors?
 				const output = await env.run(test.vars ?? {});
-				// TODO run tests
 				for (const [key, value] of Object.entries(output)) {
 					(result as { [key: string]: unknown })[key] = value;
 				}
-				result.pass = true;
-				result.assertionResults = [];
+
+				if (output.error) {
+					result.pass = false;
+					return;
+				}
+
+				// Run
+				const assertions = test.assert ?? [];
+				const assertionResults: AssertionResult[] = [];
+				for (const assertion of assertions) {
+					if (assertion.type === 'contains') {
+						const pass = output.output!.includes(assertion.vars!.needle as string);
+						assertionResults.push({ pass, message: pass ? 'String found' : 'String not found' });
+					}
+				}
+				result.pass = assertionResults.every((r) => r.pass);
+				result.assertionResults = assertionResults;
 			});
 		}
 		run.results.push(testResults);
@@ -117,5 +132,8 @@ export async function runTests() {
 	await runner.completed();
 
 	runStore.update((runs) => [...runs, run]);
-	// TODO add to storage
+
+	// Save the run to storage
+	const storage = get(storageStore);
+	storage?.addRun(run);
 }
