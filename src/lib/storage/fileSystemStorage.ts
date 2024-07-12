@@ -59,10 +59,6 @@ export class FileSystemStorage implements StorageProvider {
 
 		throw new Error('Method not implemented.');
 	}
-	reload(): Promise<void> {
-		// Do nothing, prompts are always fetched from disk
-		return Promise.resolve();
-	}
 }
 
 async function loadJsonFromDirectoryWithSchema<T>(

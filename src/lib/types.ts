@@ -91,7 +91,6 @@ export interface StorageProvider {
 	getAllRuns(): Promise<Run[]>;
 
 	addRun(run: Run): Promise<void>;
-	reload(): Promise<void>;
 }
 
 export interface ModelProvider {
