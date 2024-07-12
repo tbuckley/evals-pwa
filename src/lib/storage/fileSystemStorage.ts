@@ -25,8 +25,26 @@ export class FileSystemStorage implements StorageProvider {
 		return loadJsonFromDirectoryWithSchema(dir, runSchema);
 	}
 	async getBlob(path: string): Promise<Blob> {
-		const dir = await this.dir.getDirectoryHandle('files', { create: true });
-		const handle = await dir.getFileHandle(path, { create: false });
+		let dir: FileSystemDirectoryHandle;
+		try {
+			dir = await this.dir.getDirectoryHandle('files', { create: false });
+		} catch (e) {
+			if (e instanceof DOMException && e.name === 'NotFoundError') {
+				throw new Error(`Folder not found: files/. Expected it to contain file '${path}'`);
+			}
+			throw e;
+		}
+
+		let handle: FileSystemFileHandle;
+		try {
+			handle = await dir.getFileHandle(path, { create: false });
+		} catch (e) {
+			if (e instanceof DOMException && e.name === 'NotFoundError') {
+				throw new Error(`File not found: ${path}`);
+			}
+			throw e;
+		}
+
 		const file = await handle.getFile();
 		return file; // File is a blob
 	}
@@ -42,7 +60,8 @@ export class FileSystemStorage implements StorageProvider {
 		throw new Error('Method not implemented.');
 	}
 	reload(): Promise<void> {
-		throw new Error('Method not implemented.');
+		// Do nothing, prompts are always fetched from disk
+		return Promise.resolve();
 	}
 }
 
