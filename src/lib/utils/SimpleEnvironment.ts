@@ -18,6 +18,7 @@ export class SimpleEnvironment implements TestEnvironment {
 	async run(vars: VarSet): Promise<TestOutput> {
 		const prompt = this.prompt.format(vars);
 
+		const start = Date.now();
 		let resp: unknown;
 		try {
 			resp = await this.model.run(prompt);
@@ -30,6 +31,7 @@ export class SimpleEnvironment implements TestEnvironment {
 			}
 			throw e;
 		}
+		const latencyMillis = Date.now() - start;
 
 		let output: string;
 		try {
@@ -39,7 +41,8 @@ export class SimpleEnvironment implements TestEnvironment {
 				return {
 					rawPrompt: prompt,
 					rawOutput: resp,
-					error: e.toString()
+					error: e.toString(),
+					latencyMillis
 				};
 			}
 			throw e;
@@ -48,7 +51,8 @@ export class SimpleEnvironment implements TestEnvironment {
 		return {
 			rawPrompt: prompt,
 			rawOutput: resp,
-			output: output
+			output: output,
+			latencyMillis
 		};
 	}
 }
