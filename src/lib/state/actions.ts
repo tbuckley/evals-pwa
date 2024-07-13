@@ -58,7 +58,7 @@ export async function runTests() {
 	}
 
 	// Create the provider manager
-	const env = get(envStore);
+	const env = get(envStore); // TODO validate that env variables for each provider is set
 	const providerManager = new ProviderManager(parseEnvText(env));
 
 	// Create the test runner
@@ -77,6 +77,7 @@ export async function runTests() {
 		if (typeof provider === 'string') {
 			model = providerManager.getProvider(provider);
 		} else {
+			// TODO also allow custom model properties
 			model = providerManager.getProvider(provider.id);
 		}
 
