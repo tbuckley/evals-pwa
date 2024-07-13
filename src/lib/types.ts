@@ -103,8 +103,22 @@ export interface StorageProvider {
 	addRun(run: Run): Promise<void>;
 }
 
+export const multiPartPromptSchema = z.array(
+	z.union([
+		z.object({
+			text: z.string()
+		}),
+		z.object({
+			image: z.string()
+		})
+	])
+);
+export type MultiPartPrompt = z.infer<typeof multiPartPromptSchema>;
+
+export type PopulatedMultiPartPrompt = Array<{ text: string } | { image: File }>;
+
 export interface ModelProvider {
-	run(prompt: string): Promise<unknown>;
+	run(prompt: PopulatedMultiPartPrompt): Promise<unknown>;
 	extractOutput(response: unknown): string;
 }
 
@@ -118,5 +132,9 @@ export interface TaskQueue {
 }
 
 export interface PromptFormatter {
-	format(vars: VarSet): string;
+	format(vars: VarSet): MultiPartPrompt;
+}
+
+export interface FileLoader {
+	loadFile(path: string): Promise<File>;
 }

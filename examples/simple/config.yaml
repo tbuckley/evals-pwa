@@ -5,12 +5,16 @@ providers:
   - gemini:gemini-1.5-flash-latest
 
 prompts:
-  - '{{image}} You are a pirate. Answer the following question about this image: {{question}}'
+  - >
+    [
+      { "image": "{{image}}" },
+      { "text": "You are a pirate. Answer the following question about this image: {{question}}" }
+    ]
 
 tests:
   - description: Simple test
     vars:
-      image: file:///files/puppy.png
+      image: file:///files/puppy.jpg
       question: What is in this picture?
     assert:
       - description: Contains a puppy

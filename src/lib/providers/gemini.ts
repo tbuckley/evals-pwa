@@ -1,4 +1,4 @@
-import type { ModelProvider } from '$lib/types';
+import type { ModelProvider, PopulatedMultiPartPrompt } from '$lib/types';
 import { z } from 'zod';
 
 export const partSchema = z.union([
@@ -28,6 +28,7 @@ export const partSchema = z.union([
 		})
 	})
 ]);
+export type Part = z.infer<typeof partSchema>;
 
 export const contentSchema = z.object({
 	parts: z.array(partSchema),
@@ -86,8 +87,7 @@ export class GeminiProvider implements ModelProvider {
 		public apiKey: string
 	) {}
 
-	async run(prompt: string): Promise<unknown> {
-		// const request = requestSchema.parse(prompt);
+	async run(prompt: PopulatedMultiPartPrompt): Promise<unknown> {
 		const resp = await fetch(
 			`https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`,
 			{
@@ -96,7 +96,7 @@ export class GeminiProvider implements ModelProvider {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					contents: [{ parts: [{ text: prompt }] }]
+					contents: [{ parts: await multiPartPromptToGemini(prompt) }]
 				})
 			}
 		);
@@ -116,4 +116,53 @@ export class GeminiProvider implements ModelProvider {
 		}
 		throw new Error('Unexpected output format');
 	}
+}
+
+async function multiPartPromptToGemini(prompt: PopulatedMultiPartPrompt): Promise<Part[]> {
+	const parts: Part[] = [];
+	for (const part of prompt) {
+		if ('text' in part) {
+			parts.push({ text: part.text });
+		} else if ('image' in part) {
+			const b64 = await fileToBase64(part.image);
+			const firstComma = b64.indexOf(',');
+
+			parts.push({
+				inlineData: {
+					mimeType: mimeTypeForFile(part.image),
+					data: b64.slice(firstComma + 1)
+				}
+			});
+		} else {
+			throw new Error('Unsupported part type');
+		}
+	}
+	return parts;
+}
+
+function mimeTypeForFile(file: File): string {
+	const ext = file.name.split('.').pop();
+	if (ext === 'jpg' || ext === 'jpeg') {
+		return 'image/jpeg';
+	}
+	if (ext === 'png') {
+		return 'image/png';
+	}
+	throw new Error(`Unsupported file type: ${ext}`);
+}
+function fileToBase64(file: File): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => {
+			if (typeof reader.result === 'string') {
+				resolve(reader.result);
+			} else {
+				reject(new Error('Unexpected reader result'));
+			}
+		};
+		reader.onerror = () => {
+			reject(reader.error);
+		};
+		reader.readAsDataURL(file);
+	});
 }

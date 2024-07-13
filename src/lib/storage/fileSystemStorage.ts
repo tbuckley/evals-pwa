@@ -1,8 +1,15 @@
-import { type Run, type StorageProvider, type Config, runSchema, configSchema } from '$lib/types';
+import {
+	type Run,
+	type StorageProvider,
+	type Config,
+	runSchema,
+	configSchema,
+	type FileLoader
+} from '$lib/types';
 import type { ZodSchema } from 'zod';
 import * as yaml from 'yaml';
 
-export class FileSystemStorage implements StorageProvider {
+export class FileSystemStorage implements StorageProvider, FileLoader {
 	constructor(public dir: FileSystemDirectoryHandle) {}
 
 	async getConfig(): Promise<Config> {
@@ -26,29 +33,36 @@ export class FileSystemStorage implements StorageProvider {
 		const dir = await this.dir.getDirectoryHandle('runs', { create: true });
 		return loadJsonFromDirectoryWithSchema(dir, runSchema);
 	}
-	async getBlob(path: string): Promise<Blob> {
-		let dir: FileSystemDirectoryHandle;
-		try {
-			dir = await this.dir.getDirectoryHandle('files', { create: false });
-		} catch (e) {
-			if (e instanceof DOMException && e.name === 'NotFoundError') {
-				throw new Error(`Folder not found: files/. Expected it to contain file '${path}'`);
-			}
-			throw e;
+	async loadFile(path: string): Promise<File> {
+		// Ensure that path starts with file:/// and remove it
+		if (!path.startsWith('file:///')) {
+			throw new Error('Invalid path');
+		}
+		path = path.slice('file:///'.length);
+
+		const parts = path.split('/');
+		const fileName = parts.pop();
+		if (!fileName) {
+			throw new Error('Invalid path');
 		}
 
+		let dir = this.dir;
+		for (const part of parts) {
+			try {
+				dir = await dir.getDirectoryHandle(part, { create: false });
+			} catch {
+				throw new Error(`Error loading directory: ${part}`);
+			}
+		}
 		let handle: FileSystemFileHandle;
 		try {
-			handle = await dir.getFileHandle(path, { create: false });
-		} catch (e) {
-			if (e instanceof DOMException && e.name === 'NotFoundError') {
-				throw new Error(`File not found: ${path}`);
-			}
-			throw e;
+			handle = await dir.getFileHandle(fileName, { create: false });
+		} catch {
+			throw new Error(`Error loading file: ${fileName}`);
 		}
 
 		const file = await handle.getFile();
-		return file; // File is a blob
+		return file;
 	}
 
 	async addRun(run: Run): Promise<void> {

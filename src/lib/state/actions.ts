@@ -52,6 +52,10 @@ export async function runTests() {
 	if (!config) {
 		throw new Error('Cannot call runTests without a config');
 	}
+	const storage = get(storageStore);
+	if (!storage) {
+		throw new Error('Cannot call runTests without a storage');
+	}
 
 	// Create the provider manager
 	const env = get(envStore);
@@ -80,7 +84,13 @@ export async function runTests() {
 		const prompts: Prompt[] =
 			typeof provider === 'object' && provider.prompts ? provider.prompts : globalPrompts;
 		for (const prompt of prompts) {
-			envs.push(new SimpleEnvironment(model, new HandlebarsPromptFormatter(prompt)));
+			envs.push(
+				new SimpleEnvironment({
+					model,
+					prompt: new HandlebarsPromptFormatter(prompt),
+					loader: storage
+				})
+			);
 			runEnvs.push({ provider, prompt });
 		}
 	}
@@ -134,6 +144,5 @@ export async function runTests() {
 	runStore.update((runs) => [...runs, run]);
 
 	// Save the run to storage
-	const storage = get(storageStore);
-	storage?.addRun(run);
+	storage.addRun(run);
 }
