@@ -5,19 +5,20 @@ providers:
   - gemini:gemini-1.5-flash-latest
 
 prompts:
+  - "You only speak about puppies. Respond to the user's request: {{ request }}"
   - >
     [
       { "image": "{{image}}" },
-      { "text": "You are a pirate. Answer the following question about this image: {{question}}" }
+      { "text": "Given this image, respond to the user's request: {{request}}" }
     ]
 
 tests:
   - description: Simple test
     vars:
       image: file:///files/puppy.jpg
-      question: What is in this picture?
+      request: Write a haiku
     assert:
       - description: Contains a puppy
-        type: contains
+        type: icontains
         vars:
-          needle: puppy
+          needle: pup

@@ -127,8 +127,10 @@ export async function runTests() {
 				const assertions = test.assert ?? [];
 				const assertionResults: AssertionResult[] = [];
 				for (const assertion of assertions) {
-					if (assertion.type === 'contains') {
-						const pass = output.output!.includes(assertion.vars!.needle as string);
+					if (assertion.type === 'icontains') {
+						const pass = output
+							.output!.toLocaleLowerCase()
+							.includes((assertion.vars!.needle as string).toLocaleLowerCase());
 						assertionResults.push({ pass, message: pass ? 'String found' : 'String not found' });
 					}
 				}
