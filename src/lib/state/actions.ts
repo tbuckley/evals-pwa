@@ -98,7 +98,7 @@ export async function runTests() {
 
 	const run: Run = {
 		version: 1,
-		id: 'TODO',
+		id: crypto.randomUUID(),
 		timestamp: Date.now(),
 		envs: runEnvs,
 		tests: globalTests,
