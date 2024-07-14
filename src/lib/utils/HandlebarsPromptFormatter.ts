@@ -18,8 +18,7 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
 		try {
 			const json = JSON.parse(rendered);
 			return multiPartPromptSchema.parse(json);
-		} catch (err) {
-			console.log(err);
+		} catch {
 			return [{ text: rendered }];
 		}
 	}
