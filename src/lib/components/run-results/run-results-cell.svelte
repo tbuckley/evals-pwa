@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TestResult } from '$lib/types';
+	import type { TestResult, tokenUsageSchema } from '$lib/types';
 
 	export let testResult: TestResult;
 
@@ -24,5 +24,19 @@
 	<div>{testResult.error ?? testResult.output ?? '--no output--'}</div>
 	{#if typeof testResult.latencyMillis === 'number'}
 		<div class="mt-2 text-xs font-bold text-gray-500">{testResult.latencyMillis}ms</div>
+	{/if}
+	{#if typeof testResult.tokenUsage === 'object'}
+		<div class="mt-2 text-xs font-bold text-gray-500">
+			{#if testResult.tokenUsage.inputTokens && testResult.tokenUsage.outputTokens}
+				<span>
+					({testResult.tokenUsage.inputTokens}+{testResult.tokenUsage.outputTokens})
+				</span>
+			{/if}
+			{#if testResult.tokenUsage.costDollars}
+				<span>
+					${testResult.tokenUsage.costDollars.toFixed(4)}
+				</span>
+			{/if}
+		</div>
 	{/if}
 </div>

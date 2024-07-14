@@ -57,6 +57,15 @@ export const assertionResultSchema = z.object({
 });
 export type AssertionResult = z.infer<typeof assertionResultSchema>;
 
+export const tokenUsageSchema = z.object({
+	// Optional
+	inputTokens: z.number().int().optional(),
+	outputTokens: z.number().int().optional(),
+	totalTokens: z.number().int().optional(),
+	costDollars: z.number().optional()
+});
+export type TokenUsage = z.infer<typeof tokenUsageSchema>;
+
 export const testOutputSchema = z.object({
 	// Required
 	rawPrompt: z.unknown(),
@@ -65,6 +74,7 @@ export const testOutputSchema = z.object({
 	rawOutput: z.unknown().optional(),
 	output: z.string().optional(),
 	latencyMillis: z.number().optional(),
+	tokenUsage: tokenUsageSchema.optional(),
 
 	// Error
 	error: z.string().optional()
@@ -120,6 +130,7 @@ export type PopulatedMultiPartPrompt = Array<{ text: string } | { image: File }>
 export interface ModelProvider {
 	run(prompt: PopulatedMultiPartPrompt): Promise<unknown>;
 	extractOutput(response: unknown): string;
+	extractTokenUsage(response: unknown): TokenUsage;
 }
 
 export interface TestEnvironment {

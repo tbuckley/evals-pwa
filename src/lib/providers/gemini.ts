@@ -1,4 +1,4 @@
-import type { ModelProvider, PopulatedMultiPartPrompt } from '$lib/types';
+import type { ModelProvider, PopulatedMultiPartPrompt, TokenUsage } from '$lib/types';
 import { z } from 'zod';
 
 export const partSchema = z.union([
@@ -108,13 +108,33 @@ export class GeminiProvider implements ModelProvider {
 		return generateContentResponseSchema.parse(json);
 	}
 
-	extractOutput(output: unknown): string {
-		const json = generateContentResponseSchema.parse(output);
+	extractOutput(response: unknown): string {
+		const json = generateContentResponseSchema.parse(response);
 		const firstCandidatePart = json.candidates[0].content.parts[0];
 		if ('text' in firstCandidatePart) {
 			return firstCandidatePart.text;
 		}
 		throw new Error('Unexpected output format');
+	}
+
+	extractTokenUsage(response: unknown): TokenUsage {
+		const json = generateContentResponseSchema.parse(response);
+
+		const { promptTokenCount, candidatesTokenCount, totalTokenCount } = json.usageMetadata;
+
+		// As of July 13 2024
+		// Note that both costs differ if the prompt is >128k tokens
+		const inputCostPerMillion = promptTokenCount > 128_000 ? 7 : 3.5;
+		const outputCostPerMillion = promptTokenCount > 128_000 ? 21 : 10.5;
+
+		return {
+			inputTokens: promptTokenCount,
+			outputTokens: candidatesTokenCount,
+			totalTokens: totalTokenCount,
+			costDollars:
+				(promptTokenCount * inputCostPerMillion + candidatesTokenCount * outputCostPerMillion) /
+				1000000
+		};
 	}
 }
 

@@ -6,7 +6,8 @@ import type {
 	VarSet,
 	FileLoader,
 	MultiPartPrompt,
-	PopulatedMultiPartPrompt
+	PopulatedMultiPartPrompt,
+	TokenUsage
 } from '$lib/types';
 
 export interface Config {
@@ -47,8 +48,10 @@ export class SimpleEnvironment implements TestEnvironment {
 		const latencyMillis = Date.now() - start;
 
 		let output: string;
+		let tokenUsage: TokenUsage;
 		try {
 			output = this.model.extractOutput(resp);
+			tokenUsage = this.model.extractTokenUsage(resp);
 		} catch (e) {
 			if (e instanceof Error) {
 				return {
@@ -65,7 +68,8 @@ export class SimpleEnvironment implements TestEnvironment {
 			rawPrompt: prompt,
 			rawOutput: resp,
 			output: output,
-			latencyMillis
+			latencyMillis,
+			tokenUsage
 		};
 	}
 }
