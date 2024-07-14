@@ -20,7 +20,7 @@ export const providerSchema = z.union([
 	z.string(),
 	z.object({
 		id: z.string(),
-		config: z.any().optional(),
+		// config: z.any().optional(),
 		prompts: z.array(z.string()).optional()
 	})
 ]);
