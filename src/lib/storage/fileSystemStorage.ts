@@ -31,7 +31,9 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 	}
 	async getAllRuns(): Promise<Run[]> {
 		const dir = await this.dir.getDirectoryHandle('runs', { create: true });
-		return loadJsonFromDirectoryWithSchema(dir, runSchema);
+		const runs = await loadJsonFromDirectoryWithSchema(dir, runSchema);
+		runs.sort((a, b) => a.timestamp - b.timestamp);
+		return runs;
 	}
 	async loadFile(path: string): Promise<File> {
 		// Ensure that path starts with file:/// and remove it
