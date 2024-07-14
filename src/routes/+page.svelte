@@ -28,6 +28,11 @@
 	async function reload() {
 		await loadStateFromStorage();
 	}
+
+	const dateFormatter = new Intl.DateTimeFormat('en-US', {
+		dateStyle: 'medium',
+		timeStyle: 'short'
+	});
 </script>
 
 <article class="prose">
@@ -45,7 +50,7 @@
 	{/if}
 
 	{#each $runStore as run}
-		<h2>{run.timestamp}</h2>
+		<h2>{dateFormatter.format(new Date(run.timestamp))}</h2>
 		<RunResultsTable {run} />
 	{/each}
 </article>
