@@ -1,11 +1,19 @@
 <script lang="ts">
-	import type { Prompt, Provider, Run } from '$lib/types';
+	import type { Prompt, Provider, Run, TestCase, TestResult } from '$lib/types';
 	import { createRender, createTable, Render, Subscribe } from 'svelte-headless-table';
-	import { readable } from 'svelte/store';
+	import { readable, writable } from 'svelte/store';
 	import * as Table from '../ui/table/';
 	import RunResultsCell from './run-results-cell.svelte';
 
 	export let run: Run;
+
+	interface RunRow {
+		test: TestCase;
+		results: TestResult[];
+	}
+
+	const data = writable<RunRow[]>([]);
+	$: data.set(run.tests.map((test, index) => ({ test, results: run.results[index] })));
 
 	function getColumnName(env: { provider: Provider; prompt: Prompt }): string {
 		if (typeof env.provider === 'string') {
@@ -14,13 +22,12 @@
 		return env.provider.id + ' ' + env.prompt;
 	}
 
-	const table = createTable(readable(run.results));
+	const table = createTable(data);
 	const columns = table.createColumns([
 		table.column({
 			header: 'Test',
 			accessor: (row) => {
-				const index = run.results.indexOf(row);
-				return run.tests[index];
+				return row.test;
 			},
 			cell: ({ value }) => {
 				return value.description ?? 'Test';
@@ -29,9 +36,8 @@
 		...run.envs.map((env, index) =>
 			table.column({
 				header: getColumnName(env),
-				accessor: (row) => row[index],
+				accessor: (row) => row.results[index],
 				cell: ({ value }) => {
-					// return `${value.pass ? '[PASS]' : '[FAIL]'}: ${value.error ?? value.output ?? ''}`;
 					return createRender(RunResultsCell, { testResult: value });
 				}
 			})
