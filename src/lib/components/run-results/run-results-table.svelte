@@ -15,6 +15,25 @@
 	const data = writable<RunRow[]>([]);
 	$: data.set(run.tests.map((test, index) => ({ test, results: run.results[index] })));
 
+	let varNames = getVarNames(run.tests);
+	$: varNames = getVarNames(run.tests); // Why doesn't this work by itself?
+
+	function getVarNames(tests: TestCase[]): string[] {
+		const varNames: string[] = [];
+		const seen = new Set<string>();
+		for (const test of tests) {
+			if (!test.vars) {
+				continue;
+			}
+			for (const key of Object.keys(test.vars)) {
+				if (!seen.has(key)) {
+					seen.add(key);
+					varNames.push(key);
+				}
+			}
+		}
+		return varNames;
+	}
 	function getColumnName(env: { provider: Provider; prompt: Prompt }): string {
 		if (typeof env.provider === 'string') {
 			return env.provider + ' ' + env.prompt;
@@ -33,6 +52,17 @@
 				return value.description ?? 'Test';
 			}
 		}),
+		...varNames.map((varName) =>
+			table.column({
+				header: varName,
+				accessor: (row) => {
+					return row.test.vars?.[varName];
+				},
+				cell: ({ value }) => {
+					return value ?? '-N/A-';
+				}
+			})
+		),
 		...run.envs.map((env, index) =>
 			table.column({
 				header: getColumnName(env),
