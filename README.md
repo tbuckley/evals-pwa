@@ -4,7 +4,7 @@ A [Promptfoo](https://www.promptfoo.dev/docs/intro)-inspired evaluation framewor
 
 ## Getting Started
 
-Create a folder containing a `config.yaml` file (see [YAML spec](https://yaml.org/)). It is mostly follwing the Promptfoo format, with some minor differences.
+Create a folder containing a `config.yaml` file (see [YAML spec](https://yaml.org/)). It is mostly following the Promptfoo format, with some minor differences.
 
 _TODO: document the differences_
 
@@ -52,8 +52,9 @@ Currently supported model providers:
 Format:
 
 ```typescript
+type Prompt = string;
 interface Config {
-	prompts: string[];
+	prompts: Prompt[];
 	// ...
 }
 ```
@@ -97,6 +98,49 @@ Supported assertion types:
 - [ ] is-json
 - [ ] cost
 - [ ] latency
+
+### Runs
+
+When you run tests, they will be saved in a `runs/` folder within your selected folder.
+You don't need to know the format if you are just viewing it through the tool. But if you do want
+to process it for some reason, see below.
+
+```typescript
+interface Run {
+	version: 1;
+	id: string;
+	timestamp: number;
+	envs: {
+		provider: Provider;
+		prompt: Prompt;
+	}[];
+	tests: TestCase[];
+	results: TestResult[][]; // tests x envs
+}
+interface TestResult {
+	rawPrompt: unknown;
+	pass: boolean;
+	assertionResults: AssertionResult[];
+
+	// On success
+	rawOutput?: unknown;
+	output?: string;
+	latencyMillis?: number;
+	tokenUsage?: {
+		inputTokens?: number;
+		outputTokens?: number;
+		totalTokens?: number;
+		costDollars?: number;
+	};
+
+	// On error
+	error?: string;
+}
+interface AssertionResult {
+	pass: boolean;
+	message?: string;
+}
+```
 
 ## Building
 
