@@ -4,6 +4,7 @@
 	import { readable, writable } from 'svelte/store';
 	import * as Table from '../ui/table/';
 	import RunResultsCell from './run-results-cell.svelte';
+	import { addHiddenColumns } from 'svelte-headless-table/plugins';
 
 	export let run: Run;
 
@@ -41,9 +42,12 @@
 		return env.provider.id + ' ' + env.prompt;
 	}
 
-	const table = createTable(data);
+	const table = createTable(data, {
+		hideColumns: addHiddenColumns()
+	});
 	const columns = table.createColumns([
 		table.column({
+			id: 'testCase',
 			header: 'Test',
 			accessor: (row) => {
 				return row.test;
@@ -54,6 +58,7 @@
 		}),
 		...varNames.map((varName) =>
 			table.column({
+				id: varName,
 				header: varName,
 				accessor: (row) => {
 					return row.test.vars?.[varName];
@@ -65,6 +70,7 @@
 		),
 		...run.envs.map((env, index) =>
 			table.column({
+				id: `env-${index}`,
 				header: getColumnName(env),
 				accessor: (row) => row.results[index],
 				cell: ({ value }) => {
@@ -74,9 +80,16 @@
 		)
 	]);
 
-	const { headerRows, pageRows, tableAttrs, tableBodyAttrs } = table.createViewModel(columns);
+	const { headerRows, pageRows, tableAttrs, tableBodyAttrs, pluginStates } =
+		table.createViewModel(columns);
+	const { hiddenColumnIds } = pluginStates.hideColumns;
+
+	let showVarsColumns = true;
+	$: $hiddenColumnIds = showVarsColumns ? [] : varNames;
 </script>
 
+<input id="run-{run.id}-{run.timestamp}" type="checkbox" bind:checked={showVarsColumns} />
+<label for="run-{run.id}-{run.timestamp}">Show vars columns</label>
 <div class="rounded-md border">
 	<Table.Root {...$tableAttrs}>
 		<Table.Header>

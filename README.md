@@ -107,6 +107,11 @@ When you run tests, they will be saved in a `runs/` folder within your selected 
 You don't need to know the format if you are just viewing it through the tool. But if you do want
 to process it for some reason, see below.
 
+The run tables offer features such as:
+
+- Showing test variables (ordered by their presence in the tests)
+- Toggling whether variable values for each test are displayed
+
 ```typescript
 interface Run {
 	version: 1;
