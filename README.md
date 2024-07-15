@@ -2,6 +2,8 @@
 
 A [Promptfoo](https://www.promptfoo.dev/docs/intro)-inspired evaluation framework for AI prompts as a static PWA. There is no cloud backend, so all your data stays on your device (except for any prompts, which run directly against the Gemini/etc backends). It's free (ignoring your costs to run prompts), private, and requires no installation.
 
+Try it out at [evals-pwa.pages.dev](https://evals-pwa.pages.dev/), hosted on Cloudflare Pages.
+
 ## Getting Started
 
 Create a folder containing a `config.yaml` file (see [YAML spec](https://yaml.org/)). It is mostly following the Promptfoo format, with some minor differences.
