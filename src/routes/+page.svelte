@@ -48,9 +48,9 @@
 
 		<pre>{JSON.stringify($configStore, null, 2)}</pre>
 	{/if}
-
-	{#each $runStore as run}
-		<h2>{dateFormatter.format(new Date(run.timestamp))}</h2>
-		<RunResultsTable {run} />
-	{/each}
 </article>
+
+{#each $runStore as run}
+	<h2 class="mb-4 mt-8 text-xl font-bold">{dateFormatter.format(new Date(run.timestamp))}</h2>
+	<RunResultsTable {run} />
+{/each}
