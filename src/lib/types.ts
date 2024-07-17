@@ -149,3 +149,9 @@ export interface PromptFormatter {
 export interface FileLoader {
 	loadFile(path: string): Promise<File>;
 }
+
+export type MaybePromise<T> = T | Promise<T>;
+export interface AssertionProvider {
+	run(output: string): MaybePromise<AssertionResult>;
+	destroy?: () => void;
+}

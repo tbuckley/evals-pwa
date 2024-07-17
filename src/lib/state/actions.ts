@@ -15,6 +15,7 @@ import { envStore } from './env';
 import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
 import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
 import { ParallelTaskQueue } from '$lib/utils/ParallelTaskQueue';
+import { AssertionManager } from '$lib/assertions/AssertionManager';
 
 export async function loadStateFromStorage(): Promise<void> {
 	const storage = get(storageStore);
@@ -112,6 +113,11 @@ export async function runTests() {
 			const result: TestResult = { pass: false, assertionResults: [] };
 			testResults.push(result);
 
+			const mgr = new AssertionManager();
+			const assertions = (test.assert ?? []).map((a) => mgr.getAssertion(a));
+			// TODO destroy assertions after test is complete
+			const assertionResults: AssertionResult[] = [];
+
 			runner.enqueue(async () => {
 				// TODO should this be safeRun if it will catch all errors?
 				const output = await env.run(test.vars ?? {});
@@ -125,15 +131,10 @@ export async function runTests() {
 				}
 
 				// Run
-				const assertions = test.assert ?? [];
-				const assertionResults: AssertionResult[] = [];
 				for (const assertion of assertions) {
-					if (assertion.type === 'icontains') {
-						const pass = output
-							.output!.toLocaleLowerCase()
-							.includes((assertion.vars!.needle as string).toLocaleLowerCase());
-						assertionResults.push({ pass, message: pass ? 'String found' : 'String not found' });
-					}
+					console.log('Running', assertion);
+					const result = await assertion.run(output.output!);
+					assertionResults.push(result);
 				}
 				result.pass = assertionResults.every((r) => r.pass);
 				result.assertionResults = assertionResults;
