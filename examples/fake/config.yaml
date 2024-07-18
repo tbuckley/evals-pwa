@@ -1,0 +1,30 @@
+description: Fake test suite
+
+providers:
+  - reverser:whatever
+
+prompts:
+  - 'Hello, {{word}}!'
+  - 'The word: {{word}}'
+
+tests:
+  - description: World
+    vars:
+      word: world
+    assert:
+      - description: Contains the reversed word
+        type: icontains
+        vars:
+          needle: dlrow
+  - description: Friend
+    vars:
+      word: friend
+    assert:
+      - description: Is >1000 characters
+        type: javascript
+        vars:
+          code: |
+            function execute(output) {
+              const pass = output.split('').reverse().join('').includes('friend');
+              return {pass, message: pass ? undefined : `Output doesn't contain 'friend' in reverse: ${output}`};
+            }

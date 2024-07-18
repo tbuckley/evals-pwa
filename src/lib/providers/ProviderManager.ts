@@ -1,5 +1,6 @@
 import type { ModelProvider } from '$lib/types';
 import { GeminiProvider } from './gemini';
+import { ReverserProvider } from './reverser';
 
 export class ProviderManager {
 	constructor(public env: Record<string, string>) {}
@@ -18,6 +19,8 @@ export class ProviderManager {
 				throw new Error('GEMINI_API_KEY not found');
 			}
 			return new GeminiProvider(modelName, this.env.GEMINI_API_KEY);
+		} else if (providerId === 'reverser') {
+			return new ReverserProvider();
 		}
 		throw new Error(`Unknown provider: ${providerId}`);
 	}
