@@ -124,6 +124,8 @@ function execute(output) {
 
 The code is run inside a sandboxed iframe with `<script type="module">`. You can import libraries from a CDN, but you cannot reference other files in your directory.
 
+Note: Currently, every javascript assertion will be instantiated once per test case using it. In future we plan to only instantiate each unique script a single time and reuse it across test cases. Please avoid creating any global state that would affect following test cases.
+
 ### Runs
 
 When you run tests, they will be saved in a `runs/` folder within your selected folder.
