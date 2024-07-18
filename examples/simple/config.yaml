@@ -13,7 +13,7 @@ prompts:
     ]
 
 tests:
-  - description: Simple test
+  - description: Haiku
     vars:
       image: file:///files/puppy.jpg
       request: Write a haiku
@@ -22,3 +22,20 @@ tests:
         type: icontains
         vars:
           needle: pup
+  - description: Simple test
+    vars:
+      image: file:///files/puppy.jpg
+      request: What do you see?
+    assert:
+      - description: Contains a puppy
+        type: icontains
+        vars:
+          needle: pup
+      - description: Is >1000 characters
+        type: javascript
+        vars:
+          code: |
+            function execute(output) {
+              const pass = output.length > 1000;
+              return {pass, message: pass ? undefined : `Output is only ${output.length}, expected 1000`};
+            }

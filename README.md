@@ -92,7 +92,7 @@ interface Assertion {
 
 Supported assertion types:
 
-- [ ] javascript -- run javascript code on output
+- [x] javascript -- run javascript code on output. Vars: `{ code: string }`
 - [ ] equals
 - [ ] contains
 - [x] icontains -- case insensitive contains. Vars: `{ needle: string }`
