@@ -107,13 +107,13 @@ export async function runTests() {
 	};
 
 	// Run tests
+	const mgr = new AssertionManager();
 	for (const test of globalTests) {
 		const testResults: TestResult[] = [];
 		for (const env of envs) {
 			const result: TestResult = { pass: false, assertionResults: [] };
 			testResults.push(result);
 
-			const mgr = new AssertionManager();
 			const assertions = (test.assert ?? []).map((a) => mgr.getAssertion(a));
 			// TODO destroy assertions after test is complete
 			const assertionResults: AssertionResult[] = [];
@@ -144,6 +144,7 @@ export async function runTests() {
 	}
 
 	await runner.completed();
+	mgr.destroy();
 
 	runStore.update((runs) => [...runs, run]);
 
