@@ -45,9 +45,11 @@ type Provider = string | { id: string; prompts?: Prompt[] };
 
 Currently supported model providers:
 
-- [x] Gemini -- prefix with `gemini:`
+- [x] Gemini -- prefix with `gemini:`, eg `gemini:gemini-1.5-pro-latest`
 - [ ] OpenAI
 - [ ] Anthropic
+
+For testing, there is also a `reverser:` provider (suffix is ignored). It will concatenate any text messages with newlines and output the reversed value.
 
 ### Prompts
 
