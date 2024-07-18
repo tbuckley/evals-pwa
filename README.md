@@ -94,7 +94,7 @@ interface Assertion {
 
 Supported assertion types:
 
-- [x] javascript -- run javascript code on output. Vars: `{ code: string }`
+- [x] javascript -- run javascript code on output, see below. Vars: `{ code: string }`
 - [ ] equals
 - [ ] contains
 - [x] icontains -- case insensitive contains. Vars: `{ needle: string }`
@@ -102,6 +102,27 @@ Supported assertion types:
 - [ ] is-json
 - [ ] cost
 - [ ] latency
+
+### Javascript Assertions
+
+For `javascript` assertions, your code must provide a function `execute(output: string): Promise<AssertionResult>`.
+
+```typescript
+interface AssertionResult {
+	pass: boolean;
+	message?: string;
+}
+```
+
+For example:
+
+```js
+function execute(output) {
+	return { pass: output.length > 100; }
+}
+```
+
+The code is run inside a sandboxed iframe with `<script type="module">`. You can import libraries from a CDN, but you cannot reference other files in your directory.
 
 ### Runs
 

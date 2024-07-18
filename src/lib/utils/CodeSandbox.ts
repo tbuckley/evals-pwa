@@ -5,6 +5,7 @@
 // and return the result.
 export class CodeSandbox {
 	iframe: HTMLIFrameElement;
+	loaded: Promise<void>;
 
 	constructor(js: string) {
 		this.iframe = document.createElement('iframe');
@@ -14,9 +15,23 @@ export class CodeSandbox {
 		if (!doc) {
 			throw new Error('iframe contentDocument is null');
 		}
+
+		const nonce = crypto.randomUUID();
+
+		let resolve: () => void;
+		this.loaded = new Promise<void>((r) => (resolve = r));
+
+		const listener = (event: MessageEvent) => {
+			if (event.data.type === 'register' && event.data.nonce === nonce) {
+				resolve();
+				window.removeEventListener('message', listener);
+			}
+		};
+		window.addEventListener('message', listener);
+
 		doc.open();
 		doc.write(`
-            <script>
+            <script type="module">
                 ${js}
                 window.addEventListener('message', async (event) => {
                     const result = await execute(...event.data.args);
@@ -26,28 +41,26 @@ export class CodeSandbox {
                         result,
                     }, '*');
                 });
+				window.parent.postMessage({ type: 'register', nonce: '${nonce}' }, '*');
             </script>
         `);
 		doc.close();
 	}
 
-	execute(...args: unknown[]): Promise<unknown> {
+	async execute(...args: unknown[]): Promise<unknown> {
+		await this.loaded;
+
 		// Add a nonce so we can identify responses from this iframe
 		const nonce = crypto.randomUUID();
 
 		return new Promise((resolve) => {
-			window.addEventListener('message', (event) => {
+			const listener = (event: MessageEvent) => {
 				if (event.data.type === 'execute-output' && event.data.nonce === nonce) {
 					resolve(event.data.result);
-				} else {
-					console.log(
-						'Unexpected message:',
-						event.data,
-						event.data.type === 'execute-output',
-						event.data.nonce === nonce
-					);
+					window.removeEventListener('message', listener);
 				}
-			});
+			};
+			window.addEventListener('message', listener);
 			this.iframe.contentWindow?.postMessage({ args, nonce }, '*');
 		});
 	}
