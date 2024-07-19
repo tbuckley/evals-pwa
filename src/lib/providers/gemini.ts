@@ -123,20 +123,30 @@ export class GeminiProvider implements ModelProvider {
 
 		const { promptTokenCount, candidatesTokenCount, totalTokenCount } = json.usageMetadata;
 
-		// As of July 13 2024
-		// Note that both costs differ if the prompt is >128k tokens
-		const inputCostPerMillion = promptTokenCount > 128_000 ? 7 : 3.5;
-		const outputCostPerMillion = promptTokenCount > 128_000 ? 21 : 10.5;
-
 		return {
 			inputTokens: promptTokenCount,
 			outputTokens: candidatesTokenCount,
 			totalTokens: totalTokenCount,
-			costDollars:
-				(promptTokenCount * inputCostPerMillion + candidatesTokenCount * outputCostPerMillion) /
-				1000000
+			costDollars: getCost(this.model, promptTokenCount, candidatesTokenCount)
 		};
 	}
+}
+
+function getCost(model: string, prompt: number, completion: number): number | undefined {
+	// As of July 13 2024
+	// Note that both costs differ if the prompt is >128k tokens
+	let inputCostPerMillion: number, outputCostPerMillion: number;
+	if (model.startsWith('gemini-1.5-pro')) {
+		inputCostPerMillion = prompt > 128_000 ? 7 : 3.5;
+		outputCostPerMillion = prompt > 128_000 ? 21 : 10.5;
+	} else if (model.startsWith('gemini-1.5-flash')) {
+		inputCostPerMillion = prompt > 128_000 ? 0.7 : 0.35;
+		outputCostPerMillion = prompt > 128_000 ? 2.1 : 1.05;
+	} else {
+		return undefined;
+	}
+
+	return (prompt * inputCostPerMillion + completion * outputCostPerMillion) / 1000000;
 }
 
 async function multiPartPromptToGemini(prompt: PopulatedMultiPartPrompt): Promise<Part[]> {
