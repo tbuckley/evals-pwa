@@ -1,5 +1,6 @@
 import type { ModelProvider } from '$lib/types';
 import { GeminiProvider } from './gemini';
+import { OpenaiProvider } from './openai';
 import { ReverserProvider } from './reverser';
 
 export class ProviderManager {
@@ -19,6 +20,11 @@ export class ProviderManager {
 				throw new Error('GEMINI_API_KEY not found');
 			}
 			return new GeminiProvider(modelName, this.env.GEMINI_API_KEY);
+		} else if (providerId === 'openai') {
+			if (typeof this.env.OPENAI_API_KEY !== 'string') {
+				throw new Error('OPENAI_API_KEY not found');
+			}
+			return new OpenaiProvider(modelName, this.env.OPENAI_API_KEY);
 		} else if (providerId === 'reverser') {
 			return new ReverserProvider();
 		}

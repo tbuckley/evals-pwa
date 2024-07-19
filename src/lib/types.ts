@@ -125,7 +125,8 @@ export const multiPartPromptSchema = z.array(
 );
 export type MultiPartPrompt = z.infer<typeof multiPartPromptSchema>;
 
-export type PopulatedMultiPartPrompt = Array<{ text: string } | { image: File }>;
+export type PopulatedPrompt = { text: string } | { image: File };
+export type PopulatedMultiPartPrompt = Array<PopulatedPrompt>;
 
 export interface ModelProvider {
 	run(prompt: PopulatedMultiPartPrompt): Promise<unknown>;
