@@ -30,4 +30,19 @@ export class ProviderManager {
 		}
 		throw new Error(`Unknown provider: ${providerId}`);
 	}
+
+	getRequiredEnvVars(id: string): string[] {
+		const index = id.indexOf(':');
+		if (index === -1) {
+			throw new Error(`Invalid provider id: ${id}`);
+		}
+		const providerId = id.slice(0, index);
+
+		if (providerId === 'gemini') {
+			return ['GEMINI_API_KEY'];
+		} else if (providerId === 'openai') {
+			return ['OPENAI_API_KEY'];
+		}
+		throw new Error(`Unknown provider: ${providerId}`);
+	}
 }

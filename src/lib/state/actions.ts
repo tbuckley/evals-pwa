@@ -11,11 +11,11 @@ import type {
 	TestResult
 } from '$lib/types';
 import { ProviderManager } from '$lib/providers/ProviderManager';
-import { envStore } from './env';
 import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
 import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
 import { ParallelTaskQueue } from '$lib/utils/ParallelTaskQueue';
 import { AssertionManager } from '$lib/assertions/AssertionManager';
+import { parsedEnvStore } from './derived';
 
 export async function loadStateFromStorage(): Promise<void> {
 	const storage = get(storageStore);
@@ -28,24 +28,8 @@ export async function loadStateFromStorage(): Promise<void> {
 
 	configStore.set(config);
 	runStore.set(runs);
-}
 
-function parseEnvText(env: string): Record<string, string> {
-	// Given a series of key=value pairs separated by newlines, create an object
-	// Ignore lines starting with #
-	const lines = env.split('\n');
-	const res: Record<string, string> = {};
-	for (const line of lines) {
-		if (line.startsWith('#')) continue;
-		const index = line.indexOf('=');
-		if (index === -1) {
-			throw new Error(`Invalid line in env: ${line}`);
-		}
-		const key = line.slice(0, index);
-		const value = line.slice(index + 1);
-		res[key] = value;
-	}
-	return res;
+	// TODO check that necessary environment variables are set
 }
 
 export async function runTests() {
@@ -59,8 +43,8 @@ export async function runTests() {
 	}
 
 	// Create the provider manager
-	const env = get(envStore); // TODO validate that env variables for each provider is set
-	const providerManager = new ProviderManager(parseEnvText(env));
+	const env = get(parsedEnvStore); // TODO validate that env variables for each provider is set
+	const providerManager = new ProviderManager(env);
 
 	// Create the test runner
 	const runner = new ParallelTaskQueue(5);
