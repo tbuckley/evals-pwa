@@ -43,14 +43,11 @@ export const requiredEnvStore = derived(configStore, ($config) => {
 	return Array.from(requiredEnvVars).sort();
 });
 
-export const invalidEnvStore = derived(
-	[requiredEnvStore, parsedEnvStore],
-	([$requiredEnv, $env]) => {
-		for (const key of $requiredEnv) {
-			if (!$env[key]) {
-				return true;
-			}
+export const validEnvStore = derived([requiredEnvStore, parsedEnvStore], ([$requiredEnv, $env]) => {
+	for (const key of $requiredEnv) {
+		if (!$env[key]) {
+			return false;
 		}
-		return false;
 	}
-);
+	return true;
+});

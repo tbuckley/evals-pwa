@@ -15,3 +15,7 @@
 		begin.
 	</div>
 {/each}
+
+{#if entries.length > 0}
+	<div class="mb-2 text-sm text-gray-500">Keys will be saved in your browser's local storage.</div>
+{/if}
