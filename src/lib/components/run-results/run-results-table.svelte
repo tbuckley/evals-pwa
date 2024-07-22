@@ -86,7 +86,16 @@
 
 	let showVarsColumns = true;
 	$: $hiddenColumnIds = showVarsColumns ? [] : varNames;
+
+	// Add a computed property to sum the total cost of all tests in the run
+	$: totalCost = run.results.flat().reduce((sum, result) => {
+		return sum + (result.tokenUsage?.costDollars ?? 0);
+	}, 0);
 </script>
+
+<div class="text-right mb-2">
+	Total Cost: ${totalCost.toFixed(4)}
+</div>
 
 <input id="run-{run.id}-{run.timestamp}" type="checkbox" bind:checked={showVarsColumns} />
 <label for="run-{run.id}-{run.timestamp}">Show vars columns</label>
