@@ -1,5 +1,5 @@
 import { derived } from 'svelte/store';
-import { configStore } from './stores';
+import { configStore, runStore, selectedRunIdStore } from './stores';
 import { ProviderManager } from '$lib/providers/ProviderManager';
 import { envStore } from './env';
 
@@ -50,4 +50,11 @@ export const validEnvStore = derived([requiredEnvStore, parsedEnvStore], ([$requ
 		}
 	}
 	return true;
+});
+
+export const selectedRunStore = derived([runStore, selectedRunIdStore], ([$runs, $selectedId]) => {
+	return $selectedId ? $runs[$selectedId] : null;
+});
+export const runListStore = derived(runStore, ($runs) => {
+	return Object.values($runs).sort((a, b) => b.timestamp - a.timestamp);
 });

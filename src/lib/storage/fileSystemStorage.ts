@@ -33,6 +33,17 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 		const dir = await this.dir.getDirectoryHandle('runs', { create: true });
 		const runs = await loadJsonFromDirectoryWithSchema(dir, runSchema);
 		runs.sort((a, b) => a.timestamp - b.timestamp);
+		// If a run has the wrong number of rows/columns, throw an error
+		for (const run of runs) {
+			if (run.tests.length !== run.results.length) {
+				throw new Error(`Run ${run.id} has the wrong number of rows`);
+			}
+			for (const [i, row] of run.results.entries()) {
+				if (row.length !== run.envs.length) {
+					throw new Error(`Run ${run.id} has the wrong number of columns in row ${i}`);
+				}
+			}
+		}
 		return runs;
 	}
 	async loadFile(path: string): Promise<File> {

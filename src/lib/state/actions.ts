@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { configStore, runStore, storageStore } from './stores';
+import { configStore, runStore, selectedRunIdStore, storageStore } from './stores';
 import type {
 	AssertionResult,
 	ModelProvider,
@@ -27,7 +27,8 @@ export async function loadStateFromStorage(): Promise<void> {
 	if (get(storageStore) !== storage) return;
 
 	configStore.set(config);
-	runStore.set(runs);
+	runStore.set(Object.fromEntries(runs.map((run) => [run.id, run])));
+	selectedRunIdStore.set(runs.length > 0 ? runs[runs.length - 1].id : null);
 
 	// TODO check that necessary environment variables are set
 }
@@ -130,7 +131,11 @@ export async function runTests() {
 	await runner.completed();
 	mgr.destroy();
 
-	runStore.update((runs) => [...runs, run]);
+	runStore.update((runs) => ({
+		...runs,
+		[run.id]: run
+	}));
+	selectedRunIdStore.set(run.id);
 
 	// Save the run to storage
 	storage.addRun(run);

@@ -1,8 +1,10 @@
 <script lang="ts">
+	import Combobox from '$lib/components/Combobox.svelte';
 	import RunResultsTable from '$lib/components/run-results/run-results-table.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { loadStateFromStorage, runTests } from '$lib/state/actions';
-	import { configStore, runStore, storageStore } from '$lib/state/stores';
+	import { runListStore, selectedRunStore } from '$lib/state/derived';
+	import { configStore, runStore, selectedRunIdStore, storageStore } from '$lib/state/stores';
 	import { FileSystemStorage } from '$lib/storage/fileSystemStorage';
 
 	async function chooseFolder() {
@@ -48,9 +50,23 @@
 	{/if}
 </article>
 
-<div>
-	{#each $runStore as run}
-		<h2 class="mb-4 mt-8 text-xl font-bold">{dateFormatter.format(new Date(run.timestamp))}</h2>
-		<RunResultsTable {run} />
-	{/each}
-</div>
+{#if $selectedRunStore !== null}
+	<div>
+		<Combobox
+			items={$runListStore.map((run) => ({
+				value: run.id,
+				label: dateFormatter.format(new Date(run.timestamp))
+			}))}
+			value={$selectedRunIdStore || ''}
+			on:select={(e) => selectedRunIdStore.set(e.detail)}
+		></Combobox>
+		<h2 class="mb-4 mt-8 text-xl font-bold">
+			{dateFormatter.format(new Date($selectedRunStore.timestamp))}
+		</h2>
+
+		<!-- Use a keyed block so we don't try to reuse a table that was created with a different layout -->
+		{#key $selectedRunStore.id}
+			<RunResultsTable run={$selectedRunStore} />
+		{/key}
+	</div>
+{/if}
