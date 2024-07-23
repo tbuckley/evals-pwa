@@ -5,6 +5,8 @@
 	import * as Table from '../ui/table/';
 	import RunResultsCell from './run-results-cell.svelte';
 	import { addHiddenColumns } from 'svelte-headless-table/plugins';
+	import Label from '../ui/label/label.svelte';
+	import Checkbox from '../ui/checkbox/checkbox.svelte';
 
 	export let run: Run;
 
@@ -88,8 +90,10 @@
 	$: $hiddenColumnIds = showVarsColumns ? [] : varNames;
 </script>
 
-<input id="run-{run.id}-{run.timestamp}" type="checkbox" bind:checked={showVarsColumns} />
-<label for="run-{run.id}-{run.timestamp}">Show vars columns</label>
+<div class="mb-2 flex items-center gap-1.5">
+	<Checkbox id="run-{run.id}-{run.timestamp}" bind:checked={showVarsColumns} />
+	<Label for="run-{run.id}-{run.timestamp}">Show vars columns</Label>
+</div>
 <div class="rounded-md border">
 	<Table.Root {...$tableAttrs}>
 		<Table.Header>
