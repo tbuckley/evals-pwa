@@ -12,6 +12,10 @@ import * as yaml from 'yaml';
 export class FileSystemStorage implements StorageProvider, FileLoader {
 	constructor(public dir: FileSystemDirectoryHandle) {}
 
+	getName(): string {
+		return this.dir.name;
+	}
+
 	async getConfig(): Promise<Config> {
 		console.log('getting config...');
 		for await (const entry of this.dir.values()) {

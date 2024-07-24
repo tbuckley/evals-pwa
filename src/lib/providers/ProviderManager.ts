@@ -42,6 +42,8 @@ export class ProviderManager {
 			return ['GEMINI_API_KEY'];
 		} else if (providerId === 'openai') {
 			return ['OPENAI_API_KEY'];
+		} else if (providerId === 'reverser') {
+			return [];
 		}
 		throw new Error(`Unknown provider: ${providerId}`);
 	}

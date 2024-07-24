@@ -2,32 +2,9 @@
 	import Combobox from '$lib/components/Combobox.svelte';
 	import RunResultsTable from '$lib/components/run-results/run-results-table.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import { loadStateFromStorage, runTests } from '$lib/state/actions';
+	import { chooseFolder, runTests } from '$lib/state/actions';
 	import { runListStore, selectedRunStore } from '$lib/state/derived';
-	import { configStore, runStore, selectedRunIdStore, storageStore } from '$lib/state/stores';
-	import { FileSystemStorage } from '$lib/storage/fileSystemStorage';
-
-	async function chooseFolder() {
-		let dir: FileSystemDirectoryHandle;
-		try {
-			dir = await window.showDirectoryPicker({
-				mode: 'readwrite',
-				id: 'evals-pwa', // Remember the last used location
-				startIn: 'documents' // Default to the documents folder
-			});
-		} catch (err) {
-			console.error(err);
-			return;
-		}
-
-		const storage = new FileSystemStorage(dir);
-		storageStore.set(storage);
-		await loadStateFromStorage();
-	}
-
-	async function reload() {
-		await loadStateFromStorage();
-	}
+	import { configStore, selectedRunIdStore } from '$lib/state/stores';
 
 	const dateFormatter = new Intl.DateTimeFormat('en-US', {
 		dateStyle: 'medium',
@@ -43,9 +20,8 @@
 			OpenAI or Google), no data is sent to every server. Your configuration is stored on your file
 			system, and API keys are saved to your browser's local storage.
 		</p>
-		<Button on:click={chooseFolder}>Choose a folder</Button> to get started
+		<a href="##" on:click|preventDefault={chooseFolder}>Choose a folder</a> to get started
 	{:else}
-		<Button on:click={chooseFolder}>Change folder</Button>
 		<Button on:click={runTests}>Run tests</Button>
 	{/if}
 </article>

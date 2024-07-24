@@ -45,6 +45,7 @@
 		"@types/wicg-file-system-access": "^2023.10.5",
 		"bits-ui": "^0.21.12",
 		"clsx": "^2.1.1",
+		"cmdk-sv": "^0.0.18",
 		"handlebars": "^4.7.8",
 		"lucide-svelte": "^0.408.0",
 		"svelte-headless-table": "^0.18.2",

@@ -16,6 +16,25 @@ import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter'
 import { ParallelTaskQueue } from '$lib/utils/ParallelTaskQueue';
 import { AssertionManager } from '$lib/assertions/AssertionManager';
 import { parsedEnvStore } from './derived';
+import { FileSystemStorage } from '$lib/storage/fileSystemStorage';
+
+export async function chooseFolder() {
+	let dir: FileSystemDirectoryHandle;
+	try {
+		dir = await window.showDirectoryPicker({
+			mode: 'readwrite',
+			id: 'evals-pwa', // Remember the last used location
+			startIn: 'documents' // Default to the documents folder
+		});
+	} catch (err) {
+		console.error(err);
+		return;
+	}
+
+	const storage = new FileSystemStorage(dir);
+	storageStore.set(storage);
+	await loadStateFromStorage();
+}
 
 export async function loadStateFromStorage(): Promise<void> {
 	const storage = get(storageStore);

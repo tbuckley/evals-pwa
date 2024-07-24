@@ -108,6 +108,7 @@ export type Run = z.infer<typeof runSchema>;
 // App interfaces
 
 export interface StorageProvider {
+	getName(): string;
 	getConfig(): Promise<Config>;
 	getAllRuns(): Promise<Run[]>;
 	addRun(run: Run): Promise<void>;

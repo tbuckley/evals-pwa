@@ -13,6 +13,7 @@
 	import DocumentationIcon from 'lucide-svelte/icons/book-open';
 	import SettingsDialog from '$lib/components/SettingsDialog.svelte';
 	import { validEnvStore } from '$lib/state/derived';
+	import FolderPicker from '$lib/components/FolderPicker.svelte';
 
 	const links = [
 		{ name: 'Dashboard', href: '/', icon: Home },
@@ -83,6 +84,7 @@
 				</Sheet.Content>
 			</Sheet.Root>
 			<div class="w-full flex-1">
+				<FolderPicker></FolderPicker>
 				<!-- Search box -->
 				<!-- <form>
 					<div class="relative">
