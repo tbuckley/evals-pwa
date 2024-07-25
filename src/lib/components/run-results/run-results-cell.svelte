@@ -21,7 +21,7 @@
 			FAIL {firstFailedAssertionMessage ? ' - ' + firstFailedAssertionMessage : ''}
 		</div>
 	{/if}
-	<div>{testResult.error ?? testResult.output ?? '--no output--'}</div>
+	<div class="whitespace-pre-wrap">{testResult.error ?? testResult.output ?? '--no output--'}</div>
 	{#if typeof testResult.latencyMillis === 'number'}
 		<div class="mt-2 text-xs font-bold text-gray-500">{testResult.latencyMillis}ms</div>
 	{/if}
