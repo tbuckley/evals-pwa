@@ -14,6 +14,8 @@
 	import SettingsDialog from '$lib/components/SettingsDialog.svelte';
 	import { validEnvStore } from '$lib/state/derived';
 	import FolderPicker from '$lib/components/FolderPicker.svelte';
+	import { cn } from '$lib/utils/shadcn';
+	import { page } from '$app/stores';
 
 	const links = [
 		{ name: 'Dashboard', href: '/', icon: Home },
@@ -42,7 +44,10 @@
 					{#each links as { name, href, icon }, i}
 						<a
 							{href}
-							class="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+							class={cn(
+								'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
+								href === $page.url.pathname ? 'bg-slate-200' : ''
+							)}
 						>
 							{#if icon}
 								<svelte:component this={icon} class="h-4 w-4" />
