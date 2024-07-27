@@ -42,7 +42,8 @@ export const configSchema = z.object({
 
 	providers: z.array(providerSchema).optional(),
 	prompts: z.array(promptSchema).optional(),
-	tests: z.array(testCaseSchema).optional()
+	tests: z.array(testCaseSchema).optional(),
+	defaultTest: testCaseSchema.optional()
 });
 export type Config = z.infer<typeof configSchema>;
 

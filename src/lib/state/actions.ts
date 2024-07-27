@@ -71,8 +71,19 @@ export async function runTests() {
 
 	// Get global prompts + tests
 	const globalPrompts: Prompt[] = config.prompts ?? [];
-	const globalTests: TestCase[] = config.tests ?? [];
 	const globalProviders: Provider[] = config.providers ?? [];
+	let globalTests: TestCase[] = config.tests ?? [];
+	if (config.defaultTest) {
+		globalTests = globalTests.map((test) => ({
+			...config.defaultTest,
+			...test,
+			vars: {
+				...(config.defaultTest?.vars ?? {}),
+				...(test.vars ?? {})
+			},
+			assert: [...(config.defaultTest?.assert ?? []), ...(test.assert ?? [])]
+		}));
+	}
 
 	// Create environments
 	const envs: TestEnvironment[] = [];

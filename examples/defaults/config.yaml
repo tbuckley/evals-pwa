@@ -1,0 +1,23 @@
+description: foo
+
+providers:
+  - gemini:gemini-1.5-flash-latest
+  - openai:gpt-4o-mini
+
+prompts:
+  - 'Write a {{ type }} about {{ topic }}'
+
+defaultTest:
+  vars:
+    topic: puppies
+  assert:
+    - description: Contains a puppy
+      type: icontains
+      vars:
+        needle: pup
+
+tests:
+  - vars:
+      type: haiku
+  - vars:
+      type: couplet
