@@ -11,13 +11,15 @@ defaultTest:
   vars:
     topic: puppies
   assert:
-    - description: Contains a puppy
+    - description: Contains term
       type: icontains
       vars:
-        needle: pup
+        needle: '{{term}}'
 
 tests:
   - vars:
       type: haiku
+      term: paw
   - vars:
       type: couplet
+      term: fur

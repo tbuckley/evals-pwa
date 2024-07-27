@@ -104,6 +104,22 @@ Supported assertion types:
 - [ ] cost
 - [ ] latency
 
+Any assertion vars that are strings will be treated as Handlebars templates, and the test case's vars will be populated.
+This makes it easy to define assertions inside defaultTest, using variables to tweak the assertion for each test case.
+
+```yaml
+# ...
+defaultTest:
+  asserts:
+	- type: icontains
+	  vars:
+	    needle: "{{translation}}"
+tests:
+  - vars:
+      language: Spanish
+	  translation: hola
+```
+
 ### Javascript Assertions
 
 For `javascript` assertions, your code must provide a function `execute(output: string): Promise<AssertionResult>`.

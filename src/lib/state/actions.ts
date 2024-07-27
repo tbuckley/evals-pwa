@@ -129,7 +129,7 @@ export async function runTests() {
 			const result: TestResult = { pass: false, assertionResults: [] };
 			testResults.push(result);
 
-			const assertions = (test.assert ?? []).map((a) => mgr.getAssertion(a));
+			const assertions = (test.assert ?? []).map((a) => mgr.getAssertion(a, test.vars ?? {}));
 			// TODO destroy assertions after test is complete
 			const assertionResults: AssertionResult[] = [];
 
