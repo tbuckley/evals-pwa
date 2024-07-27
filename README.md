@@ -78,6 +78,7 @@ Format:
 ```typescript
 interface Config {
 	tests: TestCase[];
+	defaultTest?: Partial<TestCase>;
 	// ...
 }
 interface TestCase {
@@ -135,7 +136,7 @@ to process it for some reason, see below.
 The run tables offer features such as:
 
 - Showing test variables (ordered by their presence in the tests)
-- Toggling whether variable values for each test are displayed
+- Toggling whether variable values for each test are displayed (remembered across sessions)
 
 ```typescript
 interface Run {
