@@ -7,6 +7,7 @@
 	import { addHiddenColumns } from 'svelte-headless-table/plugins';
 	import Label from '../ui/label/label.svelte';
 	import Checkbox from '../ui/checkbox/checkbox.svelte';
+	import { showVarsColumnsStore } from '$lib/state/settings';
 
 	export let run: Run;
 
@@ -86,12 +87,11 @@
 		table.createViewModel(columns);
 	const { hiddenColumnIds } = pluginStates.hideColumns;
 
-	let showVarsColumns = true;
-	$: $hiddenColumnIds = showVarsColumns ? [] : varNames;
+	$: $hiddenColumnIds = $showVarsColumnsStore ? [] : varNames;
 </script>
 
 <div class="mb-2 flex items-center gap-1.5">
-	<Checkbox id="run-{run.id}-{run.timestamp}" bind:checked={showVarsColumns} />
+	<Checkbox id="run-{run.id}-{run.timestamp}" bind:checked={$showVarsColumnsStore} />
 	<Label for="run-{run.id}-{run.timestamp}">Show vars columns</Label>
 </div>
 <div class="rounded-md border">
