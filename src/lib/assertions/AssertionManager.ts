@@ -1,4 +1,5 @@
 import type { Assertion, AssertionProvider, TestCase } from '$lib/types';
+import { convertAllStringsToHandlebarSafe } from '$lib/utils/handlebars';
 import { createIContainsAssertion } from './icontains';
 import { createJavascriptAssertion } from './javascript';
 import Handlebars from 'handlebars';
@@ -24,10 +25,11 @@ function createAssertion(
 	testVars: TestCase['vars']
 ): AssertionProvider {
 	const populatedVars = { ...vars };
+	const safeVars = convertAllStringsToHandlebarSafe(testVars ?? {});
 	for (const key in populatedVars) {
 		if (typeof populatedVars[key] === 'string') {
 			const template = Handlebars.compile(populatedVars[key]);
-			populatedVars[key] = template(testVars);
+			populatedVars[key] = template(safeVars);
 		}
 	}
 

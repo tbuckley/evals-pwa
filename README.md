@@ -65,7 +65,7 @@ interface Config {
 }
 ```
 
-Unlike Promptfoo, these use [Handlebars](https://handlebarsjs.com/) format instead.
+Unlike Promptfoo, these use [Handlebars](https://handlebarsjs.com/) format instead. Test case variables are considered "safe" strings and will not be escaped.
 
 If the format matches the following, the request will combine the text and images in the order given. Otherwise it will be a string.
 
