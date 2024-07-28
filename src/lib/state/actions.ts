@@ -121,6 +121,12 @@ export async function runTests() {
 		results: []
 	};
 
+	// Request permission to show notifications
+	if (Notification.permission !== 'granted') {
+		// Note: not awaited so it does not delay results
+		Notification.requestPermission();
+	}
+
 	// Run tests
 	const mgr = new AssertionManager();
 	for (const test of globalTests) {
@@ -169,4 +175,8 @@ export async function runTests() {
 
 	// Save the run to storage
 	storage.addRun(run);
+
+	if (document.visibilityState !== 'visible' && Notification.permission === 'granted') {
+		new Notification('Eval complete', { body: 'See your results in Evals PWA.' });
+	}
 }

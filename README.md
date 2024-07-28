@@ -8,7 +8,9 @@ Try it out at [evals-pwa.pages.dev](https://evals-pwa.pages.dev/), hosted on Clo
 
 Create a folder containing a `config.yaml` file (see [YAML spec](https://yaml.org/)). It is mostly following the Promptfoo format, with some minor differences. _TODO: document the differences_
 
-You will then be prompted (ha) to add API keys (or other required env variables) before continuing. These will be saved in your browser's local storage across sessions.
+Once you select it, you will then be prompted (ha) to add API keys (or other required env variables) before continuing. These will be saved in your browser's local storage across sessions. You can edit them from the settings icon in the top-right.
+
+If you run tests and they are taking a while, feel free to navigate elsewhere -- a notification will be shown when your tests are complete.
 
 ```yaml
 description: A description
