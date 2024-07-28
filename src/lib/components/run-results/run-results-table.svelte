@@ -4,10 +4,11 @@
 	import { readable, writable } from 'svelte/store';
 	import * as Table from '../ui/table/';
 	import RunResultsCell from './run-results-cell.svelte';
-	import { addHiddenColumns } from 'svelte-headless-table/plugins';
+	import { addHiddenColumns, addResizedColumns } from 'svelte-headless-table/plugins';
 	import Label from '../ui/label/label.svelte';
 	import Checkbox from '../ui/checkbox/checkbox.svelte';
 	import { showVarsColumnsStore } from '$lib/state/settings';
+	import GripVertical from 'lucide-svelte/icons/grip-vertical';
 
 	export let run: Run;
 
@@ -46,6 +47,7 @@
 	}
 
 	const table = createTable(data, {
+		resize: addResizedColumns(),
 		hideColumns: addHiddenColumns()
 	});
 	const columns = table.createColumns([
@@ -78,6 +80,11 @@
 				accessor: (row) => row.results[index],
 				cell: ({ value }) => {
 					return createRender(RunResultsCell, { testResult: value });
+				},
+				plugins: {
+					resize: {
+						initialWidth: 200
+					}
 				}
 			})
 		)
@@ -88,6 +95,12 @@
 	const { hiddenColumnIds } = pluginStates.hideColumns;
 
 	$: $hiddenColumnIds = $showVarsColumnsStore ? [] : varNames;
+	const { columnWidths } = pluginStates.resize;
+
+	let forceResizeUpdateValue = 0;
+	columnWidths.subscribe(($widths) => {
+		forceResizeUpdateValue = Object.values($widths).reduce((acc, val) => acc + val, 0);
+	});
 </script>
 
 <div class="mb-2 flex items-center gap-1.5">
@@ -95,16 +108,33 @@
 	<Label for="run-{run.id}-{run.timestamp}">Show vars columns</Label>
 </div>
 <div class="rounded-md border">
-	<Table.Root {...$tableAttrs}>
+	<Table.Root {...$tableAttrs} class="mr-[150px] w-auto">
 		<Table.Header>
-			{#each $headerRows as headerRow}
-				<Subscribe rowAttrs={headerRow.attrs()}>
-					<Table.Row>
+			{#each $headerRows as headerRow (headerRow.id)}
+				<Subscribe rowAttrs={headerRow.attrs()} let:rowAttrs>
+					<Table.Row {...rowAttrs}>
 						{#each headerRow.cells as cell (cell.id)}
-							<Subscribe attrs={cell.attrs()} let:attrs props={cell.props()}>
-								<Table.Head {...attrs}>
+							<!-- See https://github.com/bryanmylee/svelte-headless-table/issues/139 -->
+							{@const headerCellAttrs = cell.attrs()}
+							{@const headerCellProps = cell.props()}
+							<Subscribe attrs={headerCellAttrs} let:attrs props={headerCellProps} let:props>
+								<!-- Classes copied from Table.Head -->
+								<th
+									class="relative h-10 px-2 pr-[16px] text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]"
+									{...attrs}
+									use:props.resize
+								>
 									<Render of={cell.render()} />
-								</Table.Head>
+
+									{#if !props.resize.disabled}
+										<div
+											class="absolute right-0 top-1 z-10 w-4 cursor-col-resize"
+											use:props.resize.drag
+										>
+											<GripVertical class="h-4 w-4"></GripVertical>
+										</div>
+									{/if}
+								</th>
 							</Subscribe>
 						{/each}
 					</Table.Row>
@@ -128,3 +158,6 @@
 		</Table.Body>
 	</Table.Root>
 </div>
+
+<!-- Necessary to force the column resizing to take effect -->
+<div id="force-{forceResizeUpdateValue}"></div>
