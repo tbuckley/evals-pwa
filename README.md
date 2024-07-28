@@ -155,6 +155,7 @@ The run tables offer features such as:
 
 - Showing test variables (ordered by their presence in the tests)
 - Toggling whether variable values for each test are displayed (remembered across sessions)
+- Resizing columns
 
 ```typescript
 interface Run {
