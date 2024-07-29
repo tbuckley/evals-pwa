@@ -98,7 +98,7 @@ interface Assertion {
 Supported assertion types:
 
 - [x] javascript -- run javascript code on output, see below. Vars: `{ code: string }`
-- [ ] equals
+- [x] equals -- compare against a string, optionally ignoring case. Vars: `{ value: string, ignoreCase?: boolean }`
 - [ ] contains
 - [x] icontains -- case insensitive contains. Vars: `{ needle: string }`
 - [x] regex -- test against a regex pattern, with optional flags (e.g. "i" for case-insensitive, see [docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions#advanced_searching_with_flags)). Vars: `{ pattern: string, flags?: string }`

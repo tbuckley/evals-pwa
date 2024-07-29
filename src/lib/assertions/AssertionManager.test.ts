@@ -23,4 +23,25 @@ describe('AssertionManager', () => {
 		const res = await assertion.run("Hello, all the world's people!");
 		expect(res.pass).toBe(true);
 	});
+	test('supports equals with a string', async function () {
+		const mgr = new AssertionManager();
+		const assertion = mgr.getAssertion({ type: 'equals', vars: { value: 'Hello, world!' } }, {});
+		const res1 = await assertion.run('Hello, world!');
+		expect(res1.pass).toBe(true);
+
+		const res2 = await assertion.run('Hello!');
+		expect(res2.pass).toBe(false);
+	});
+	test('supports case-insensitive equals with a string', async function () {
+		const mgr = new AssertionManager();
+		const assertion = mgr.getAssertion(
+			{ type: 'equals', vars: { value: 'Hello, world!', ignoreCase: true } },
+			{}
+		);
+		const res1 = await assertion.run('hello, world!');
+		expect(res1.pass).toBe(true);
+
+		const res2 = await assertion.run('hello!');
+		expect(res2.pass).toBe(false);
+	});
 });

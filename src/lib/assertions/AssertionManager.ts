@@ -4,6 +4,7 @@ import { createIContainsAssertion } from './icontains';
 import { createJavascriptAssertion } from './javascript';
 import Handlebars from 'handlebars';
 import { createRegexAssertion } from './regex';
+import { createEqualsAssertion } from './equals';
 
 export class AssertionManager {
 	assertions: AssertionProvider[] = [];
@@ -35,6 +36,8 @@ function createAssertion(
 	}
 
 	switch (type) {
+		case 'equals':
+			return createEqualsAssertion(populatedVars);
 		case 'icontains':
 			return createIContainsAssertion(populatedVars);
 		case 'regex':

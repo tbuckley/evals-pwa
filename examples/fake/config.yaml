@@ -20,6 +20,10 @@ tests:
         type: regex
         vars:
           pattern: d.*w
+      - description: Equals a value
+        type: equals
+        vars:
+          value: '!dlrow ,olleH'
   - description: Friend
     vars:
       word: friend
