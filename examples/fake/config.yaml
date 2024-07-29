@@ -16,6 +16,10 @@ tests:
         type: icontains
         vars:
           needle: dlrow
+      - description: Matches a regex
+        type: regex
+        vars:
+          pattern: d.*w
   - description: Friend
     vars:
       word: friend

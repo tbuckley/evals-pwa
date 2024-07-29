@@ -3,6 +3,7 @@ import { convertAllStringsToHandlebarSafe } from '$lib/utils/handlebars';
 import { createIContainsAssertion } from './icontains';
 import { createJavascriptAssertion } from './javascript';
 import Handlebars from 'handlebars';
+import { createRegexAssertion } from './regex';
 
 export class AssertionManager {
 	assertions: AssertionProvider[] = [];
@@ -36,6 +37,8 @@ function createAssertion(
 	switch (type) {
 		case 'icontains':
 			return createIContainsAssertion(populatedVars);
+		case 'regex':
+			return createRegexAssertion(populatedVars);
 		case 'javascript':
 			return createJavascriptAssertion(populatedVars);
 		default:

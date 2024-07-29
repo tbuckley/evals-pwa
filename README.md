@@ -101,7 +101,7 @@ Supported assertion types:
 - [ ] equals
 - [ ] contains
 - [x] icontains -- case insensitive contains. Vars: `{ needle: string }`
-- [ ] regex
+- [x] regex -- test against a regex pattern, with optional flags (e.g. "i" for case-insensitive, see [docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions#advanced_searching_with_flags)). Vars: `{ pattern: string, flags?: string }`
 - [ ] is-json
 - [ ] cost
 - [ ] latency
