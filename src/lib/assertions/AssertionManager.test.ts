@@ -5,7 +5,7 @@ describe('AssertionManager', () => {
 	test('substitutes variables', async function () {
 		const mgr = new AssertionManager();
 		const assertion = mgr.getAssertion(
-			{ type: 'icontains', vars: { needle: '{{ target }}' } },
+			{ type: 'contains', vars: { needle: '{{ target }}' } },
 			{ target: 'world' }
 		);
 		const res = await assertion.run('Hello, world!');
@@ -17,8 +17,18 @@ describe('AssertionManager', () => {
 	test('does not escape apostrophes', async function () {
 		const mgr = new AssertionManager();
 		const assertion = mgr.getAssertion(
-			{ type: 'icontains', vars: { needle: '{{ target }}' } },
+			{ type: 'contains', vars: { needle: '{{ target }}' } },
 			{ target: "all the world's people" }
+		);
+		const res = await assertion.run("Hello, all the world's people!");
+		expect(res.pass).toBe(true);
+	});
+
+	test('supports case-insensitive contains', async function () {
+		const mgr = new AssertionManager();
+		const assertion = mgr.getAssertion(
+			{ type: 'contains', vars: { needle: 'THE WORLD', ignoreCase: true } },
+			{}
 		);
 		const res = await assertion.run("Hello, all the world's people!");
 		expect(res.pass).toBe(true);

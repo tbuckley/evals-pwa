@@ -12,7 +12,7 @@ defaultTest:
     topic: puppies
   assert:
     - description: Contains term
-      type: icontains
+      type: contains
       vars:
         needle: '{{term}}'
 

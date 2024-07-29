@@ -1,6 +1,6 @@
 import type { Assertion, AssertionProvider, TestCase } from '$lib/types';
 import { convertAllStringsToHandlebarSafe } from '$lib/utils/handlebars';
-import { createIContainsAssertion } from './icontains';
+import { createContainsAssertion } from './contains';
 import { createJavascriptAssertion } from './javascript';
 import Handlebars from 'handlebars';
 import { createRegexAssertion } from './regex';
@@ -38,8 +38,8 @@ function createAssertion(
 	switch (type) {
 		case 'equals':
 			return createEqualsAssertion(populatedVars);
-		case 'icontains':
-			return createIContainsAssertion(populatedVars);
+		case 'contains':
+			return createContainsAssertion(populatedVars);
 		case 'regex':
 			return createRegexAssertion(populatedVars);
 		case 'javascript':

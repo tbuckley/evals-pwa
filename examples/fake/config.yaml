@@ -13,9 +13,10 @@ tests:
       word: world
     assert:
       - description: Contains the reversed word
-        type: icontains
+        type: contains
         vars:
           needle: dlrow
+          ignoreCase: true
       - description: Matches a regex
         type: regex
         vars:

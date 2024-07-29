@@ -1,7 +1,6 @@
 description: foo
 
 providers:
-  - gemini:gemini-1.5-pro-latest
   - gemini:gemini-1.5-flash-latest
   - openai:gpt-4o-mini
 
@@ -20,18 +19,20 @@ tests:
       request: Write a haiku
     assert:
       - description: Contains a puppy
-        type: icontains
+        type: contains
         vars:
           needle: pup
+          ignoreCase: true
   - description: Simple test
     vars:
       image: file:///files/puppy.jpg
       request: What do you see?
     assert:
       - description: Contains a puppy
-        type: icontains
+        type: contains
         vars:
           needle: pup
+          ignoreCase: true
       - description: Is >1000 characters
         type: javascript
         vars:

@@ -99,8 +99,7 @@ Supported assertion types:
 
 - [x] javascript -- run javascript code on output, see below. Vars: `{ code: string }`
 - [x] equals -- compare against a string, optionally ignoring case. Vars: `{ value: string, ignoreCase?: boolean }`
-- [ ] contains
-- [x] icontains -- case insensitive contains. Vars: `{ needle: string }`
+- [x] contains -- check if the output contains a string, optionally ignoring case. Vars: `{ needle: string, ignoreCase?: boolean }`
 - [x] regex -- test against a regex pattern, with optional flags (e.g. "i" for case-insensitive, see [docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions#advanced_searching_with_flags)). Vars: `{ pattern: string, flags?: string }`
 - [ ] is-json
 - [ ] cost
@@ -113,9 +112,10 @@ This makes it easy to define assertions inside defaultTest, using variables to t
 # ...
 defaultTest:
   asserts:
-	- type: icontains
+	- type: contains
 	  vars:
 	    needle: "{{translation}}"
+		ignoreCase: true
 tests:
   - vars:
       language: Spanish
