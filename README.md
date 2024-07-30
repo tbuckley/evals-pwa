@@ -104,6 +104,7 @@ Supported assertion types:
 - [ ] is-json
 - [ ] cost
 - [ ] latency
+- [x] llm-rubric -- ask an LLM to validate the output. Provider defaults to `gemini-1.5-pro-latest`. If you override `prompt`, it should be a template containing both `{{output}}` and `{{rubric}}`. Vars: `{ rubric: string; prompt?: string; provider?: string}`
 
 Any assertion vars that are strings will be treated as Handlebars templates, and the test case's vars will be populated.
 This makes it easy to define assertions inside defaultTest, using variables to tweak the assertion for each test case.
@@ -116,6 +117,9 @@ defaultTest:
 	  vars:
 	    needle: "{{translation}}"
 		ignoreCase: true
+	- type: llm-rubric
+	  vars:
+	  	rubric: Is a poem
 tests:
   - vars:
       language: Spanish

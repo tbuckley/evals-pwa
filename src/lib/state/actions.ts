@@ -128,7 +128,7 @@ export async function runTests() {
 	}
 
 	// Run tests
-	const mgr = new AssertionManager();
+	const mgr = new AssertionManager(providerManager, storage);
 	for (const test of globalTests) {
 		const testResults: TestResult[] = [];
 		for (const env of envs) {

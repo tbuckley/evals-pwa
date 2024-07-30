@@ -1,9 +1,11 @@
 import { describe, test, expect } from 'vitest';
 import { AssertionManager } from './AssertionManager';
+import { ProviderManager } from '$lib/providers/ProviderManager';
+import { type FileLoader } from '$lib/types';
 
 describe('AssertionManager', () => {
 	test('substitutes variables', async function () {
-		const mgr = new AssertionManager();
+		const mgr = createAssertionManager();
 		const assertion = mgr.getAssertion(
 			{ type: 'contains', vars: { needle: '{{ target }}' } },
 			{ target: 'world' }
@@ -15,7 +17,7 @@ describe('AssertionManager', () => {
 		expect(res2.pass).toBe(false);
 	});
 	test('does not escape apostrophes', async function () {
-		const mgr = new AssertionManager();
+		const mgr = createAssertionManager();
 		const assertion = mgr.getAssertion(
 			{ type: 'contains', vars: { needle: '{{ target }}' } },
 			{ target: "all the world's people" }
@@ -25,7 +27,7 @@ describe('AssertionManager', () => {
 	});
 
 	test('supports case-insensitive contains', async function () {
-		const mgr = new AssertionManager();
+		const mgr = createAssertionManager();
 		const assertion = mgr.getAssertion(
 			{ type: 'contains', vars: { needle: 'THE WORLD', ignoreCase: true } },
 			{}
@@ -34,7 +36,7 @@ describe('AssertionManager', () => {
 		expect(res.pass).toBe(true);
 	});
 	test('supports equals with a string', async function () {
-		const mgr = new AssertionManager();
+		const mgr = createAssertionManager();
 		const assertion = mgr.getAssertion({ type: 'equals', vars: { value: 'Hello, world!' } }, {});
 		const res1 = await assertion.run('Hello, world!');
 		expect(res1.pass).toBe(true);
@@ -43,7 +45,7 @@ describe('AssertionManager', () => {
 		expect(res2.pass).toBe(false);
 	});
 	test('supports case-insensitive equals with a string', async function () {
-		const mgr = new AssertionManager();
+		const mgr = createAssertionManager();
 		const assertion = mgr.getAssertion(
 			{ type: 'equals', vars: { value: 'Hello, world!', ignoreCase: true } },
 			{}
@@ -54,4 +56,31 @@ describe('AssertionManager', () => {
 		const res2 = await assertion.run('hello!');
 		expect(res2.pass).toBe(false);
 	});
+	test('supports llm-rubric', async function () {
+		const mgr = createAssertionManager();
+		const assertion = mgr.getAssertion(
+			{
+				type: 'llm-rubric',
+				vars: {
+					rubric: 'THIS IS IGNORED BECAUSE {{ rubric }} IS NOT IN THE PROMPT',
+					prompt: '} "{{ output }} :tuptuO" :"egassem" ,eurt :"ssap" {',
+					provider: 'reverser:whatever'
+				}
+			},
+			{}
+		);
+		const res = await assertion.run('olleh');
+		// expect(res.pass).toBe(true);
+		expect(res.message).toBe('Output: hello');
+	});
 });
+
+function createAssertionManager(): AssertionManager {
+	const provider = new ProviderManager({});
+	const loader: FileLoader = {
+		loadFile() {
+			throw new Error('unsupported');
+		}
+	};
+	return new AssertionManager(provider, loader);
+}

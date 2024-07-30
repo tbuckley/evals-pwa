@@ -40,6 +40,22 @@ export const requiredEnvStore = derived(configStore, ($config) => {
 		}
 	}
 
+	const tests = $config?.tests ?? [];
+	for (const test of tests) {
+		const asserts = test.assert ?? [];
+		for (const assertion of asserts) {
+			const vars = assertion.vars ?? {};
+			if ('provider' in vars && typeof vars['provider'] === 'string') {
+				// TODO support other types of provider
+				const providerId = vars['provider'];
+				const envVars = mgr.getRequiredEnvVars(providerId);
+				for (const envVar of envVars) {
+					requiredEnvVars.add(envVar);
+				}
+			}
+		}
+	}
+
 	return Array.from(requiredEnvVars).sort();
 });
 
