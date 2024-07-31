@@ -102,7 +102,10 @@ export const runSchema = z.object({
 		})
 	),
 	tests: z.array(testCaseSchema),
-	results: z.array(z.array(testResultSchema))
+	results: z.array(z.array(testResultSchema)),
+
+	// Optional
+	description: z.string().optional()
 });
 export type Run = z.infer<typeof runSchema>;
 

@@ -142,6 +142,7 @@ export async function runTests() {
 		version: 1,
 		id: crypto.randomUUID(),
 		timestamp: Date.now(),
+		description: config.description,
 		envs: runEnvs,
 		tests: globalTests,
 		results: []

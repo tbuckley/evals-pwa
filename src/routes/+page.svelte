@@ -5,11 +5,20 @@
 	import { chooseFolder, runTests } from '$lib/state/actions';
 	import { runListStore, selectedRunStore } from '$lib/state/derived';
 	import { configStore, selectedRunIdStore } from '$lib/state/stores';
+	import type { Run } from '$lib/types';
 
 	const dateFormatter = new Intl.DateTimeFormat('en-US', {
 		dateStyle: 'medium',
 		timeStyle: 'short'
 	});
+
+	function getRunTitle(run: Run): string {
+		const datetime = dateFormatter.format(new Date(run.timestamp));
+		if (run.description) {
+			return `${run.description} (${datetime})`;
+		}
+		return datetime;
+	}
 </script>
 
 <article class="prose">
@@ -31,13 +40,13 @@
 		<Combobox
 			items={$runListStore.map((run) => ({
 				value: run.id,
-				label: dateFormatter.format(new Date(run.timestamp))
+				label: getRunTitle(run)
 			}))}
 			value={$selectedRunIdStore || ''}
 			on:select={(e) => selectedRunIdStore.set(e.detail)}
 		></Combobox>
 		<h2 class="mb-4 mt-8 text-xl font-bold">
-			{dateFormatter.format(new Date($selectedRunStore.timestamp))}
+			{getRunTitle($selectedRunStore)}
 		</h2>
 
 		<!-- Use a keyed block so we don't try to reuse a table that was created with a different layout -->

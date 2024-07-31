@@ -13,7 +13,8 @@ Once you select it, you will then be prompted (ha) to add API keys (or other req
 If you run tests and they are taking a while, feel free to navigate elsewhere -- a notification will be shown when your tests are complete. When you run tests, it will check if config.yaml has changed on disk and prompt you to use the updated one if so.
 
 ```yaml
-description: A description
+description: A short description
+# Note: your description will be shown in a dropdown to help you select a run
 
 providers:
   - gemini:gemini-1.5-pro-latest
@@ -166,6 +167,7 @@ interface Run {
 	version: 1;
 	id: string;
 	timestamp: number;
+	description?: string;
 	envs: {
 		provider: Provider;
 		prompt: Prompt;
