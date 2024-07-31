@@ -1,3 +1,3 @@
 <article class="prose">
-	<p>Coming soon!</p>
+	<slot></slot>
 </article>
