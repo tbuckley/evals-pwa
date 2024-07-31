@@ -17,6 +17,7 @@ import { ParallelTaskQueue } from '$lib/utils/ParallelTaskQueue';
 import { AssertionManager } from '$lib/assertions/AssertionManager';
 import { parsedEnvStore } from './derived';
 import { FileSystemStorage } from '$lib/storage/fileSystemStorage';
+import { alertStore, type AlertState } from './ui';
 
 export async function chooseFolder() {
 	let dir: FileSystemDirectoryHandle;
@@ -52,14 +53,39 @@ export async function loadStateFromStorage(): Promise<void> {
 	// TODO check that necessary environment variables are set
 }
 
+export async function showPrompt(prompt: Omit<AlertState, 'callback'>): Promise<boolean> {
+	let resolve: (value: boolean) => void;
+	const result = new Promise<boolean>((r) => (resolve = r));
+	alertStore.set({ ...prompt, callback: resolve! });
+	return result;
+}
+
 export async function runTests() {
-	const config = get(configStore);
+	let config = get(configStore);
 	if (!config) {
 		throw new Error('Cannot call runTests without a config');
 	}
 	const storage = get(storageStore);
 	if (!storage) {
 		throw new Error('Cannot call runTests without a storage');
+	}
+
+	// Check if the config is the latest
+	const latestConfig = await storage.getConfig();
+	if (!deepEquals(config, latestConfig)) {
+		// Prompt the user to update to the latest config
+		const res = await showPrompt({
+			title: 'Configuration has changed',
+			description:
+				'The config.yaml has changed since it was last loaded. Would you like to update to the latest configuration?',
+			confirmText: 'Update',
+			cancelText: 'Ignore'
+		});
+		if (res) {
+			configStore.set(latestConfig);
+			config = latestConfig;
+			// TODO what if the required env variables have changed?
+		}
 	}
 
 	// Create the provider manager
@@ -153,7 +179,6 @@ export async function runTests() {
 
 				// Run
 				for (const assertion of assertions) {
-					console.log('Running', assertion);
 					const result = await assertion.run(output.output!);
 					assertionResults.push(result);
 				}
@@ -179,4 +204,23 @@ export async function runTests() {
 	if (document.visibilityState !== 'visible' && Notification.permission === 'granted') {
 		new Notification('Eval complete', { body: 'See your results in Evals PWA.' });
 	}
+}
+
+function deepEquals(a: unknown, b: unknown): boolean {
+	if (a === b) return true;
+	if (typeof a !== typeof b) return false;
+	if (typeof a !== 'object' || a === null) return false;
+
+	const keysA = Object.keys(a);
+	const keysB = Object.keys(b as { [key: string]: unknown });
+	if (keysA.length !== keysB.length) return false;
+	for (const key of keysA) {
+		if (!keysB.includes(key)) return false;
+		if (
+			!deepEquals((a as { [key: string]: unknown })[key], (b as { [key: string]: unknown })[key])
+		) {
+			return false;
+		}
+	}
+	return true;
 }

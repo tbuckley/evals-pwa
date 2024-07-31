@@ -1,8 +1,9 @@
-<script>
+<script lang="ts">
 	import '../app.css';
 
 	import { Button } from '$lib/components/ui/button/index';
 	import * as Sheet from '$lib/components/ui/sheet/index';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index';
 
 	import FlaskConical from 'lucide-svelte/icons/flask-conical';
 	import Menu from 'lucide-svelte/icons/menu';
@@ -16,6 +17,7 @@
 	import FolderPicker from '$lib/components/FolderPicker.svelte';
 	import { cn } from '$lib/utils/shadcn';
 	import { page } from '$app/stores';
+	import { alertStore } from '$lib/state/ui';
 
 	const links = [
 		{ name: 'Dashboard', href: '/', icon: Home },
@@ -24,6 +26,13 @@
 	];
 
 	let settingsOpen = false;
+
+	function handleAlertOpenChange(open: boolean) {
+		if (!open && $alertStore) {
+			$alertStore.callback(false);
+			alertStore.set(null);
+		}
+	}
 </script>
 
 <!-- <main>
@@ -117,6 +126,23 @@
 		</main>
 	</div>
 </div>
+
+<AlertDialog.Root open={$alertStore !== null} onOpenChange={handleAlertOpenChange}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>{$alertStore?.title ?? 'Error'}</AlertDialog.Title>
+			<AlertDialog.Description>
+				{$alertStore?.description ?? 'An unknown error occurred.'}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>{$alertStore?.cancelText ?? 'Cancel'}</AlertDialog.Cancel>
+			<AlertDialog.Action on:click={() => $alertStore?.callback?.(true)}
+				>{$alertStore?.confirmText ?? 'Continue'}</AlertDialog.Action
+			>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
 
 <SettingsDialog
 	open={settingsOpen || !$validEnvStore}

@@ -30,7 +30,6 @@ export class SimpleEnvironment implements TestEnvironment {
 	async run(vars: VarSet): Promise<TestOutput> {
 		const prompt = this.prompt.format(vars);
 		const populatedPrompt = await populate(prompt, this.loader);
-		console.log(prompt, populatedPrompt);
 
 		const start = Date.now();
 		let resp: unknown;
