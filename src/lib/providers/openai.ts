@@ -27,11 +27,13 @@ const generateContentResponseSchema = z.object({
 export class OpenaiProvider implements ModelProvider {
 	constructor(
 		public model: string,
-		public apiKey: string
+		public apiKey: string,
+		public endpoint: string = 'https://api.openai.com',
+		public costFunction: typeof getCost = getCost
 	) {}
 
 	async run(prompt: PopulatedMultiPartPrompt): Promise<unknown> {
-		const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+		const resp = await fetch(`${this.endpoint}/v1/chat/completions`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -73,7 +75,7 @@ export class OpenaiProvider implements ModelProvider {
 			inputTokens: prompt_tokens,
 			outputTokens: completion_tokens,
 			totalTokens: total_tokens,
-			costDollars: getCost(this.model, prompt_tokens, completion_tokens)
+			costDollars: this.costFunction(this.model, prompt_tokens, completion_tokens)
 		};
 	}
 }

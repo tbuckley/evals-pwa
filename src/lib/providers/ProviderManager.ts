@@ -30,6 +30,11 @@ export class ProviderManager {
 			return new ReverserProvider();
 		} else if (providerId === 'chrome') {
 			return new ChromeProvider();
+		} else if (providerId === 'ollama') {
+			if (typeof this.env.OLLAMA_ENDPOINT !== 'string') {
+				throw new Error('OLLAMA_ENDPOINT not found');
+			}
+			return new OpenaiProvider(modelName, 'no-key', this.env.OLLAMA_ENDPOINT, () => 0);
 		}
 		throw new Error(`Unknown provider: ${providerId}`);
 	}
@@ -49,6 +54,8 @@ export class ProviderManager {
 			return [];
 		} else if (providerId === 'chrome') {
 			return [];
+		} else if (providerId === 'ollama') {
+			return ['OLLAMA_ENDPOINT'];
 		}
 		throw new Error(`Unknown provider: ${providerId}`);
 	}
