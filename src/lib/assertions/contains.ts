@@ -9,7 +9,7 @@ const argsSchema = z.object({
 export function createContainsAssertion(args: unknown): AssertionProvider {
 	const parsedArgs = argsSchema.safeParse(args);
 	if (!parsedArgs.success) {
-		throw new Error('Invalid icontains arguments');
+		throw new Error('Invalid contains arguments');
 	}
 
 	const { needle, ignoreCase } = parsedArgs.data;

@@ -27,7 +27,7 @@ tests:
     vars:
       request: Who was the first US president?
     assert:
-      - type: icontains
+      - type: contains
         vars:
           needle: washington
 ```
