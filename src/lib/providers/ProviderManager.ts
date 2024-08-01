@@ -2,6 +2,7 @@ import type { ModelProvider } from '$lib/types';
 import { GeminiProvider } from './gemini';
 import { OpenaiProvider } from './openai';
 import { ReverserProvider } from './reverser';
+import { ChromeProvider } from './chrome';
 
 export class ProviderManager {
 	constructor(public env: Record<string, string>) {}
@@ -27,6 +28,8 @@ export class ProviderManager {
 			return new OpenaiProvider(modelName, this.env.OPENAI_API_KEY);
 		} else if (providerId === 'reverser') {
 			return new ReverserProvider();
+		} else if (providerId === 'chrome') {
+			return new ChromeProvider();
 		}
 		throw new Error(`Unknown provider: ${providerId}`);
 	}
@@ -43,6 +46,8 @@ export class ProviderManager {
 		} else if (providerId === 'openai') {
 			return ['OPENAI_API_KEY'];
 		} else if (providerId === 'reverser') {
+			return [];
+		} else if (providerId === 'chrome') {
 			return [];
 		}
 		throw new Error(`Unknown provider: ${providerId}`);
