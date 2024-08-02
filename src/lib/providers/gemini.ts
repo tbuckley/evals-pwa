@@ -1,4 +1,4 @@
-import type { ModelProvider, PopulatedMultiPartPrompt, TokenUsage } from '$lib/types';
+import type { ModelProvider, MultiPartPrompt, TokenUsage } from '$lib/types';
 import { fileToBase64, mimeTypeForFile } from '$lib/utils/media';
 import { z } from 'zod';
 
@@ -88,7 +88,7 @@ export class GeminiProvider implements ModelProvider {
 		public apiKey: string
 	) {}
 
-	async run(prompt: PopulatedMultiPartPrompt): Promise<unknown> {
+	async run(prompt: MultiPartPrompt): Promise<unknown> {
 		const resp = await fetch(
 			`https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`,
 			{
@@ -149,7 +149,7 @@ function getCost(model: string, prompt: number, completion: number): number | un
 	return (prompt * inputCostPerMillion + completion * outputCostPerMillion) / 1000000;
 }
 
-async function multiPartPromptToGemini(prompt: PopulatedMultiPartPrompt): Promise<Part[]> {
+async function multiPartPromptToGemini(prompt: MultiPartPrompt): Promise<Part[]> {
 	const parts: Part[] = [];
 	for (const part of prompt) {
 		if ('text' in part) {

@@ -1,4 +1,4 @@
-import type { ModelProvider, PopulatedMultiPartPrompt, TokenUsage } from '$lib/types';
+import type { ModelProvider, MultiPartPrompt, TokenUsage } from '$lib/types';
 
 interface PromptAPI {
 	createTextSession(): Promise<PromptSession>;
@@ -15,7 +15,7 @@ declare global {
 }
 
 export class ChromeProvider implements ModelProvider {
-	async run(prompt: PopulatedMultiPartPrompt) {
+	async run(prompt: MultiPartPrompt) {
 		const session = await window.ai.createTextSession();
 		return session.prompt(prompt.map((part) => ('text' in part ? part.text : '')).join('\n'));
 	}

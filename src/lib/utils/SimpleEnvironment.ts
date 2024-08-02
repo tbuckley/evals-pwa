@@ -5,9 +5,8 @@ import type {
 	PromptFormatter,
 	VarSet,
 	FileLoader,
-	MultiPartPrompt,
-	PopulatedMultiPartPrompt,
-	TokenUsage
+	TokenUsage,
+	PopulatedVarSet
 } from '$lib/types';
 
 export interface Config {
@@ -28,13 +27,13 @@ export class SimpleEnvironment implements TestEnvironment {
 	}
 
 	async run(vars: VarSet): Promise<TestOutput> {
-		const prompt = this.prompt.format(vars);
-		const populatedPrompt = await populate(prompt, this.loader);
+		const populatedVars = await populate(vars, this.loader);
+		const prompt = this.prompt.format(populatedVars);
 
 		const start = Date.now();
 		let resp: unknown;
 		try {
-			resp = await this.model.run(populatedPrompt);
+			resp = await this.model.run(prompt);
 		} catch (e) {
 			if (e instanceof Error) {
 				return {
@@ -73,19 +72,18 @@ export class SimpleEnvironment implements TestEnvironment {
 	}
 }
 
-async function populate(
-	prompt: MultiPartPrompt,
-	loader: FileLoader
-): Promise<PopulatedMultiPartPrompt> {
-	const populated: PopulatedMultiPartPrompt = [];
-	for (const part of prompt) {
-		if ('text' in part) {
-			populated.push({ text: part.text });
-		} else if ('image' in part) {
-			populated.push({ image: await loader.loadFile(part.image) });
+async function populate(vars: VarSet, loader: FileLoader): Promise<PopulatedVarSet> {
+	const populated: PopulatedVarSet = {};
+	for (const key in vars) {
+		if (vars[key].startsWith('file:///') && isSupportedImageType(vars[key])) {
+			populated[key] = await loader.loadFile(vars[key]);
 		} else {
-			throw new Error('Unsupported part type');
+			populated[key] = vars[key];
 		}
 	}
 	return populated;
+}
+
+function isSupportedImageType(path: string): boolean {
+	return path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg');
 }

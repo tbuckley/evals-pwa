@@ -84,15 +84,18 @@
 							<span class="sr-only">Evals PWA</span>
 						</a>
 						{#each links as { name, href, icon }, i}
-							<a
-								{href}
-								class="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
-							>
-								{#if icon}
-									<svelte:component this={icon} class="h-4 w-4" />
-								{/if}
-								{name}
-							</a>
+							<Sheet.Close asChild let:builder>
+								<a
+									use:builder.action
+									{href}
+									class="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
+								>
+									{#if icon}
+										<svelte:component this={icon} class="h-4 w-4" />
+									{/if}
+									{name}
+								</a>
+							</Sheet.Close>
 						{/each}
 					</nav>
 				</Sheet.Content>
