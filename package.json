@@ -36,7 +36,7 @@
 		"tailwindcss": "^3.4.7",
 		"tslib": "^2.4.1",
 		"typescript": "^5.5.4",
-		"typescript-eslint": "^8.0.0-alpha.44",
+		"typescript-eslint": "^8.0.0-alpha.56",
 		"vite": "^5.3.5",
 		"vitest": "^2.0.4"
 	},
