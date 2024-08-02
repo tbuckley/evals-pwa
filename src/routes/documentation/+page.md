@@ -67,10 +67,17 @@ interface Config {
 
 Unlike Promptfoo, these use [Handlebars](https://handlebarsjs.com/) format instead. Test case variables are considered "safe" strings and will not be escaped.
 
-If the format matches the following, the request will combine the text and images in the order given. Otherwise it will be a string.
+If a var starts with `file:///` and ends with .png, .jpg, or .jpeg then it will be loaded as an image. Note that not all providers support images.
 
-```json
-[{ "text": "A text prompt here" }, { "image": "file:///path/to/image.png" }]
+```yaml
+prompts:
+  - '{{image}} What is this?'
+  # Will be sent as {image: ...}, {text: " What is this?"}
+  # Note the whitespace
+
+tests:
+  - vars:
+      image: file:///foo.png
 ```
 
 ### Tests

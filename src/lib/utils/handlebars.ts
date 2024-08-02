@@ -1,7 +1,6 @@
-import type { VarSet } from '$lib/types';
 import Handlebars from 'handlebars';
 
-export function convertAllStringsToHandlebarSafe(vars: VarSet) {
+export function convertAllStringsToHandlebarSafe(vars: Record<string, unknown>) {
 	return Object.fromEntries(
 		Object.entries(vars).map(([key, value]) => {
 			if (typeof value === 'string') {

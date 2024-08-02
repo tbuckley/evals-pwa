@@ -6,11 +6,7 @@ providers:
 
 prompts:
   - "You only speak about puppies. Respond to the user's request: {{ request }}"
-  - >
-    [
-      { "image": "{{image}}" },
-      { "text": "Given this image, respond to the user's request: {{request}}" }
-    ]
+  - "{{image}} Given this image, respond to the user's request: {{request}}"
 
 tests:
   - description: Haiku
@@ -23,6 +19,10 @@ tests:
         vars:
           needle: pup
           ignoreCase: true
+      - type: llm-rubric
+        vars:
+          rubric: Is a poem
+          provider: openai:gpt-4o-mini
   - description: Simple test
     vars:
       image: file:///files/puppy.jpg

@@ -1,9 +1,4 @@
-import type {
-	ModelProvider,
-	PopulatedMultiPartPrompt,
-	PopulatedPrompt,
-	TokenUsage
-} from '$lib/types';
+import type { ModelProvider, MultiPartPrompt, PromptPart, TokenUsage } from '$lib/types';
 import { fileToBase64 } from '$lib/utils/media';
 import { z } from 'zod';
 
@@ -30,7 +25,7 @@ export class OpenaiProvider implements ModelProvider {
 		public apiKey: string
 	) {}
 
-	async run(prompt: PopulatedMultiPartPrompt): Promise<unknown> {
+	async run(prompt: MultiPartPrompt): Promise<unknown> {
 		const resp = await fetch('https://api.openai.com/v1/chat/completions', {
 			method: 'POST',
 			headers: {
@@ -104,7 +99,7 @@ type Part =
 	| { type: 'text'; text: string }
 	| { type: 'image_url'; image_url: { url: string; detail?: 'auto' | 'low' | 'high' } };
 
-async function multiPartPromptToOpenAI(part: PopulatedPrompt): Promise<Part> {
+async function multiPartPromptToOpenAI(part: PromptPart): Promise<Part> {
 	if ('text' in part) {
 		return { type: 'text', text: part.text };
 	} else if ('image' in part) {

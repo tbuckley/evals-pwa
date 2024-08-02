@@ -1,7 +1,7 @@
-import type { ModelProvider, PopulatedMultiPartPrompt, TokenUsage } from '$lib/types';
+import type { ModelProvider, MultiPartPrompt, TokenUsage } from '$lib/types';
 
 export class ReverserProvider implements ModelProvider {
-	async run(prompt: PopulatedMultiPartPrompt): Promise<unknown> {
+	async run(prompt: MultiPartPrompt): Promise<unknown> {
 		const textParts = prompt.filter((part) => 'text' in part) as { text: string }[];
 		const text = textParts.map((part) => part.text).join('\n');
 		return { reversed: reverseString(text) };
