@@ -19,31 +19,30 @@ const generateContentResponseSchema = z.object({
 	})
 });
 
-const configSchema = z.object({
-	request: z.object({}).passthrough().optional(),
-	apiBaseUrl: z.string().optional()
-});
+const configSchema = z
+	.object({
+		apiBaseUrl: z.string().optional()
+	})
+	.passthrough();
 
 export type OpenaiConfig = z.infer<typeof configSchema>;
 
 export class OpenaiProvider implements ModelProvider {
-	private config: OpenaiConfig & Required<Pick<OpenaiConfig, 'apiBaseUrl'>>;
+	private apiBaseUrl: string;
+	private request: object;
 	constructor(
 		public model: string,
 		public apiKey: string,
-		config: object = {},
+		config = {},
 		public costFunction: typeof getCost = getCost
 	) {
-		this.config = Object.assign(
-			{
-				apiBaseUrl: 'https://api.openai.com'
-			},
-			configSchema.parse(config)
-		);
+		const { apiBaseUrl, ...request } = configSchema.parse(config);
+		this.apiBaseUrl = apiBaseUrl ?? 'https://api.openai.com';
+		this.request = request;
 	}
 
 	async run(prompt: MultiPartPrompt): Promise<unknown> {
-		const resp = await fetch(`${this.config.apiBaseUrl}/v1/chat/completions`, {
+		const resp = await fetch(`${this.apiBaseUrl}/v1/chat/completions`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -51,7 +50,7 @@ export class OpenaiProvider implements ModelProvider {
 			},
 			body: JSON.stringify({
 				model: this.model,
-				...(this.config.request ?? {}),
+				...(this.request ?? {}),
 				messages: [
 					{
 						role: 'user',

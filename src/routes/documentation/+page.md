@@ -59,17 +59,17 @@ For testing, there is also a `reverser:` provider (suffix is ignored). It will c
 When providers are defined in the expanded form, additional configuration options can be specified:
 
 ```yaml
-provider:
-  id: ollama:llama3:8b
-  config:
-    apiBaseUrl: http://localhost:11434
-    request: {response_format: {type: 'json_object'}}
+providers:
+  - id: ollama:llama3:8b
+    config:
+      apiBaseUrl: http://localhost:11434
+      response_format: {type: 'json_object'}
 ```
 
 #### OpenAI Config
 
 * `apiBaseUrl` -- the base for the API endpoint, default: `https://api.openai.com`
-* `request` -- additional properties to inclued in the API request, see <https://platform.openai.com/docs/api-reference/chat/completions>
+* `...` -- additional properties to inclued in the API request, see <https://platform.openai.com/docs/api-reference/chat/completions>
 
 #### Ollama Config
 
