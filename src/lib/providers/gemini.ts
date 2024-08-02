@@ -85,7 +85,8 @@ export type Request = z.infer<typeof requestSchema>;
 export class GeminiProvider implements ModelProvider {
 	constructor(
 		public model: string,
-		public apiKey: string
+		public apiKey: string,
+		public config: object = {}
 	) {}
 
 	async run(prompt: MultiPartPrompt): Promise<unknown> {
@@ -97,6 +98,7 @@ export class GeminiProvider implements ModelProvider {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
+					...this.config,
 					contents: [{ parts: await multiPartPromptToGemini(prompt) }]
 				})
 			}

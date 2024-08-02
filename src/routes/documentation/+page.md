@@ -32,7 +32,7 @@ tests:
           needle: washington
 ```
 
-### Providers
+## Providers
 
 Format:
 
@@ -54,7 +54,7 @@ Currently supported model providers:
 
 For testing, there is also a `reverser:` provider (suffix is ignored). It will concatenate any text messages with newlines and output the reversed value.
 
-#### Provider Config
+### Provider Config
 
 When providers are defined in the expanded form, additional configuration options can be specified:
 
@@ -63,19 +63,27 @@ providers:
   - id: ollama:llama3:8b
     config:
       apiBaseUrl: http://localhost:11434
-      response_format: {type: 'json_object'}
+      response_format: { type: 'json_object' }
+  - id: gemini:gemini-1.5-flash-latest
+    config:
+	  generationConfig:
+	    responseMimeType: application/json
 ```
+
+#### Gemini Config
+
+Any config will be included as additional properties in the API request. See <https://ai.google.dev/api/generate-content#request-body>
 
 #### OpenAI Config
 
-* `apiBaseUrl` -- the base for the API endpoint, default: `https://api.openai.com`
-* `...` -- additional properties to inclued in the API request, see <https://platform.openai.com/docs/api-reference/chat/completions>
+- `apiBaseUrl` -- the base for the API endpoint, default: `https://api.openai.com`
+- `...` -- additional properties to include in the API request, see <https://platform.openai.com/docs/api-reference/chat/completions>
 
 #### Ollama Config
 
 Equivalent to OpenAI Config.
 
-### Prompts
+## Prompts
 
 Format:
 
@@ -102,7 +110,7 @@ tests:
       image: file:///foo.png
 ```
 
-### Tests
+## Tests
 
 Format:
 
@@ -155,7 +163,7 @@ tests:
 	  translation: hola
 ```
 
-### Javascript Assertions
+## Javascript Assertions
 
 For `javascript` assertions, your code must provide a function `execute(output: string): Promise<AssertionResult>`.
 
@@ -178,7 +186,7 @@ The code is run inside a sandboxed iframe with `<script type="module">`. You can
 
 Note: Currently, every javascript assertion will be instantiated once per test case using it. In future we plan to only instantiate each unique script a single time and reuse it across test cases. Please avoid creating any global state that would affect following test cases.
 
-### Runs
+## Runs
 
 When you run tests, they will be saved in a `runs/` folder within your selected folder.
 You don't need to know the format if you are just viewing it through the tool. But if you do want

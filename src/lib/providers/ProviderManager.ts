@@ -20,7 +20,7 @@ export class ProviderManager {
 			if (typeof this.env.GEMINI_API_KEY !== 'string') {
 				throw new Error('GEMINI_API_KEY not found');
 			}
-			return new GeminiProvider(modelName, this.env.GEMINI_API_KEY);
+			return new GeminiProvider(modelName, this.env.GEMINI_API_KEY, config);
 		} else if (providerId === 'openai') {
 			if (typeof this.env.OPENAI_API_KEY !== 'string') {
 				throw new Error('OPENAI_API_KEY not found');
