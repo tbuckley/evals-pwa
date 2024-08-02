@@ -1,13 +1,13 @@
 import type { ModelProvider } from '$lib/types';
 import { GeminiProvider } from './gemini';
-import { OpenaiProvider } from './openai';
+import { OpenaiProvider, type OpenaiConfig } from './openai';
 import { ReverserProvider } from './reverser';
 import { ChromeProvider } from './chrome';
 
 export class ProviderManager {
 	constructor(public env: Record<string, string>) {}
 
-	getProvider(id: string): ModelProvider {
+	getProvider(id: string, config: object = {}): ModelProvider {
 		// id is in the format providerId:modelName, for example gemini:gemini-1.5-pro-latest
 		const index = id.indexOf(':');
 		if (index === -1) {
@@ -25,11 +25,19 @@ export class ProviderManager {
 			if (typeof this.env.OPENAI_API_KEY !== 'string') {
 				throw new Error('OPENAI_API_KEY not found');
 			}
-			return new OpenaiProvider(modelName, this.env.OPENAI_API_KEY);
+			return new OpenaiProvider(modelName, this.env.OPENAI_API_KEY, config);
 		} else if (providerId === 'reverser') {
 			return new ReverserProvider();
 		} else if (providerId === 'chrome') {
 			return new ChromeProvider();
+		} else if (providerId === 'ollama') {
+			if ((config as OpenaiConfig).apiBaseUrl === undefined) {
+				if (typeof this.env.OLLAMA_ENDPOINT !== 'string') {
+					throw new Error('OLLAMA_ENDPOINT not found');
+				}
+				(config as OpenaiConfig).apiBaseUrl = this.env.OLLAMA_ENDPOINT;
+			}
+			return new OpenaiProvider(modelName, 'no-key', config, () => 0);
 		}
 		throw new Error(`Unknown provider: ${providerId}`);
 	}
@@ -49,6 +57,8 @@ export class ProviderManager {
 			return [];
 		} else if (providerId === 'chrome') {
 			return [];
+		} else if (providerId === 'ollama') {
+			return ['OLLAMA_ENDPOINT'];
 		}
 		throw new Error(`Unknown provider: ${providerId}`);
 	}

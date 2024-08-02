@@ -119,8 +119,7 @@ export async function runTests() {
 		if (typeof provider === 'string') {
 			model = providerManager.getProvider(provider);
 		} else {
-			// TODO also allow custom model properties
-			model = providerManager.getProvider(provider.id);
+			model = providerManager.getProvider(provider.id, provider.config);
 		}
 
 		// First use any provider-specific prompts; otherwise, use the global prompts

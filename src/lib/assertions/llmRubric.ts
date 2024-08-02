@@ -2,6 +2,7 @@ import { LLM_RUBRIC_PROMPT } from '$lib/prompts';
 import type { ProviderManager } from '$lib/providers/ProviderManager';
 import {
 	assertionResultSchema,
+	providerSchema,
 	type AssertionProvider,
 	type AssertionResult,
 	type FileLoader
@@ -16,7 +17,7 @@ export const DEFAULT_LLM_RUBRIC_PROVIDER = 'gemini:gemini-1.5-pro-latest';
 const argsSchema = z.object({
 	rubric: z.string(),
 	prompt: z.string().optional(),
-	provider: z.string().optional()
+	provider: providerSchema
 });
 
 export function createLlmRubricAssertion(
@@ -29,9 +30,12 @@ export function createLlmRubricAssertion(
 		throw new Error('Invalid LLM Rubric arguments');
 	}
 
-	const { rubric, prompt, provider } = parsedArgs.data;
-
-	const model = providerManager.getProvider(provider ?? DEFAULT_LLM_RUBRIC_PROVIDER);
+	const { rubric, prompt, provider: providerOptions } = parsedArgs.data;
+	const provider =
+		typeof providerOptions === 'string'
+			? { id: providerOptions, config: {} }
+			: (providerOptions ?? { id: DEFAULT_LLM_RUBRIC_PROVIDER, config: {} });
+	const model = providerManager.getProvider(provider.id, provider.config);
 	const env = new SimpleEnvironment({
 		model,
 		prompt: new HandlebarsPromptFormatter(prompt ?? LLM_RUBRIC_PROMPT),

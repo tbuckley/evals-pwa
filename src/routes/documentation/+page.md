@@ -49,9 +49,31 @@ Currently supported model providers:
 - [x] Gemini -- prefix with `gemini:`, e.g. `gemini:gemini-1.5-pro-latest`. Requires `GEMINI_API_KEY` in your environment.
 - [x] OpenAI -- prefix with `openai:`, e.g. `openai:gpt-4o`. Requires `OPENAI_API_KEY` in your environment.
 - [x] Chrome -- prefix with `chrome:`, see <https://goo.gle/chrome-ai-dev-preview>.
+- [x] Ollama -- prefix with `ollama:`, e.g. `ollama:gemma-2:2b`. Requires `OLLAMA_ENDPOINT` (e.g. `http://localhost:11434`) in your environment, or the `apiBaseUrl` config option.
 - [ ] Anthropic
 
 For testing, there is also a `reverser:` provider (suffix is ignored). It will concatenate any text messages with newlines and output the reversed value.
+
+#### Provider Config
+
+When providers are defined in the expanded form, additional configuration options can be specified:
+
+```yaml
+provider:
+  id: ollama:llama3:8b
+  config:
+    apiBaseUrl: http://localhost:11434
+    request: {response_format: {type: 'json_object'}}
+```
+
+#### OpenAI Config
+
+* `apiBaseUrl` -- the base for the API endpoint, default: `https://api.openai.com`
+* `request` -- additional properties to inclued in the API request, see <https://platform.openai.com/docs/api-reference/chat/completions>
+
+#### Ollama Config
+
+Equivalent to OpenAI Config.
 
 ### Prompts
 

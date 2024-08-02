@@ -19,14 +19,31 @@ const generateContentResponseSchema = z.object({
 	})
 });
 
+const configSchema = z.object({
+	request: z.object({}).passthrough().optional(),
+	apiBaseUrl: z.string().optional()
+});
+
+export type OpenaiConfig = z.infer<typeof configSchema>;
+
 export class OpenaiProvider implements ModelProvider {
+	private config: OpenaiConfig & Required<Pick<OpenaiConfig, 'apiBaseUrl'>>;
 	constructor(
 		public model: string,
-		public apiKey: string
-	) {}
+		public apiKey: string,
+		config: object = {},
+		public costFunction: typeof getCost = getCost
+	) {
+		this.config = Object.assign(
+			{
+				apiBaseUrl: 'https://api.openai.com'
+			},
+			configSchema.parse(config)
+		);
+	}
 
 	async run(prompt: MultiPartPrompt): Promise<unknown> {
-		const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+		const resp = await fetch(`${this.config.apiBaseUrl}/v1/chat/completions`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -34,6 +51,7 @@ export class OpenaiProvider implements ModelProvider {
 			},
 			body: JSON.stringify({
 				model: this.model,
+				...(this.config.request ?? {}),
 				messages: [
 					{
 						role: 'user',
@@ -68,7 +86,7 @@ export class OpenaiProvider implements ModelProvider {
 			inputTokens: prompt_tokens,
 			outputTokens: completion_tokens,
 			totalTokens: total_tokens,
-			costDollars: getCost(this.model, prompt_tokens, completion_tokens)
+			costDollars: this.costFunction(this.model, prompt_tokens, completion_tokens)
 		};
 	}
 }
