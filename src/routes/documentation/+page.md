@@ -15,21 +15,21 @@ description: A short description
 # Note: your description will be shown in a dropdown to help you select a run
 
 providers:
-  - gemini:gemini-1.5-pro-latest
-  - gemini:gemini-1.5-flash-latest
+	- gemini:gemini-1.5-pro-latest
+	- gemini:gemini-1.5-flash-latest
 
 prompts:
-  - Speak like a pirate. {{request}}
-  - Only respond with a haiku. {{request}}
+	- Speak like a pirate. {{request}}
+	- Only respond with a haiku. {{request}}
 
 tests:
-  - description: foo
-    vars:
-      request: Who was the first US president?
-    assert:
-      - type: contains
-        vars:
-          needle: washington
+	- description: foo
+		vars:
+			request: Who was the first US president?
+		assert:
+			- type: contains
+				vars:
+					needle: washington
 ```
 
 ## Providers
@@ -60,14 +60,14 @@ When providers are defined in the expanded form, additional configuration option
 
 ```yaml
 providers:
-  - id: ollama:llama3:8b
-    config:
-      apiBaseUrl: http://localhost:11434
-      response_format: { type: 'json_object' }
-  - id: gemini:gemini-1.5-flash-latest
-    config:
-	  generationConfig:
-	    responseMimeType: application/json
+	- id: ollama:llama3:8b
+		config:
+			apiBaseUrl: http://localhost:11434
+			response_format: { type: 'json_object' }
+	- id: gemini:gemini-1.5-flash-latest
+		config:
+			generationConfig:
+			responseMimeType: application/json
 ```
 
 #### Gemini Config
@@ -101,13 +101,13 @@ If a var starts with `file:///` and ends with .png, .jpg, or .jpeg then it will 
 
 ```yaml
 prompts:
-  - '{{image}} What is this?'
-  # Will be sent as {image: ...}, {text: " What is this?"}
-  # Note the whitespace
+	- '{{image}} What is this?'
+	# Will be sent as {image: ...}, {text: " What is this?"}
+	# Note the whitespace
 
 tests:
-  - vars:
-      image: file:///foo.png
+	- vars:
+			image: file:///foo.png
 ```
 
 ## Tests
@@ -149,18 +149,18 @@ This makes it easy to define assertions inside defaultTest, using variables to t
 ```yaml
 # ...
 defaultTest:
-  asserts:
-	- type: contains
-	  vars:
-	    needle: "{{translation}}"
-		ignoreCase: true
-	- type: llm-rubric
-	  vars:
-	  	rubric: Is a poem
+	asserts:
+		- type: contains
+			vars:
+				needle: '{{translation}}'
+			ignoreCase: true
+		- type: llm-rubric
+			vars:
+				rubric: Is a poem
 tests:
-  - vars:
-      language: Spanish
-	  translation: hola
+	- vars:
+			language: Spanish
+		translation: hola
 ```
 
 ## Javascript Assertions
