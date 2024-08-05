@@ -2,13 +2,16 @@ import { get } from 'svelte/store';
 import { configStore, runStore, selectedRunIdStore, storageStore } from './stores';
 import type {
 	AssertionResult,
-	ModelProvider,
+	FileLoader,
+	NormalizedProvider,
+	NormalizedTestCase,
+	PopulatedVarSet,
 	Prompt,
 	Provider,
 	Run,
-	TestCase,
 	TestEnvironment,
-	TestResult
+	TestResult,
+	VarSet
 } from '$lib/types';
 import { ProviderManager } from '$lib/providers/ProviderManager';
 import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
@@ -88,49 +91,28 @@ export async function runTests() {
 		}
 	}
 
+	// Get global prompts + tests
+	const globalPrompts: Prompt[] = config.prompts;
+	const globalProviders: NormalizedProvider[] = config.providers;
+	const globalTests: NormalizedTestCase[] = config.tests;
+
 	// Create the provider manager
 	const env = get(parsedEnvStore); // TODO validate that env variables for each provider is set
 	const providerManager = new ProviderManager(env);
-
-	// Create the test runner
-	const runner = new ParallelTaskQueue(5);
-
-	// Get global prompts + tests
-	const globalPrompts: Prompt[] = config.prompts ?? [];
-	const globalProviders: Provider[] = config.providers ?? [];
-	let globalTests: TestCase[] = config.tests ?? [];
-	if (config.defaultTest) {
-		globalTests = globalTests.map((test) => ({
-			...config.defaultTest,
-			...test,
-			vars: {
-				...(config.defaultTest?.vars ?? {}),
-				...(test.vars ?? {})
-			},
-			assert: [...(config.defaultTest?.assert ?? []), ...(test.assert ?? [])]
-		}));
-	}
 
 	// Create environments
 	const envs: TestEnvironment[] = [];
 	const runEnvs: { provider: Provider; prompt: Prompt }[] = [];
 	for (const provider of globalProviders) {
-		let model: ModelProvider;
-		if (typeof provider === 'string') {
-			model = providerManager.getProvider(provider);
-		} else {
-			model = providerManager.getProvider(provider.id, provider.config);
-		}
+		const model = providerManager.getProvider(provider.id, provider.config);
 
 		// First use any provider-specific prompts; otherwise, use the global prompts
-		const prompts: Prompt[] =
-			typeof provider === 'object' && provider.prompts ? provider.prompts : globalPrompts;
+		const prompts: Prompt[] = provider.prompts ? provider.prompts : globalPrompts;
 		for (const prompt of prompts) {
 			envs.push(
 				new SimpleEnvironment({
 					model,
-					prompt: new HandlebarsPromptFormatter(prompt),
-					loader: storage
+					prompt: new HandlebarsPromptFormatter(prompt)
 				})
 			);
 			runEnvs.push({ provider, prompt });
@@ -153,6 +135,9 @@ export async function runTests() {
 		Notification.requestPermission();
 	}
 
+	// Create the test runner
+	const runner = new ParallelTaskQueue(5);
+
 	// Run tests
 	const mgr = new AssertionManager(providerManager, storage);
 	for (const test of globalTests) {
@@ -161,13 +146,14 @@ export async function runTests() {
 			const result: TestResult = { pass: false, assertionResults: [] };
 			testResults.push(result);
 
-			const assertions = (test.assert ?? []).map((a) => mgr.getAssertion(a, test.vars ?? {}));
+			const assertions = test.assert.map((a) => mgr.getAssertion(a, test.vars));
 			// TODO destroy assertions after test is complete
 			const assertionResults: AssertionResult[] = [];
 
 			runner.enqueue(async () => {
 				// TODO should this be safeRun if it will catch all errors?
-				const output = await env.run(test.vars ?? {});
+				const populatedVars = await populate(test.vars, storage);
+				const output = await env.run(populatedVars);
 				for (const [key, value] of Object.entries(output)) {
 					(result as { [key: string]: unknown })[key] = value;
 				}
@@ -223,4 +209,20 @@ function deepEquals(a: unknown, b: unknown): boolean {
 		}
 	}
 	return true;
+}
+
+async function populate(vars: VarSet, loader: FileLoader): Promise<PopulatedVarSet> {
+	const populated: PopulatedVarSet = {};
+	for (const key in vars) {
+		if (vars[key].startsWith('file:///') && isSupportedImageType(vars[key])) {
+			populated[key] = await loader.loadFile(vars[key]);
+		} else {
+			populated[key] = vars[key];
+		}
+	}
+	return populated;
+}
+
+function isSupportedImageType(path: string): boolean {
+	return path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg');
 }

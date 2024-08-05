@@ -4,7 +4,12 @@ import {
 	type Config,
 	runSchema,
 	configSchema,
-	type FileLoader
+	type FileLoader,
+	type NormalizedConfig,
+	type NormalizedProvider,
+	type NormalizedTestCase,
+	type NormalizedAssertion,
+	type Assertion
 } from '$lib/types';
 import type { ZodSchema } from 'zod';
 import * as yaml from 'yaml';
@@ -16,7 +21,7 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 		return this.dir.name;
 	}
 
-	async getConfig(): Promise<Config> {
+	private async getRawConfig(): Promise<Config> {
 		console.log('getting config...');
 		for await (const entry of this.dir.values()) {
 			console.log(entry.kind, entry.name);
@@ -33,6 +38,62 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 		}
 		return res.data;
 	}
+
+	async getConfig(): Promise<NormalizedConfig> {
+		const config = await this.getRawConfig();
+
+		const providers: NormalizedProvider[] = await this.normalizeProviders(config.providers);
+		const tests: NormalizedTestCase[] = await this.normalizeTestCases(
+			config.tests,
+			config.defaultTest
+		);
+		return {
+			description: config.description,
+			providers,
+			prompts: config.prompts ?? [],
+			tests
+		};
+	}
+	private async normalizeProviders(providers: Config['providers']): Promise<NormalizedProvider[]> {
+		if (!providers) {
+			return [];
+		}
+
+		const normalized: NormalizedProvider[] = [];
+		for (const provider of providers) {
+			if (typeof provider === 'string') {
+				normalized.push({ id: provider });
+			} else {
+				normalized.push(provider);
+			}
+		}
+		return normalized;
+	}
+	private async normalizeTestCases(
+		tests: Config['tests'],
+		defaultTest: Config['defaultTest']
+	): Promise<NormalizedTestCase[]> {
+		if (!tests) {
+			return [];
+		}
+
+		const normalized: NormalizedTestCase[] = [];
+		for (const test of tests) {
+			const vars = { ...(defaultTest?.vars ?? {}), ...(test.vars ?? {}) };
+			const assert = await Promise.all(
+				[...(defaultTest?.assert ?? []), ...(test.assert ?? [])].map((assert) =>
+					this.normalizeAssertion(assert)
+				)
+			);
+			normalized.push({ description: test.description, vars, assert });
+		}
+		return normalized;
+	}
+	private async normalizeAssertion(assertion: Assertion): Promise<NormalizedAssertion> {
+		const vars = assertion.vars ?? {};
+		return { ...assertion, vars };
+	}
+
 	async getAllRuns(): Promise<Run[]> {
 		const dir = await this.dir.getDirectoryHandle('runs', { create: true });
 		const runs = await loadJsonFromDirectoryWithSchema(dir, runSchema);

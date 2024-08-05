@@ -16,14 +16,14 @@ export const assertionSchema = z.object({
 });
 export type Assertion = z.infer<typeof assertionSchema>;
 
-export const providerSchema = z.union([
-	z.string(),
-	z.object({
-		id: z.string(),
-		config: z.object({}).passthrough().optional(),
-		prompts: z.array(z.string()).optional()
-	})
-]);
+export const normalizedProviderSchema = z.object({
+	id: z.string(),
+	config: z.object({}).passthrough().optional(),
+	prompts: z.array(z.string()).optional()
+});
+export type NormalizedProvider = z.infer<typeof normalizedProviderSchema>;
+
+export const providerSchema = z.union([z.string(), normalizedProviderSchema]);
 export type Provider = z.infer<typeof providerSchema>;
 
 export const promptSchema = z.string();
@@ -46,6 +46,20 @@ export const configSchema = z.object({
 	defaultTest: testCaseSchema.optional()
 });
 export type Config = z.infer<typeof configSchema>;
+
+export type NormalizedAssertion = Assertion & Required<Pick<Assertion, 'vars'>>;
+export interface NormalizedTestCase {
+	description?: string;
+	vars: VarSet;
+	assert: NormalizedAssertion[];
+}
+
+export interface NormalizedConfig {
+	description?: string;
+	providers: NormalizedProvider[];
+	prompts: Prompt[];
+	tests: NormalizedTestCase[];
+}
 
 // Output
 
@@ -113,7 +127,7 @@ export type Run = z.infer<typeof runSchema>;
 
 export interface StorageProvider {
 	getName(): string;
-	getConfig(): Promise<Config>;
+	getConfig(): Promise<NormalizedConfig>;
 	getAllRuns(): Promise<Run[]>;
 	addRun(run: Run): Promise<void>;
 }
