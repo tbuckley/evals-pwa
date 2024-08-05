@@ -9,7 +9,8 @@ import {
 	type NormalizedProvider,
 	type NormalizedTestCase,
 	type NormalizedAssertion,
-	type Assertion
+	type Assertion,
+	testCaseSchema
 } from '$lib/types';
 import type { ZodSchema } from 'zod';
 import * as yaml from 'yaml';
@@ -61,7 +62,7 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 
 		const normalized: string[] = [];
 		for (const prompt of prompts) {
-			if (isTxtFileRef(prompt)) {
+			if (isFileRef(prompt, '.txt')) {
 				const file = await this.loadFile(prompt);
 				const text = await file.text();
 				normalized.push(text);
@@ -95,7 +96,17 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 		}
 
 		const normalized: NormalizedTestCase[] = [];
-		for (const test of tests) {
+		for (let test of tests) {
+			if (typeof test === 'string') {
+				if (isFileRef(test, '.yaml')) {
+					const file = await this.loadFile(test);
+					const text = await file.text();
+					const data = yaml.parse(text);
+					test = testCaseSchema.parse(data);
+				} else {
+					throw new Error('asdf');
+				}
+			}
 			const vars = { ...(defaultTest?.vars ?? {}), ...(test.vars ?? {}) };
 			const assert = await Promise.all(
 				[...(defaultTest?.assert ?? []), ...(test.assert ?? [])].map((assert) =>
@@ -195,9 +206,12 @@ async function getFileJson(handle: FileSystemFileHandle): Promise<unknown> {
 	const text = await file.text();
 	return JSON.parse(text);
 }
-function isFileRef(value: string): boolean {
-	return value.startsWith('file:///');
-}
-function isTxtFileRef(value: string): boolean {
-	return isFileRef(value) && value.endsWith('.txt');
+function isFileRef(value: string, type?: string): boolean {
+	if (!value.startsWith('file:///')) {
+		return false;
+	}
+	if (type) {
+		return value.endsWith(type);
+	}
+	return true;
 }

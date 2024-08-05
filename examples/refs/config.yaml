@@ -8,32 +8,5 @@ prompts:
   - 'The word: {{word}}'
 
 tests:
-  - description: World
-    vars:
-      word: world
-    assert:
-      - description: Contains the reversed word
-        type: contains
-        vars:
-          needle: dlrow
-          ignoreCase: true
-      - description: Matches a regex
-        type: regex
-        vars:
-          pattern: d.*w
-      - description: Equals a value
-        type: equals
-        vars:
-          value: '!dlrow ,olleH'
-  - description: Friend
-    vars:
-      word: friend
-    assert:
-      - description: Is >1000 characters
-        type: javascript
-        vars:
-          code: |
-            function execute(output) {
-              const pass = output.split('').reverse().join('').includes('friend');
-              return {pass, message: pass ? undefined : `Output doesn't contain 'friend' in reverse: ${output}`};
-            }
+  - file:///testA.yaml
+  - file:///testB.yaml

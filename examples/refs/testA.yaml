@@ -1,0 +1,17 @@
+description: World
+vars:
+  word: world
+assert:
+  - description: Contains the reversed word
+    type: contains
+    vars:
+      needle: dlrow
+      ignoreCase: true
+  - description: Matches a regex
+    type: regex
+    vars:
+      pattern: d.*w
+  - description: Equals a value
+    type: equals
+    vars:
+      value: '!dlrow ,olleH'
