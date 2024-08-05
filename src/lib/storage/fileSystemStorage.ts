@@ -42,17 +42,34 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 	async getConfig(): Promise<NormalizedConfig> {
 		const config = await this.getRawConfig();
 
-		const providers: NormalizedProvider[] = await this.normalizeProviders(config.providers);
-		const tests: NormalizedTestCase[] = await this.normalizeTestCases(
-			config.tests,
-			config.defaultTest
-		);
+		const [providers, tests, prompts] = await Promise.all([
+			this.normalizeProviders(config.providers),
+			this.normalizeTestCases(config.tests, config.defaultTest),
+			this.normalizePrompts(config.prompts)
+		]);
 		return {
 			description: config.description,
 			providers,
-			prompts: config.prompts ?? [],
+			prompts,
 			tests
 		};
+	}
+	private async normalizePrompts(prompts: Config['prompts']): Promise<string[]> {
+		if (!prompts) {
+			return [];
+		}
+
+		const normalized: string[] = [];
+		for (const prompt of prompts) {
+			if (isTxtFileRef(prompt)) {
+				const file = await this.loadFile(prompt);
+				const text = await file.text();
+				normalized.push(text);
+			} else {
+				normalized.push(prompt);
+			}
+		}
+		return normalized;
 	}
 	private async normalizeProviders(providers: Config['providers']): Promise<NormalizedProvider[]> {
 		if (!providers) {
@@ -177,4 +194,10 @@ async function getFileJson(handle: FileSystemFileHandle): Promise<unknown> {
 	const file = await handle.getFile();
 	const text = await file.text();
 	return JSON.parse(text);
+}
+function isFileRef(value: string): boolean {
+	return value.startsWith('file:///');
+}
+function isTxtFileRef(value: string): boolean {
+	return isFileRef(value) && value.endsWith('.txt');
 }
