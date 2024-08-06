@@ -108,7 +108,7 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 					const data = yaml.parse(text);
 					test = testCaseSchema.parse(data);
 				} else {
-					throw new Error('asdf');
+					throw new Error('String test case must be a reference to a yaml file');
 				}
 			}
 			const vars: VarSet = await this.normalizeVars({
