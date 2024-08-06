@@ -11,7 +11,8 @@ import {
 	type NormalizedAssertion,
 	type Assertion,
 	testCaseSchema,
-	type VarSet
+	type VarSet,
+	type TestCase
 } from '$lib/types';
 import type { ZodSchema } from 'zod';
 import * as yaml from 'yaml';
@@ -100,29 +101,39 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 		}
 
 		const normalized: NormalizedTestCase[] = [];
-		for (let test of tests) {
-			if (typeof test === 'string') {
-				if (isFileRef(test, '.yaml')) {
-					const file = await this.loadFile(test);
+		for (const test of tests) {
+			if (typeof test === 'object') {
+				const normalizedTest = await this.normalizeTestCase(test, defaultTest ?? {});
+				normalized.push(normalizedTest);
+			} else if (typeof test === 'string' && isFileRef(test, '.yaml')) {
+				const files = await this.loadGlob(test);
+				for (const file of files) {
 					const text = await file.text();
 					const data = yaml.parse(text);
-					test = testCaseSchema.parse(data);
-				} else {
-					throw new Error('String test case must be a reference to a yaml file');
+					const test = testCaseSchema.parse(data);
+					const normalizedTest = await this.normalizeTestCase(test, defaultTest ?? {});
+					normalized.push(normalizedTest);
 				}
+			} else {
+				throw new Error('String test case must be a reference to a yaml file');
 			}
-			const vars: VarSet = await this.normalizeVars({
-				...(defaultTest?.vars ?? {}),
-				...(test.vars ?? {})
-			});
-			const assert = await Promise.all(
-				[...(defaultTest?.assert ?? []), ...(test.assert ?? [])].map((assert) =>
-					this.normalizeAssertion(assert)
-				)
-			);
-			normalized.push({ description: test.description, vars, assert });
 		}
 		return normalized;
+	}
+	private async normalizeTestCase(
+		test: TestCase,
+		defaultTest: Partial<TestCase>
+	): Promise<NormalizedTestCase> {
+		const vars: VarSet = await this.normalizeVars({
+			...(defaultTest.vars ?? {}),
+			...(test.vars ?? {})
+		});
+		const assert = await Promise.all(
+			[...(defaultTest.assert ?? []), ...(test.assert ?? [])].map((assert) =>
+				this.normalizeAssertion(assert)
+			)
+		);
+		return { description: test.description ?? defaultTest.description, vars, assert };
 	}
 	private async normalizeAssertion(assertion: Assertion): Promise<NormalizedAssertion> {
 		const vars = await this.normalizeVars(assertion.vars ?? {});

@@ -95,7 +95,7 @@ interface Config {
 }
 ```
 
-You can store prompts in separate `.txt` files, just reference it using `file:///`.
+You can store prompts in separate `.txt` files, just reference it using `file:///`. Or import multiple with a glob, such as `file:///prompts/*.txt`.
 
 Unlike Promptfoo, these use [Handlebars](https://handlebarsjs.com/) format instead. Test case variables are considered "safe" strings and will not be escaped.
 
@@ -134,7 +134,7 @@ interface Assertion {
 }
 ```
 
-A test may either be an object describing the test, or a `file:///` path to a `.yaml` file containing the description.
+A test may either be an object describing the test, a `file:///` path to a `.yaml` file containing the description, or a `file:///` glob pattern to match against (e.g. `file:///tests/**/*.yaml`).
 
 Vars will be substituted into the prompt. In addition to support for image files (shown above), `file:///` paths to `.txt` files will also be loaded as a string variable.
 

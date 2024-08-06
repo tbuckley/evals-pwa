@@ -9,7 +9,7 @@ prompts:
 
 tests:
   - file:///testA.yaml
-  - file:///testB.yaml
+  - file:///tests/**/*.yaml
   - description: Local ref
     vars:
       word: file:///varA.txt
