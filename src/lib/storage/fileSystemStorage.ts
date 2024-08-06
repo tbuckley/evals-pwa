@@ -150,7 +150,7 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 	private async normalizeVars<T>(vars: Record<string, T>): Promise<Record<string, T | string>> {
 		const normalized: Record<string, T | string> = { ...vars };
 		for (const key in normalized) {
-			if (typeof normalized[key] === 'string' && isFileRef(normalized[key], '.txt')) {
+			if (typeof normalized[key] === 'string' && isFileRef(normalized[key], ['.txt', '.js'])) {
 				const file = await this.loadFile(normalized[key]);
 				const text = await file.text();
 				normalized[key] = text;
@@ -294,12 +294,14 @@ async function getFileJson(handle: FileSystemFileHandle): Promise<unknown> {
 	const text = await file.text();
 	return JSON.parse(text);
 }
-function isFileRef(value: string, type?: string): boolean {
+function isFileRef(value: string, type?: string | string[]): boolean {
 	if (!value.startsWith('file:///')) {
 		return false;
 	}
-	if (type) {
+	if (typeof type === 'string') {
 		return value.endsWith(type);
+	} else if (Array.isArray(type)) {
+		return type.some((t) => value.endsWith(t));
 	}
 	return true;
 }

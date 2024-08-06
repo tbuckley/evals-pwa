@@ -5,4 +5,4 @@ assert:
   - description: Is >1000 characters
     type: javascript
     vars:
-      code: file:///code.txt
+      code: file:///code.js
