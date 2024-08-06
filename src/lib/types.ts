@@ -41,8 +41,10 @@ export const configSchema = z.object({
 	description: z.string().optional(),
 
 	providers: z.array(providerSchema).optional(),
-	prompts: z.array(promptSchema).optional(),
-	tests: z.array(z.union([testCaseSchema, z.string().startsWith('file:///')])).optional(),
+	prompts: z.union([z.string(), z.array(promptSchema)]).optional(),
+	tests: z
+		.union([z.string(), z.array(z.union([testCaseSchema, z.string().startsWith('file:///')]))])
+		.optional(),
 	defaultTest: testCaseSchema.optional()
 });
 export type Config = z.infer<typeof configSchema>;

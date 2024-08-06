@@ -63,6 +63,10 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 			return [];
 		}
 
+		if (typeof prompts === 'string') {
+			prompts = [prompts];
+		}
+
 		const normalized: string[] = [];
 		for (const prompt of prompts) {
 			if (isFileRef(prompt, '.txt')) {
@@ -98,6 +102,10 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 	): Promise<NormalizedTestCase[]> {
 		if (!tests) {
 			return [];
+		}
+
+		if (typeof tests === 'string') {
+			tests = [tests];
 		}
 
 		const normalized: NormalizedTestCase[] = [];
