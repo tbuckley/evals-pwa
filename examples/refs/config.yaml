@@ -10,3 +10,11 @@ prompts:
 tests:
   - file:///testA.yaml
   - file:///testB.yaml
+  - description: Local ref
+    vars:
+      word: file:///varA.txt
+    assert:
+      - description: Contains the word
+        type: contains
+        vars:
+          needle: ereht

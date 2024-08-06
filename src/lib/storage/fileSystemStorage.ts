@@ -10,7 +10,8 @@ import {
 	type NormalizedTestCase,
 	type NormalizedAssertion,
 	type Assertion,
-	testCaseSchema
+	testCaseSchema,
+	type VarSet
 } from '$lib/types';
 import type { ZodSchema } from 'zod';
 import * as yaml from 'yaml';
@@ -107,7 +108,10 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 					throw new Error('asdf');
 				}
 			}
-			const vars = { ...(defaultTest?.vars ?? {}), ...(test.vars ?? {}) };
+			const vars: VarSet = await this.normalizeVars({
+				...(defaultTest?.vars ?? {}),
+				...(test.vars ?? {})
+			});
 			const assert = await Promise.all(
 				[...(defaultTest?.assert ?? []), ...(test.assert ?? [])].map((assert) =>
 					this.normalizeAssertion(assert)
@@ -118,8 +122,21 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 		return normalized;
 	}
 	private async normalizeAssertion(assertion: Assertion): Promise<NormalizedAssertion> {
-		const vars = assertion.vars ?? {};
+		const vars = await this.normalizeVars(assertion.vars ?? {});
 		return { ...assertion, vars };
+	}
+	private async normalizeVars<T>(vars: Record<string, T>): Promise<Record<string, T | string>> {
+		const normalized: Record<string, T | string> = { ...vars };
+		for (const key in normalized) {
+			if (typeof normalized[key] === 'string' && isFileRef(normalized[key], '.txt')) {
+				const file = await this.loadFile(normalized[key]);
+				const text = await file.text();
+				normalized[key] = text;
+			}
+			// TODO also load other file types, or throw an error
+			// Currently images are loaded in runTests
+		}
+		return normalized;
 	}
 
 	async getAllRuns(): Promise<Run[]> {

@@ -95,6 +95,8 @@ interface Config {
 }
 ```
 
+You can store prompts in separate `.txt` files, just reference it using `file:///`.
+
 Unlike Promptfoo, these use [Handlebars](https://handlebarsjs.com/) format instead. Test case variables are considered "safe" strings and will not be escaped.
 
 If a var starts with `file:///` and ends with .png, .jpg, or .jpeg then it will be loaded as an image. Note that not all providers support images.
@@ -116,7 +118,7 @@ Format:
 
 ```typescript
 interface Config {
-	tests: TestCase[];
+	tests: Array<TestCase | string>[];
 	defaultTest?: Partial<TestCase>;
 	// ...
 }
@@ -132,6 +134,10 @@ interface Assertion {
 }
 ```
 
+A test may either be an object describing the test, or a `file:///` path to a `.yaml` file containing the description.
+
+Vars will be substituted into the prompt. In addition to support for image files (shown above), `file:///` paths to `.txt` files will also be loaded as a string variable.
+
 Supported assertion types:
 
 - [x] javascript -- run javascript code on output, see below. Vars: `{ code: string }`
@@ -145,6 +151,8 @@ Supported assertion types:
 
 Any assertion vars that are strings will be treated as Handlebars templates, and the test case's vars will be populated.
 This makes it easy to define assertions inside defaultTest, using variables to tweak the assertion for each test case.
+
+Any assertion vars that start with `file:///` and end with `.txt` will be loaded.
 
 ```yaml
 # ...
