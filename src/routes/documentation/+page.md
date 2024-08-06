@@ -136,7 +136,7 @@ interface Assertion {
 
 `tests` is either an array of tests, or a `file:///` glob referencing the tests. A test may either be an object describing the test, a `file:///` path to a `.yaml` file containing the description, or a `file:///` glob pattern to match against (e.g. `file:///tests/**/*.yaml`).
 
-Vars will be substituted into the prompt. In addition to support for image files (shown above), `file:///` paths to `.txt` files will also be loaded as a string variable.
+Vars will be substituted into the prompt. In addition to support for image files (shown above), `file:///` paths to `.txt` or `.js` files will also be loaded as a string variable.
 
 Supported assertion types:
 
@@ -152,7 +152,7 @@ Supported assertion types:
 Any assertion vars that are strings will be treated as Handlebars templates, and the test case's vars will be populated.
 This makes it easy to define assertions inside defaultTest, using variables to tweak the assertion for each test case.
 
-Any assertion vars that start with `file:///` and end with `.txt` will be loaded.
+Any assertion vars that start with `file:///` and end with `.txt` or `.js` will be loaded.
 
 ```yaml
 # ...
