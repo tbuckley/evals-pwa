@@ -15,6 +15,7 @@ import {
 } from '$lib/types';
 import type { ZodSchema } from 'zod';
 import * as yaml from 'yaml';
+import * as pm from 'picomatch';
 
 export class FileSystemStorage implements StorageProvider, FileLoader {
 	constructor(public dir: FileSystemDirectoryHandle) {}
@@ -64,9 +65,11 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 		const normalized: string[] = [];
 		for (const prompt of prompts) {
 			if (isFileRef(prompt, '.txt')) {
-				const file = await this.loadFile(prompt);
-				const text = await file.text();
-				normalized.push(text);
+				const files = await this.loadGlob(prompt);
+				for (const file of files) {
+					const text = await file.text();
+					normalized.push(text);
+				}
 			} else {
 				normalized.push(prompt);
 			}
@@ -156,6 +159,23 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 		}
 		return runs;
 	}
+	private async getSubdirHandle(path: string): Promise<FileSystemDirectoryHandle> {
+		if (path === '') {
+			return this.dir;
+		}
+		const parts = path.split('/'); // Should not contain a trailing slash, unless the path itself ends with one
+		let basedir = this.dir;
+		for (const part of parts) {
+			// TODO error if part is empty?
+			try {
+				basedir = await basedir.getDirectoryHandle(part, { create: false });
+			} catch {
+				throw new Error(`Error loading directory: "${part}" (of "${path}")`);
+			}
+		}
+		return basedir;
+	}
+
 	async loadFile(path: string): Promise<File> {
 		// Ensure that path starts with file:/// and remove it
 		if (!path.startsWith('file:///')) {
@@ -169,14 +189,7 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 			throw new Error('Invalid path');
 		}
 
-		let dir = this.dir;
-		for (const part of parts) {
-			try {
-				dir = await dir.getDirectoryHandle(part, { create: false });
-			} catch {
-				throw new Error(`Error loading directory: ${part}`);
-			}
-		}
+		const dir = await this.getSubdirHandle(parts.join('/'));
 		let handle: FileSystemFileHandle;
 		try {
 			handle = await dir.getFileHandle(fileName, { create: false });
@@ -186,6 +199,45 @@ export class FileSystemStorage implements StorageProvider, FileLoader {
 
 		const file = await handle.getFile();
 		return file;
+	}
+
+	async loadGlob(pattern: string): Promise<File[]> {
+		// Ensure that pattern starts with file:/// and remove it
+		if (!pattern.startsWith('file:///')) {
+			throw new Error('Invalid path');
+		}
+		pattern = pattern.slice('file:///'.length);
+
+		// Split pattern into base + glob
+		const { base, glob, isGlob } = pm.scan(pattern);
+
+		// If it's not a glob, just load the file...
+		if (!isGlob) {
+			const file = await this.loadFile('file:///' + pattern);
+			return [file];
+		}
+
+		// Get a regular expression. mm.isMatch() will use nodejs path module.
+		const re = pm.makeRe(glob, { windows: false, cwd: '/' });
+
+		// Get all file paths
+		const files: File[] = [];
+		const basedir = await this.getSubdirHandle(base);
+		const queue: { handle: FileSystemDirectoryHandle; path: string }[] = [
+			{ handle: basedir, path: '' }
+		];
+		while (queue.length > 0) {
+			const { handle, path } = queue.pop()!;
+			for await (const entry of handle.values()) {
+				if (entry.kind === 'file' && re.test(path + entry.name)) {
+					files.push(await entry.getFile());
+				} else if (entry.kind === 'directory') {
+					queue.push({ handle: entry, path: path + entry.name + '/' });
+				}
+			}
+		}
+
+		return files;
 	}
 
 	async addRun(run: Run): Promise<void> {
