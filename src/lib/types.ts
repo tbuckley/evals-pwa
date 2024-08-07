@@ -1,12 +1,10 @@
 import { object, z } from 'zod';
 
-export const varSchema = z.string();
-export type Var = z.infer<typeof varSchema>;
+const varSchema = z.string();
 
-export const varSetSchema = z.record(z.string(), varSchema);
-export type VarSet = z.infer<typeof varSetSchema>;
+const varSetSchema = z.record(z.string(), varSchema);
 
-export const assertionSchema = z.object({
+const assertionSchema = z.object({
 	// Required
 	type: z.string(),
 
@@ -14,42 +12,22 @@ export const assertionSchema = z.object({
 	description: z.string().optional(),
 	vars: z.record(z.string(), z.unknown()).optional()
 });
-export type Assertion = z.infer<typeof assertionSchema>;
-
-export const normalizedProviderSchema = z.object({
+const normalizedProviderSchema = z.object({
 	id: z.string(),
 	config: z.object({}).passthrough().optional(),
 	prompts: z.array(z.string()).optional()
 });
-export type NormalizedProvider = z.infer<typeof normalizedProviderSchema>;
-
 export const providerSchema = z.union([z.string(), normalizedProviderSchema]);
+const promptSchema = z.string();
+
+export type Var = z.infer<typeof varSchema>;
+export type VarSet = z.infer<typeof varSetSchema>;
+export type Assertion = z.infer<typeof assertionSchema>;
+export type NormalizedProvider = z.infer<typeof normalizedProviderSchema>;
 export type Provider = z.infer<typeof providerSchema>;
-
-export const promptSchema = z.string();
 export type Prompt = z.infer<typeof promptSchema>;
-
-export const testCaseSchema = z.object({
-	// Optional
-	vars: varSetSchema.optional(),
-	description: z.string().optional(),
-	assert: z.array(assertionSchema).optional()
-});
-export type TestCase = z.infer<typeof testCaseSchema>;
-
-export const configSchema = z.object({
-	description: z.string().optional(),
-
-	providers: z.array(providerSchema).optional(),
-	prompts: z.union([z.string(), z.array(promptSchema)]).optional(),
-	tests: z
-		.union([z.string(), z.array(z.union([testCaseSchema, z.string().startsWith('file:///')]))])
-		.optional(),
-	defaultTest: testCaseSchema.optional()
-});
-export type Config = z.infer<typeof configSchema>;
-
 export type NormalizedAssertion = Assertion & Required<Pick<Assertion, 'vars'>>;
+
 export interface NormalizedTestCase {
 	description?: string;
 	vars: VarSet;
@@ -74,7 +52,7 @@ export const assertionResultSchema = z.object({
 });
 export type AssertionResult = z.infer<typeof assertionResultSchema>;
 
-export const tokenUsageSchema = z.object({
+const tokenUsageSchema = z.object({
 	// Optional
 	inputTokens: z.number().int().optional(),
 	outputTokens: z.number().int().optional(),
@@ -83,7 +61,7 @@ export const tokenUsageSchema = z.object({
 });
 export type TokenUsage = z.infer<typeof tokenUsageSchema>;
 
-export const testOutputSchema = z.object({
+const testOutputSchema = z.object({
 	// Required
 	rawPrompt: z.unknown(),
 
@@ -98,12 +76,20 @@ export const testOutputSchema = z.object({
 });
 export type TestOutput = z.infer<typeof testOutputSchema>;
 
-export const testResultSchema = testOutputSchema.extend({
+const testResultSchema = testOutputSchema.extend({
 	// Required
 	pass: z.boolean(),
 	assertionResults: z.array(assertionResultSchema)
 });
 export type TestResult = z.infer<typeof testResultSchema>;
+
+const testCaseSchema = z.object({
+	// Optional
+	vars: varSetSchema.optional(),
+	description: z.string().optional(),
+	assert: z.array(assertionSchema).optional()
+});
+export type TestCase = z.infer<typeof testCaseSchema>;
 
 export const runSchema = z.object({
 	version: z.literal(1),

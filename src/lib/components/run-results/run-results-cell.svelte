@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { TestResult, tokenUsageSchema } from '$lib/types';
+	import type { TestResult } from '$lib/types';
 
 	export let testResult: TestResult;
 

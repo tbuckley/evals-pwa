@@ -1,4 +1,4 @@
-import type { Assertion, AssertionProvider, FileLoader, TestCase } from '$lib/types';
+import type { Assertion, AssertionProvider, FileLoader, NormalizedTestCase } from '$lib/types';
 import { convertAllStringsToHandlebarSafe } from '$lib/utils/handlebars';
 import { createContainsAssertion } from './contains';
 import { createJavascriptAssertion } from './javascript';
@@ -16,7 +16,7 @@ export class AssertionManager {
 		public fileLoader: FileLoader
 	) {}
 
-	getAssertion(assertion: Assertion, testVars: TestCase['vars']): AssertionProvider {
+	getAssertion(assertion: Assertion, testVars: NormalizedTestCase['vars']): AssertionProvider {
 		const provider = this.createAssertion(assertion.type, assertion.vars, testVars);
 		this.assertions.push(provider);
 		return provider;
@@ -30,7 +30,7 @@ export class AssertionManager {
 	private createAssertion(
 		type: string,
 		vars: Assertion['vars'],
-		testVars: TestCase['vars']
+		testVars: NormalizedTestCase['vars']
 	): AssertionProvider {
 		const populatedVars = { ...vars };
 		const safeVars = convertAllStringsToHandlebarSafe(testVars ?? {});
