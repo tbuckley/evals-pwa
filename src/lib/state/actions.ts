@@ -1,17 +1,18 @@
 import { get } from 'svelte/store';
 import { configStore, runStore, selectedRunIdStore, storageStore } from './stores';
-import type {
-	AssertionResult,
-	FileLoader,
-	NormalizedProvider,
-	NormalizedTestCase,
-	PopulatedVarSet,
-	Prompt,
-	Provider,
-	Run,
-	TestEnvironment,
-	TestResult,
-	VarSet
+import {
+	UiError,
+	type AssertionResult,
+	type FileLoader,
+	type NormalizedProvider,
+	type NormalizedTestCase,
+	type PopulatedVarSet,
+	type Prompt,
+	type Provider,
+	type Run,
+	type TestEnvironment,
+	type TestResult,
+	type VarSet
 } from '$lib/types';
 import { ProviderManager } from '$lib/providers/ProviderManager';
 import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
@@ -36,6 +37,7 @@ export async function chooseFolder() {
 		return;
 	}
 
+	// TODO don't allow the user to select a directory if it is invalid
 	const storage = new FileSystemEvalsStorage(new WebFileSystemStorage(dir));
 	storageStore.set(storage);
 	await loadStateFromStorage();
@@ -45,7 +47,38 @@ export async function loadStateFromStorage(): Promise<void> {
 	const storage = get(storageStore);
 	if (!storage) return;
 
-	const [config, runs] = await Promise.all([storage.getConfig(), storage.getAllRuns()]);
+	let config, runs;
+	try {
+		[config, runs] = await Promise.all([storage.getConfig(), storage.getAllRuns()]);
+	} catch (err) {
+		if (err instanceof UiError) {
+			switch (err.detail.type) {
+				case 'missing-config':
+					showPrompt({
+						title: 'Missing config.yaml',
+						description: `Please create ${err.detail.path} in your selected directory.`,
+						cancelText: null
+					});
+					break;
+				case 'missing-config-reference':
+					showPrompt({
+						title: 'Missing file',
+						description: `The file ${err.detail.path} referenced from your configuration does not exist.`,
+						cancelText: null
+					});
+					break;
+				case 'invalid-config':
+					showPrompt({
+						title: 'Invalid configuration',
+						description: `The config.yaml file contains errors:\n${err.detail.errors.join('\n')}`,
+						cancelText: null
+					});
+					break;
+			}
+			return;
+		}
+		throw err;
+	}
 
 	// If the storage has changed since the request was made, ignore the results
 	if (get(storageStore) !== storage) return;

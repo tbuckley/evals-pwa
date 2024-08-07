@@ -139,7 +139,9 @@
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
-			<AlertDialog.Cancel>{$alertStore?.cancelText ?? 'Cancel'}</AlertDialog.Cancel>
+			{#if $alertStore?.cancelText !== null}
+				<AlertDialog.Cancel>{$alertStore?.cancelText ?? 'Cancel'}</AlertDialog.Cancel>
+			{/if}
 			<AlertDialog.Action on:click={() => $alertStore?.callback?.(true)}
 				>{$alertStore?.confirmText ?? 'Continue'}</AlertDialog.Action
 			>

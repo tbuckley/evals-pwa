@@ -152,3 +152,17 @@ export interface AssertionProvider {
 	run(output: string): MaybePromise<AssertionResult>;
 	destroy?: () => void;
 }
+
+export type ErrorState =
+	| { type: 'missing-config'; path: string }
+	| { type: 'invalid-config'; errors: string[] }
+	| { type: 'missing-config-reference'; path: string };
+
+export class UiError extends Error {
+	constructor(
+		public detail: ErrorState,
+		message?: string
+	) {
+		super(message);
+	}
+}

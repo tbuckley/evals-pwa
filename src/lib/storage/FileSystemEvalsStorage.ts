@@ -1,8 +1,14 @@
-import { runSchema, type NormalizedConfig, type Run, type StorageProvider } from '$lib/types';
+import {
+	runSchema,
+	UiError,
+	type NormalizedConfig,
+	type Run,
+	type StorageProvider
+} from '$lib/types';
 import { dereferenceFilePaths } from './dereferenceFilePaths';
 import { normalizeConfig } from './normalizeConfig';
 import { fsConfigSchema } from './types';
-import type { WebFileSystemStorage } from './WebFileSystemStorage';
+import { MissingFileError, type WebFileSystemStorage } from './WebFileSystemStorage';
 import * as yaml from 'yaml';
 
 export class FileSystemEvalsStorage implements StorageProvider {
@@ -13,18 +19,44 @@ export class FileSystemEvalsStorage implements StorageProvider {
 	}
 
 	async getConfig(): Promise<NormalizedConfig> {
-		const file = await this.fs.loadFile('file:///config.yaml');
+		let file;
+		try {
+			file = await this.fs.loadFile('file:///config.yaml');
+		} catch {
+			throw new UiError({ type: 'missing-config', path: 'file:///config.yaml' });
+		}
+
 		const text = await file.text();
 		const raw = yaml.parse(text);
 
-		const dereferenced = await dereferenceFilePaths(raw, { storage: this.fs });
-		const parsed = fsConfigSchema.parse(dereferenced);
+		let dereferenced;
+		try {
+			dereferenced = await dereferenceFilePaths(raw, { storage: this.fs });
+		} catch (err) {
+			if (err instanceof MissingFileError) {
+				throw new UiError({ type: 'missing-config-reference', path: err.path });
+			}
+			throw err;
+		}
 
-		return normalizeConfig(parsed);
+		const parsed = fsConfigSchema.safeParse(dereferenced);
+		if (!parsed.success) {
+			const errors = parsed.error.issues.map(
+				(issue) => `${issue.path.join('.')}: ${issue.message}`
+			);
+			throw new UiError({ type: 'invalid-config', errors });
+		}
+
+		return normalizeConfig(parsed.data);
 	}
 
 	async getAllRuns(): Promise<Run[]> {
-		const files = (await this.fs.load('file:///runs/*.json')) as { path: string; file: File }[];
+		let files;
+		try {
+			files = (await this.fs.load('file:///runs/*.json')) as { path: string; file: File }[];
+		} catch {
+			return [];
+		}
 		return Promise.all(
 			files.map(async ({ file }) => {
 				const text = await file.text();

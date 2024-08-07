@@ -43,10 +43,7 @@ export class WebFileSystemStorage {
 		const filepath = getPathFromUri(uri);
 		const { path, filename } = splitPathAndFilename(filepath);
 		const dir = await this.getSubdirHandle(path);
-		const handle = await handleNotFoundError(
-			dir.getFileHandle(filename, { create: false }),
-			`Error loading file: ${uri}`
-		);
+		const handle = await handleNotFoundError(dir.getFileHandle(filename, { create: false }), uri);
 		return handle.getFile();
 	}
 
@@ -58,10 +55,7 @@ export class WebFileSystemStorage {
 		let subdir = this.dir;
 		for (const part of parts) {
 			// TODO error if part is empty?
-			subdir = await handleNotFoundError(
-				subdir.getDirectoryHandle(part, { create: false }),
-				`Error loading directory: "${part}" in "${path}"`
-			);
+			subdir = await handleNotFoundError(subdir.getDirectoryHandle(part, { create: false }), path);
 		}
 		return subdir;
 	}
@@ -83,12 +77,12 @@ function splitPathAndFilename(filepath: string): { path: string; filename: strin
 	const path = parts.join('/');
 	return { path, filename };
 }
-async function handleNotFoundError<T>(handlePromise: Promise<T>, msg: string): Promise<T> {
+async function handleNotFoundError<T>(handlePromise: Promise<T>, path: string): Promise<T> {
 	try {
 		return await handlePromise;
 	} catch (e) {
 		if (e instanceof DOMException && e.name === 'NotFoundError') {
-			throw new Error(msg);
+			throw new MissingFileError(path);
 		}
 		throw e;
 	}
@@ -107,5 +101,11 @@ async function fileDfs(
 				queue.push({ path: path + entry.name + '/', handle: entry });
 			}
 		}
+	}
+}
+
+export class MissingFileError extends Error {
+	constructor(public path: string) {
+		super(`File not found: ${path}`);
 	}
 }
