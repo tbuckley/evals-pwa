@@ -25,6 +25,15 @@ import { FileSystemEvalsStorage } from '$lib/storage/FileSystemEvalsStorage';
 import { WebFileSystemStorage } from '$lib/storage/WebFileSystemStorage';
 import { getVarNamesForTests } from '$lib/utils/testCase';
 import { summarizeResults } from '$lib/utils/summarizeResults';
+import * as idb from 'idb-keyval';
+
+const folder = await idb.get<FileSystemDirectoryHandle>('folder');
+if (folder) {
+	const permission = await folder.queryPermission({ mode: 'readwrite' });
+	if (permission === 'granted') {
+		await setStorageDirectory(folder);
+	}
+}
 
 export async function chooseFolder() {
 	let dir: FileSystemDirectoryHandle;
@@ -45,6 +54,7 @@ export async function chooseFolder() {
 
 export async function setStorageDirectory(dir: FileSystemDirectoryHandle) {
 	const storage = new FileSystemEvalsStorage(new WebFileSystemStorage(dir));
+	await idb.set('folder', dir);
 	storageStore.set(storage);
 	await loadStateFromStorage();
 }
