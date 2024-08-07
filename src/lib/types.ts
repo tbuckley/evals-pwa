@@ -1,4 +1,4 @@
-import { object, z } from 'zod';
+import { z } from 'zod';
 
 const varSchema = z.string();
 
@@ -98,7 +98,7 @@ export const runSchema = z.object({
 	id: z.string(),
 	timestamp: z.number(),
 	envs: z.array(
-		object({
+		z.object({
 			provider: providerSchema,
 			prompt: promptSchema
 		})
