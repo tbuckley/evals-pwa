@@ -19,8 +19,9 @@ import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter'
 import { ParallelTaskQueue } from '$lib/utils/ParallelTaskQueue';
 import { AssertionManager } from '$lib/assertions/AssertionManager';
 import { parsedEnvStore } from './derived';
-import { FileSystemStorage } from '$lib/storage/fileSystemStorage';
 import { alertStore, type AlertState } from './ui';
+import { FileSystemEvalsStorage } from '$lib/storage/FileSystemEvalsStorage';
+import { WebFileSystemStorage } from '$lib/storage/WebFileSystemStorage';
 
 export async function chooseFolder() {
 	let dir: FileSystemDirectoryHandle;
@@ -35,7 +36,7 @@ export async function chooseFolder() {
 		return;
 	}
 
-	const storage = new FileSystemStorage(dir);
+	const storage = new FileSystemEvalsStorage(new WebFileSystemStorage(dir));
 	storageStore.set(storage);
 	await loadStateFromStorage();
 }

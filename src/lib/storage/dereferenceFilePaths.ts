@@ -77,7 +77,8 @@ async function handleFile(filepath: string, file: File, options: DereferenceOpti
 		const text = await file.text();
 		const newVisited = new Set([...visited, filepath]); // Track file to detect cycles
 		return dereferenceFilePaths(yaml.parse(text), { ...options, visited: newVisited });
-	} else if (file.name.endsWith('.txt')) {
+	} else if (file.name.endsWith('.txt') || file.name.endsWith('.js')) {
+		// TODO handle js files (for javascript assertions) independently
 		const text = await file.text();
 		return text;
 	}
