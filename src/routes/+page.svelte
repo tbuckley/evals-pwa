@@ -23,7 +23,7 @@
 
 <article class="prose">
 	{#if $configStore === null}
-		<h1>Welcome to Evals PWA!</h1>
+		<h1>Welcome to Evals!</h1>
 		<p>
 			You can evaluate popular LLM models using your own prompts and test cases, all from within
 			your browser. Apart from requests directly to the LLM providers (like OpenAI or Google), no

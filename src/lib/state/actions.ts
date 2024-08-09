@@ -222,7 +222,7 @@ export async function runTests() {
 	storage.addRun(run);
 
 	if (document.visibilityState !== 'visible' && Notification.permission === 'granted') {
-		new Notification('Eval complete', { body: 'See your results in Evals PWA.' });
+		new Notification('Eval complete', { body: 'See your results in Evals.' });
 	}
 }
 

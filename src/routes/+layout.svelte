@@ -45,7 +45,7 @@
 			<div class="flex h-14 items-center border-b px-4">
 				<a href="/" class="flex items-center gap-2 font-semibold">
 					<FlaskConical class="h-6 w-6" />
-					<span class="">Evals PWA</span>
+					<span class="">Evals</span>
 				</a>
 			</div>
 			<div class="flex-1">
@@ -81,7 +81,7 @@
 					<nav class="grid gap-2 text-lg font-medium">
 						<a href="##" class="flex items-center gap-2 text-lg font-semibold">
 							<FlaskConical class="h-6 w-6" />
-							<span class="sr-only">Evals PWA</span>
+							<span class="sr-only">Evals</span>
 						</a>
 						{#each links as { name, href, icon }, i}
 							<Sheet.Close asChild let:builder>
