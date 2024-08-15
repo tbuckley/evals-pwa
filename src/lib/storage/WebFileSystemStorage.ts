@@ -31,7 +31,7 @@ export class WebFileSystemStorage {
 		const filepath = getPathFromUri(uri);
 		const { path, filename } = splitPathAndFilename(filepath);
 
-		const dir = await this.getSubdirHandle(path);
+		const dir = await this.getSubdirHandle(path, true);
 		const handle = await dir.getFileHandle(filename, { create: true });
 
 		const writable = await handle.createWritable();
@@ -47,7 +47,7 @@ export class WebFileSystemStorage {
 		return handle.getFile();
 	}
 
-	private async getSubdirHandle(path: string): Promise<FileSystemDirectoryHandle> {
+	private async getSubdirHandle(path: string, create = false): Promise<FileSystemDirectoryHandle> {
 		if (path === '') {
 			return this.dir;
 		}
@@ -55,7 +55,7 @@ export class WebFileSystemStorage {
 		let subdir = this.dir;
 		for (const part of parts) {
 			// TODO error if part is empty?
-			subdir = await handleNotFoundError(subdir.getDirectoryHandle(part, { create: false }), path);
+			subdir = await handleNotFoundError(subdir.getDirectoryHandle(part, { create }), path);
 		}
 		return subdir;
 	}
