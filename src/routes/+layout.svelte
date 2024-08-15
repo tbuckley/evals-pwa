@@ -135,7 +135,11 @@
 		<AlertDialog.Header>
 			<AlertDialog.Title>{$alertStore?.title ?? 'Error'}</AlertDialog.Title>
 			<AlertDialog.Description>
-				{$alertStore?.description ?? 'An unknown error occurred.'}
+				{#each $alertStore?.description ?? [] as description}
+					<p>{description}</p>
+				{:else}
+					<p>An unknown error occurred.</p>
+				{/each}
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>

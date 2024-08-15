@@ -26,8 +26,21 @@ export class FileSystemEvalsStorage implements StorageProvider {
 			throw new UiError({ type: 'missing-config', path: 'file:///config.yaml' });
 		}
 
-		const text = await file.text();
-		const raw = yaml.parse(text);
+		let text;
+		let raw;
+		try {
+			text = await file.text();
+			raw = yaml.parse(text);
+		} catch (err) {
+			if (err instanceof yaml.YAMLParseError) {
+				if (text && err.linePos) {
+					const line = text.split('\n')[err.linePos[0].line - 1];
+					const error = `Line ${err.linePos[0].line}: ${line}`;
+					throw new UiError({ type: 'invalid-config', errors: [error] });
+				}
+			}
+			throw new UiError({ type: 'invalid-config', errors: ['Invalid YAML'] });
+		}
 
 		let dereferenced;
 		try {

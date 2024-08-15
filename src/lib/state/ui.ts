@@ -2,7 +2,7 @@ import { writable } from 'svelte/store';
 
 export interface AlertState {
 	title: string;
-	description: string;
+	description: string[];
 	cancelText?: string | null;
 	confirmText?: string;
 	callback: (result: boolean) => void;

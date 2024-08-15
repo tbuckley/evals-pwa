@@ -56,21 +56,23 @@ export async function loadStateFromStorage(): Promise<void> {
 				case 'missing-config':
 					showPrompt({
 						title: 'Missing config.yaml',
-						description: `Please create ${err.detail.path} in your selected directory.`,
+						description: [`Please create ${err.detail.path} in your selected directory.`],
 						cancelText: null
 					});
 					break;
 				case 'missing-config-reference':
 					showPrompt({
 						title: 'Missing file',
-						description: `The file ${err.detail.path} referenced from your configuration does not exist.`,
+						description: [
+							`The file ${err.detail.path} referenced from your configuration does not exist.`
+						],
 						cancelText: null
 					});
 					break;
 				case 'invalid-config':
 					showPrompt({
 						title: 'Invalid configuration',
-						description: `The config.yaml file contains errors:\n${err.detail.errors.join('\n')}`,
+						description: [`The config.yaml file contains errors:`, ...err.detail.errors],
 						cancelText: null
 					});
 					break;
@@ -113,8 +115,9 @@ export async function runTests() {
 		// Prompt the user to update to the latest config
 		const res = await showPrompt({
 			title: 'Configuration has changed',
-			description:
-				'The config.yaml has changed since it was last loaded. Would you like to update to the latest configuration?',
+			description: [
+				'The config.yaml has changed since it was last loaded. Would you like to update to the latest configuration?'
+			],
 			confirmText: 'Update',
 			cancelText: 'Ignore'
 		});
