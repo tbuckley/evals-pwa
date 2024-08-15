@@ -21,6 +21,12 @@ providers:
 prompts:
 	- Speak like a pirate. {{request}}
 	- Only respond with a haiku. {{request}}
+	# For multi-line prompts, you probably want to use ">-"
+	# See https://yaml-multiline.info/
+	- >-
+	  This is a multi-line string where all the
+	  newlines will be replaced with spaces,
+	  and there will be no newline at the end.
 
 tests:
 	- description: foo
