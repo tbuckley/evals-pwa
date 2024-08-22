@@ -112,4 +112,23 @@ describe('dereferenceFilePaths', () => {
 		const output = await dereferenceFilePaths(input, { storage });
 		expect(output).toEqual({ txt: 'a', img: 'file:///b.png' });
 	});
+
+	test('supports relative paths', async () => {
+		const storage = new InMemoryFileStorage();
+		storage.register(
+			'file:///tests/a.yaml',
+			'vars: file://./b.yaml\nassert: file://../assert.js\nabs: file:///assert.js'
+		);
+		storage.register('file:///tests/b.yaml', 'foo: 1\nbar: 2\nbaz: file://./baz/c.png');
+		storage.register('file:///tests/baz/c.png', 'image');
+		storage.register('file:///assert.js', 'code');
+
+		const input = { tests: ['file:///tests/a.yaml'] };
+		const output = await dereferenceFilePaths(input, { storage });
+		expect(output).toEqual({
+			tests: [
+				{ vars: { foo: 1, bar: 2, baz: 'file:///tests/baz/c.png' }, assert: 'code', abs: 'code' }
+			]
+		});
+	});
 });

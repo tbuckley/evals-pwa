@@ -1,3 +1,10 @@
+import {
+	fileUriToPath,
+	getDirname,
+	isValidFileUri,
+	joinPath,
+	pathIsRelative
+} from '$lib/utils/path';
 import * as yaml from 'yaml';
 
 export interface FileStorage {
@@ -6,6 +13,7 @@ export interface FileStorage {
 
 export interface DereferenceOptions {
 	storage: FileStorage;
+	absolutePath?: string;
 	visited?: Set<string>;
 	markGlobs?: boolean;
 }
@@ -17,8 +25,15 @@ export async function dereferenceFilePaths(
 	options: DereferenceOptions
 ): Promise<unknown> {
 	if (typeof val === 'string') {
-		if (val.startsWith('file:///')) {
-			const res = await options.storage.load(val);
+		if (isValidFileUri(val)) {
+			let path = fileUriToPath(val);
+			if (pathIsRelative(path)) {
+				const base = options.absolutePath ?? '/';
+				path = joinPath(base, path);
+			}
+			const fileUri = `file://${path}`;
+
+			const res = await options.storage.load(fileUri);
 			if (Array.isArray(res)) {
 				const arr = await Promise.all(
 					res.map(async ({ path, file }) => handleFile(path, file, options))
@@ -29,7 +44,7 @@ export async function dereferenceFilePaths(
 			}
 
 			const file = res;
-			return handleFile(val, file, options);
+			return handleFile(fileUri, file, options);
 		}
 		return val;
 	}
@@ -65,22 +80,26 @@ export async function dereferenceFilePaths(
 	return val;
 }
 
-async function handleFile(filepath: string, file: File, options: DereferenceOptions) {
+async function handleFile(absoluteFileUri: string, file: File, options: DereferenceOptions) {
 	const visited = options.visited ?? new Set<string>();
 
 	// If we've already seen this file, throw an error
-	if (visited.has(filepath)) {
-		throw new Error(`Cyclic reference detected: ${[...visited, filepath].join(' -> ')}`);
+	if (visited.has(absoluteFileUri)) {
+		throw new Error(`Cyclic reference detected: ${[...visited, absoluteFileUri].join(' -> ')}`);
 	}
 
 	if (file.name.endsWith('.yaml')) {
 		const text = await file.text();
-		const newVisited = new Set([...visited, filepath]); // Track file to detect cycles
-		return dereferenceFilePaths(yaml.parse(text), { ...options, visited: newVisited });
+		const newVisited = new Set([...visited, absoluteFileUri]); // Track file to detect cycles
+		return dereferenceFilePaths(yaml.parse(text), {
+			...options,
+			absolutePath: getDirname(fileUriToPath(absoluteFileUri)),
+			visited: newVisited
+		});
 	} else if (file.name.endsWith('.txt') || file.name.endsWith('.js')) {
 		// TODO handle js files (for javascript assertions) independently
 		const text = await file.text();
 		return text;
 	}
-	return filepath;
+	return absoluteFileUri;
 }
