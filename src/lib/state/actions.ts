@@ -1,17 +1,17 @@
-import { get } from 'svelte/store';
+import { get, writable, type Writable } from 'svelte/store';
 import { configStore, runStore, selectedRunIdStore, storageStore } from './stores';
 import {
 	UiError,
 	type AssertionResult,
 	type FileLoader,
+	type LiveResult,
+	type LiveRun,
 	type NormalizedProvider,
 	type NormalizedTestCase,
 	type PopulatedVarSet,
 	type Prompt,
-	type Provider,
 	type Run,
 	type TestEnvironment,
-	type TestResult,
 	type VarSet
 } from '$lib/types';
 import { ProviderManager } from '$lib/providers/ProviderManager';
@@ -128,6 +128,12 @@ export async function runTests() {
 		}
 	}
 
+	// Request permission to show notifications
+	if (Notification.permission !== 'granted') {
+		// Note: not awaited so it does not delay results
+		Notification.requestPermission();
+	}
+
 	// Get global prompts + tests
 	const globalPrompts: Prompt[] = config.prompts;
 	const globalProviders: NormalizedProvider[] = config.providers;
@@ -138,75 +144,29 @@ export async function runTests() {
 	const providerManager = new ProviderManager(env);
 
 	// Create environments
-	const envs: TestEnvironment[] = [];
-	const runEnvs: { provider: Provider; prompt: Prompt }[] = [];
-	for (const provider of globalProviders) {
-		const model = providerManager.getProvider(provider.id, provider.config);
+	const runEnvs: RunEnv[] = getRunEnvs(globalProviders, globalPrompts);
+	const envs: TestEnvironment[] = createEnvironments(runEnvs, providerManager);
 
-		// First use any provider-specific prompts; otherwise, use the global prompts
-		const prompts: Prompt[] = provider.prompts ? provider.prompts : globalPrompts;
-		for (const prompt of prompts) {
-			envs.push(
-				new SimpleEnvironment({
-					model,
-					prompt: new HandlebarsPromptFormatter(prompt)
-				})
-			);
-			runEnvs.push({ provider, prompt });
-		}
-	}
-
-	const run: Run = {
-		version: 1,
+	const run: LiveRun = {
 		id: crypto.randomUUID(),
 		timestamp: Date.now(),
 		description: config.description,
 		envs: runEnvs,
 		tests: globalTests,
+		varNames: [], // TODO
 		results: []
 	};
 
-	// Request permission to show notifications
-	if (Notification.permission !== 'granted') {
-		// Note: not awaited so it does not delay results
-		Notification.requestPermission();
-	}
-
-	// Create the test runner
-	const runner = new ParallelTaskQueue(5);
-
 	// Run tests
+	const runner = new ParallelTaskQueue(5);
 	const mgr = new AssertionManager(providerManager, storage);
 	for (const test of globalTests) {
-		const testResults: TestResult[] = [];
+		const testResults: Writable<LiveResult>[] = [];
 		for (const env of envs) {
-			const result: TestResult = { pass: false, assertionResults: [] };
+			const result = writable<LiveResult>({ rawPrompt: null, state: 'waiting' });
 			testResults.push(result);
-
-			const assertions = test.assert.map((a) => mgr.getAssertion(a, test.vars));
-			// TODO destroy assertions after test is complete
-			const assertionResults: AssertionResult[] = [];
-
 			runner.enqueue(async () => {
-				// TODO should this be safeRun if it will catch all errors?
-				const populatedVars = await populate(test.vars, storage);
-				const output = await env.run(populatedVars);
-				for (const [key, value] of Object.entries(output)) {
-					(result as { [key: string]: unknown })[key] = value;
-				}
-
-				if (output.error) {
-					result.pass = false;
-					return;
-				}
-
-				// Run
-				for (const assertion of assertions) {
-					const result = await assertion.run(output.output!);
-					assertionResults.push(result);
-				}
-				result.pass = assertionResults.every((r) => r.pass);
-				result.assertionResults = assertionResults;
+				await runTest(test, env, mgr, storage, result);
 			});
 		}
 		run.results.push(testResults);
@@ -217,16 +177,111 @@ export async function runTests() {
 
 	runStore.update((runs) => ({
 		...runs,
-		[run.id]: run
+		[run.id]: liveRunToRun(run)
 	}));
 	selectedRunIdStore.set(run.id);
 
 	// Save the run to storage
-	storage.addRun(run);
+	storage.addRun(liveRunToRun(run));
 
 	if (document.visibilityState !== 'visible' && Notification.permission === 'granted') {
 		new Notification('Eval complete', { body: 'See your results in Evals.' });
 	}
+}
+
+type RunEnv = { provider: NormalizedProvider; prompt: Prompt };
+function getRunEnvs(providers: NormalizedProvider[], prompts: Prompt[]): RunEnv[] {
+	const envs: RunEnv[] = [];
+	for (const provider of providers) {
+		// First use any provider-specific prompts; otherwise, use the global prompts
+		const providerPrompts: Prompt[] = provider.prompts ? provider.prompts : prompts;
+		for (const prompt of providerPrompts) {
+			envs.push({ provider, prompt });
+		}
+	}
+	return envs;
+}
+
+function createEnvironments(
+	runEnvs: RunEnv[],
+	providerManager: ProviderManager
+): TestEnvironment[] {
+	const envs: TestEnvironment[] = [];
+	for (const env of runEnvs) {
+		const { provider, prompt } = env;
+
+		const model = providerManager.getProvider(provider.id, provider.config);
+		envs.push(
+			new SimpleEnvironment({
+				model,
+				prompt: new HandlebarsPromptFormatter(prompt)
+			})
+		);
+	}
+	return envs;
+}
+
+async function runTest(
+	test: NormalizedTestCase,
+	env: TestEnvironment,
+	assertionManager: AssertionManager,
+	storage: FileLoader,
+	result: Writable<LiveResult>
+): Promise<void> {
+	result.update((state) => ({
+		...state,
+		state: 'in-progress'
+	}));
+	// TODO should this be safeRun if it will catch all errors?
+	const populatedVars = await populate(test.vars, storage);
+	const output = await env.run(populatedVars);
+
+	result.update((state) => {
+		for (const [key, value] of Object.entries(output)) {
+			(state as unknown as { [key: string]: unknown })[key] = value;
+		}
+		return state;
+	});
+
+	if (output.error) {
+		result.update((state) => ({
+			...state,
+			state: 'error',
+			pass: false
+		}));
+		return;
+	}
+
+	// Test assertions
+	const assertions = test.assert.map((a) => assertionManager.getAssertion(a, test.vars));
+	const assertionResults: AssertionResult[] = [];
+	for (const assertion of assertions) {
+		const result = await assertion.run(output.output!);
+		assertionResults.push(result);
+	}
+	result.update((state) => ({
+		...state,
+		state: assertionResults.every((r) => r.pass) ? 'success' : 'error',
+		assertionResults
+	}));
+}
+
+function liveRunToRun(liveRun: LiveRun): Run {
+	return {
+		version: 1,
+		...liveRun,
+		results: liveRun.results.map((row) =>
+			row.map((store) => {
+				const res = get(store);
+				return {
+					...res,
+					state: undefined,
+					pass: res.state === 'success',
+					assertionResults: res.assertionResults ?? []
+				};
+			})
+		)
+	};
 }
 
 function deepEquals(a: unknown, b: unknown): boolean {

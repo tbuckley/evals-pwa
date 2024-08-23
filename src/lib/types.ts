@@ -1,3 +1,4 @@
+import type { Readable } from 'svelte/store';
 import { z } from 'zod';
 
 const varSchema = z.string();
@@ -165,4 +166,35 @@ export class UiError extends Error {
 	) {
 		super(message);
 	}
+}
+
+export interface LiveResult {
+	// Required
+	rawPrompt: unknown;
+	state: 'waiting' | 'in-progress' | 'success' | 'error';
+
+	// Success
+	output?: string;
+	rawOutput?: unknown;
+	latencyMillis?: number;
+	tokenUsage?: TokenUsage;
+	assertionResults?: AssertionResult[];
+
+	// Error
+	error?: string;
+}
+export interface LiveRun {
+	// Static
+	id: string;
+	timestamp: number;
+	description?: string;
+
+	envs: { provider: Provider; prompt: Prompt }[];
+	tests: TestCase[];
+
+	// Generated
+	varNames: string[];
+
+	// Dynamic
+	results: Readable<LiveResult>[][];
 }
