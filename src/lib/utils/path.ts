@@ -3,7 +3,7 @@ export function fileUriToPath(uri: string): string {
 	if (url.protocol !== 'file:' || (url.host !== '' && url.host !== '.' && url.host !== '..')) {
 		throw new Error(`Invalid file URI: ${uri}`);
 	}
-	const path = url.host + url.pathname;
+	const path = url.host + decodeURIComponent(url.pathname);
 	if (pathIsDirectory(path)) {
 		return path;
 	}
@@ -16,6 +16,11 @@ export function fileUriToPath(uri: string): string {
 		throw new Error(`Invalid file URI, must end with a slash: ${uri}`);
 	}
 	return path;
+}
+
+export function pathToFileUri(path: string): string {
+	// TODO validate path?
+	return 'file://' + path;
 }
 
 export function isValidFileUri(uri: string): boolean {

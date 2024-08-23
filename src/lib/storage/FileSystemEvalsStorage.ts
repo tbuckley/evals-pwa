@@ -66,7 +66,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
 	async getAllRuns(): Promise<Run[]> {
 		let files;
 		try {
-			files = (await this.fs.load('file:///runs/*.json')) as { path: string; file: File }[];
+			files = (await this.fs.load('file:///runs/*.json')) as { uri: string; file: File }[];
 		} catch {
 			return [];
 		}

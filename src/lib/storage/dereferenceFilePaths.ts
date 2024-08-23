@@ -3,12 +3,13 @@ import {
 	getDirname,
 	isValidFileUri,
 	joinPath,
-	pathIsRelative
+	pathIsRelative,
+	pathToFileUri
 } from '$lib/utils/path';
 import * as yaml from 'yaml';
 
 export interface FileStorage {
-	load(path: string): Promise<File | { path: string; file: File }[]>;
+	load(path: string): Promise<File | { uri: string; file: File }[]>;
 }
 
 export interface DereferenceOptions {
@@ -31,12 +32,15 @@ export async function dereferenceFilePaths(
 				const base = options.absolutePath ?? '/';
 				path = joinPath(base, path);
 			}
-			const fileUri = `file://${path}`;
+			const fileUri = pathToFileUri(path);
+			if (!isValidFileUri(fileUri)) {
+				throw new Error(`Generated invalid file URI: ${fileUri} (from ${val})`);
+			}
 
 			const res = await options.storage.load(fileUri);
 			if (Array.isArray(res)) {
 				const arr = await Promise.all(
-					res.map(async ({ path, file }) => handleFile(path, file, options))
+					res.map(async ({ uri, file }) => handleFile(uri, file, options))
 				);
 
 				// If markGlobs is true, return a special object so we can flatten it later

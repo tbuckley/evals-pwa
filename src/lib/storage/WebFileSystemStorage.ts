@@ -1,3 +1,14 @@
+import {
+	fileUriToPath,
+	getDirname,
+	getFilename,
+	joinPath,
+	normalizePath,
+	pathIsAbsolute,
+	pathIsDirectory,
+	pathIsFile,
+	pathToFileUri
+} from '$lib/utils/path';
 import picomatch from 'picomatch';
 
 export class WebFileSystemStorage {
@@ -7,31 +18,42 @@ export class WebFileSystemStorage {
 		return this.dir.name;
 	}
 
-	async load(uri: string): Promise<File | { path: string; file: File }[]> {
-		const path = getPathFromUri(uri);
+	async load(uri: string): Promise<File | { uri: string; file: File }[]> {
+		const path = fileUriToPath(uri);
 
-		const { base, glob, isGlob } = picomatch.scan(path);
+		const { base: picoDirname, glob, isGlob } = picomatch.scan(path);
 		if (!isGlob) {
 			return this.loadFile(uri);
+		}
+		const base = picoDirname + '/';
+		if (!pathIsAbsolute(base) || !pathIsDirectory(base)) {
+			throw new Error(`Invalid glob base: ${base}`);
 		}
 
 		const re = picomatch.makeRe(glob, { windows: false, cwd: '/' });
 		const basedir = await this.getSubdirHandle(base);
 
-		const files: { path: string; file: File }[] = [];
+		const files: { uri: string; file: File }[] = [];
 		await fileDfs(basedir, async (filepath, handle) => {
 			if (re.test(filepath)) {
-				files.push({ path: base + '/' + filepath, file: await handle.getFile() });
+				files.push({
+					uri: pathToFileUri(joinPath(base, './' + filepath)),
+					file: await handle.getFile()
+				});
 			}
 		});
 		return files;
 	}
 
 	async writeText(uri: string, text: string): Promise<void> {
-		const filepath = getPathFromUri(uri);
-		const { path, filename } = splitPathAndFilename(filepath);
+		const filepath = fileUriToPath(uri);
+		if (!pathIsFile(filepath)) {
+			throw new Error(`Cannot write to a directory: ${uri}`);
+		}
+		const dirname = getDirname(filepath);
+		const filename = getFilename(filepath)!;
 
-		const dir = await this.getSubdirHandle(path, true);
+		const dir = await this.getSubdirHandle(dirname, true);
 		const handle = await dir.getFileHandle(filename, { create: true });
 
 		const writable = await handle.createWritable();
@@ -40,9 +62,14 @@ export class WebFileSystemStorage {
 	}
 
 	async loadFile(uri: string): Promise<File> {
-		const filepath = getPathFromUri(uri);
-		const { path, filename } = splitPathAndFilename(filepath);
-		const dir = await this.getSubdirHandle(path);
+		const filepath = fileUriToPath(uri);
+		if (!pathIsFile(filepath)) {
+			throw new Error(`Cannot write to a directory: ${uri}`);
+		}
+		const dirname = getDirname(filepath);
+		const filename = getFilename(filepath)!;
+
+		const dir = await this.getSubdirHandle(dirname);
 		const handle = await handleNotFoundError(dir.getFileHandle(filename, { create: false }), uri);
 		return handle.getFile();
 	}
@@ -51,32 +78,15 @@ export class WebFileSystemStorage {
 		if (path === '') {
 			return this.dir;
 		}
-		const parts = path.split('/'); // Should not contain a trailing slash, unless the path itself ends with one
+		const parts = getAbsPathDirectories(path); // Should not contain a trailing slash, unless the path itself ends with one
 		let subdir = this.dir;
 		for (const part of parts) {
-			// TODO error if part is empty?
 			subdir = await handleNotFoundError(subdir.getDirectoryHandle(part, { create }), path);
 		}
 		return subdir;
 	}
 }
 
-function getPathFromUri(uri: string): string {
-	if (!uri.startsWith('file:///')) {
-		throw new Error('Invalid path');
-	}
-	return uri.slice('file:///'.length);
-}
-
-function splitPathAndFilename(filepath: string): { path: string; filename: string } {
-	const parts = filepath.split('/');
-	const filename = parts.pop()!;
-	if (!filename) {
-		throw new Error('Invalid path');
-	}
-	const path = parts.join('/');
-	return { path, filename };
-}
 async function handleNotFoundError<T>(handlePromise: Promise<T>, path: string): Promise<T> {
 	try {
 		return await handlePromise;
@@ -87,6 +97,8 @@ async function handleNotFoundError<T>(handlePromise: Promise<T>, path: string): 
 		throw e;
 	}
 }
+
+// Note: must return relative paths without ./, so that the glob matching works
 async function fileDfs(
 	dir: FileSystemDirectoryHandle,
 	fn: (filepath: string, handle: FileSystemFileHandle) => Promise<void>
@@ -102,6 +114,27 @@ async function fileDfs(
 			}
 		}
 	}
+}
+
+function getAbsPathDirectories(path: string): string[] {
+	if (!pathIsAbsolute(path)) {
+		throw new Error(`Path is not absolute: ${path}`);
+	}
+	if (!pathIsDirectory(path)) {
+		throw new Error(`Path is not a directory: ${path}`);
+	}
+
+	const normalized = normalizePath(path);
+	const parts = normalized.split('/');
+
+	// For absolute paths to directories, the first and last parts should be empty
+	if (parts[0] !== '') {
+		throw new Error(`Path is not absolute: ${path}`);
+	}
+	if (parts[parts.length - 1] !== '') {
+		throw new Error(`Path is not a directory: ${path}`);
+	}
+	return parts.slice(1, -1);
 }
 
 export class MissingFileError extends Error {

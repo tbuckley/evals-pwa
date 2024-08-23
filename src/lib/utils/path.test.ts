@@ -23,8 +23,14 @@ describe('path utils', () => {
 		expect(isValidFileUri('file://./bar/')).toBe(true);
 		expect(isValidFileUri('file://../bar/')).toBe(true);
 
+		// Globs
+		expect(isValidFileUri('file:///path/**/*.yaml')).toBe(true);
+		expect(isValidFileUri('file:///path/{foo,bar}.txt')).toBe(true);
+		expect(isValidFileUri('file://../path/{foo,bar}.txt')).toBe(true);
+
 		// Invalid
 		expect(isValidFileUri('file://foo')).toBe(false);
+		expect(isValidFileUri('foo:bar')).toBe(false);
 		// expect(isValidFileUri('file://.')).toBe(false); // new URL() will add a trailing slash
 	});
 	test('supports absolute paths to files', () => {
@@ -42,6 +48,11 @@ describe('path utils', () => {
 		expect(fileUriToPath('file://./path/to/file.txt')).toEqual('./path/to/file.txt');
 		expect(fileUriToPath('file://./bar/')).toEqual('./bar/');
 		expect(fileUriToPath('file://./')).toEqual('./');
+	});
+	test('supports globs', () => {
+		expect(fileUriToPath('file:///path/**/*.yaml')).toBe('/path/**/*.yaml');
+		expect(fileUriToPath('file:///path/{foo,bar}.txt')).toBe('/path/{foo,bar}.txt');
+		expect(fileUriToPath('file://../path/{foo,bar}.txt')).toBe('../path/{foo,bar}.txt');
 	});
 	test('throws errors on invalid paths', () => {
 		expect(() => fileUriToPath('file://path/to/file')).toThrow();
