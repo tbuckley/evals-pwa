@@ -1,5 +1,5 @@
 import { get, writable, type Writable } from 'svelte/store';
-import { configStore, runStore, selectedRunIdStore, storageStore } from './stores';
+import { configStore, liveRunStore, runStore, selectedRunIdStore, storageStore } from './stores';
 import {
 	UiError,
 	type AssertionResult,
@@ -172,14 +172,27 @@ export async function runTests() {
 		run.results.push(testResults);
 	}
 
-	await runner.completed();
-	mgr.destroy();
+	// Show the live run immediately
+	liveRunStore.update((state) => ({
+		...state,
+		[run.id]: run
+	}));
+	selectedRunIdStore.set(run.id);
 
+	// Wait to finish
+	await runner.completed();
+
+	// Clean up and save the run
+	mgr.destroy();
+	liveRunStore.update((state) => {
+		const newState = { ...state };
+		delete newState[run.id];
+		return newState;
+	});
 	runStore.update((runs) => ({
 		...runs,
 		[run.id]: liveRunToRun(run)
 	}));
-	selectedRunIdStore.set(run.id);
 
 	// Save the run to storage
 	storage.addRun(liveRunToRun(run));
@@ -267,9 +280,11 @@ async function runTest(
 }
 
 function liveRunToRun(liveRun: LiveRun): Run {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const { varNames: _, ...rest } = liveRun;
 	return {
+		...rest,
 		version: 1,
-		...liveRun,
 		results: liveRun.results.map((row) =>
 			row.map((store) => {
 				const res = get(store);

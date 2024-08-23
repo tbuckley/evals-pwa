@@ -1,7 +1,8 @@
-import { derived } from 'svelte/store';
-import { configStore, runStore, selectedRunIdStore } from './stores';
+import { derived, get } from 'svelte/store';
+import { configStore, liveRunStore, runStore, selectedRunIdStore } from './stores';
 import { ProviderManager } from '$lib/providers/ProviderManager';
 import { envStore } from './env';
+import type { LiveRun, Run } from '$lib/types';
 
 function parseEnvText(env: string): Record<string, string> {
 	// Given a series of key=value pairs separated by newlines, create an object
@@ -68,9 +69,70 @@ export const validEnvStore = derived([requiredEnvStore, parsedEnvStore], ([$requ
 	return true;
 });
 
-export const selectedRunStore = derived([runStore, selectedRunIdStore], ([$runs, $selectedId]) => {
-	return $selectedId ? $runs[$selectedId] : null;
+export const selectedRunStore = derived(
+	[liveRunStore, runStore, selectedRunIdStore],
+	([$liveRuns, $runs, $selectedId]) => {
+		if ($selectedId === null) {
+			return null;
+		}
+		if ($selectedId in $liveRuns) {
+			return liveRunToRun($liveRuns[$selectedId]);
+		}
+		if ($selectedId in $runs) {
+			// FIXME convert to live run
+			return $runs[$selectedId];
+		}
+		// TODO throw error?
+		return null;
+	}
+);
+
+interface RunLike {
+	id: string;
+	timestamp: number;
+	description?: string;
+}
+export const runTitleListStore = derived([liveRunStore, runStore], ([$liveRuns, $runs]) => {
+	const objects: RunLike[] = [...Object.values($liveRuns), ...Object.values($runs)];
+	const runs = objects.sort((a, b) => b.timestamp - a.timestamp);
+	return runs.map((run) => ({
+		id: run.id,
+		title: getRunTitle(run)
+	}));
 });
-export const runListStore = derived(runStore, ($runs) => {
-	return Object.values($runs).sort((a, b) => b.timestamp - a.timestamp);
+export const selectedRunTitle = derived(selectedRunStore, ($selectedRun) => {
+	if (!$selectedRun) {
+		return '';
+	}
+	return getRunTitle($selectedRun);
 });
+
+function getRunTitle(run: RunLike): string {
+	const dateFormatter = new Intl.DateTimeFormat('en-US', {
+		dateStyle: 'medium',
+		timeStyle: 'short'
+	});
+	const datetime = dateFormatter.format(new Date(run.timestamp));
+	if (run.description) {
+		return `${run.description} (${datetime})`;
+	}
+	return datetime;
+}
+
+function liveRunToRun(liveRun: LiveRun): Run {
+	return {
+		version: 1,
+		...liveRun,
+		results: liveRun.results.map((row) =>
+			row.map((store) => {
+				const res = get(store);
+				return {
+					...res,
+					state: undefined,
+					pass: res.state === 'success',
+					assertionResults: res.assertionResults ?? []
+				};
+			})
+		)
+	};
+}
