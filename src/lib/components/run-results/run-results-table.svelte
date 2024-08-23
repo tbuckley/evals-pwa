@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { Prompt, Provider, Run, TestCase, TestResult } from '$lib/types';
+	import type { LiveResult, LiveRun, Prompt, Provider, TestCase } from '$lib/types';
 	import { createRender, createTable, Render, Subscribe } from 'svelte-headless-table';
-	import { readable, writable } from 'svelte/store';
+	import { writable, type Readable } from 'svelte/store';
 	import * as Table from '../ui/table/';
 	import RunResultsCell from './run-results-cell.svelte';
 	import { addHiddenColumns, addResizedColumns } from 'svelte-headless-table/plugins';
@@ -10,35 +10,16 @@
 	import { showVarsColumnsStore } from '$lib/state/settings';
 	import GripVertical from 'lucide-svelte/icons/grip-vertical';
 
-	export let run: Run;
+	export let run: LiveRun;
 
 	interface RunRow {
 		test: TestCase;
-		results: TestResult[];
+		results: Readable<LiveResult>[];
 	}
 
 	const data = writable<RunRow[]>([]);
 	$: data.set(run.tests.map((test, index) => ({ test, results: run.results[index] })));
 
-	let varNames = getVarNames(run.tests);
-	$: varNames = getVarNames(run.tests); // Why doesn't this work by itself?
-
-	function getVarNames(tests: TestCase[]): string[] {
-		const varNames: string[] = [];
-		const seen = new Set<string>();
-		for (const test of tests) {
-			if (!test.vars) {
-				continue;
-			}
-			for (const key of Object.keys(test.vars)) {
-				if (!seen.has(key)) {
-					seen.add(key);
-					varNames.push(key);
-				}
-			}
-		}
-		return varNames;
-	}
 	function getColumnName(env: { provider: Provider; prompt: Prompt }): string {
 		if (typeof env.provider === 'string') {
 			return env.provider + ' ' + env.prompt;
@@ -61,7 +42,7 @@
 				return value.description ?? 'Test';
 			}
 		}),
-		...varNames.map((varName) =>
+		...run.varNames.map((varName) =>
 			table.column({
 				id: varName,
 				header: varName,
@@ -94,7 +75,7 @@
 		table.createViewModel(columns);
 	const { hiddenColumnIds } = pluginStates.hideColumns;
 
-	$: $hiddenColumnIds = $showVarsColumnsStore ? [] : varNames;
+	$: $hiddenColumnIds = $showVarsColumnsStore ? [] : run.varNames;
 	const { columnWidths } = pluginStates.resize;
 
 	let forceResizeUpdateValue = 0;

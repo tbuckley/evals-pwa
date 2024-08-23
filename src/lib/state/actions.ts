@@ -23,6 +23,7 @@ import { parsedEnvStore } from './derived';
 import { alertStore, type AlertState } from './ui';
 import { FileSystemEvalsStorage } from '$lib/storage/FileSystemEvalsStorage';
 import { WebFileSystemStorage } from '$lib/storage/WebFileSystemStorage';
+import { getVarNamesForTests } from '$lib/utils/testCase';
 
 export async function chooseFolder() {
 	let dir: FileSystemDirectoryHandle;
@@ -153,7 +154,7 @@ export async function runTests() {
 		description: config.description,
 		envs: runEnvs,
 		tests: globalTests,
-		varNames: [], // TODO
+		varNames: getVarNamesForTests(globalTests),
 		results: []
 	};
 

@@ -1,8 +1,9 @@
-import { derived, get } from 'svelte/store';
+import { derived, readable } from 'svelte/store';
 import { configStore, liveRunStore, runStore, selectedRunIdStore } from './stores';
 import { ProviderManager } from '$lib/providers/ProviderManager';
 import { envStore } from './env';
 import type { LiveRun, Run } from '$lib/types';
+import { getVarNamesForTests } from '$lib/utils/testCase';
 
 function parseEnvText(env: string): Record<string, string> {
 	// Given a series of key=value pairs separated by newlines, create an object
@@ -76,11 +77,11 @@ export const selectedRunStore = derived(
 			return null;
 		}
 		if ($selectedId in $liveRuns) {
-			return liveRunToRun($liveRuns[$selectedId]);
+			return $liveRuns[$selectedId];
 		}
 		if ($selectedId in $runs) {
 			// FIXME convert to live run
-			return $runs[$selectedId];
+			return runToLiveRun($runs[$selectedId]);
 		}
 		// TODO throw error?
 		return null;
@@ -119,19 +120,20 @@ function getRunTitle(run: RunLike): string {
 	return datetime;
 }
 
-function liveRunToRun(liveRun: LiveRun): Run {
+function runToLiveRun(run: Run): LiveRun {
 	return {
-		version: 1,
-		...liveRun,
-		results: liveRun.results.map((row) =>
-			row.map((store) => {
-				const res = get(store);
-				return {
-					...res,
-					state: undefined,
-					pass: res.state === 'success',
-					assertionResults: res.assertionResults ?? []
-				};
+		...run,
+		varNames: getVarNamesForTests(run.tests),
+		results: run.results.map((row) =>
+			row.map((res) => {
+				const state = res.pass ? 'success' : 'error';
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				const { pass: _, rawPrompt, ...rest } = res;
+				return readable({
+					...rest,
+					rawPrompt: rawPrompt ?? null,
+					state
+				});
 			})
 		)
 	};
