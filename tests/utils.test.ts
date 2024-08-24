@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 test.describe('CodeSandbox', () => {
 	test('can run code', async ({ page }) => {
 		await page.goto('/__playwright');
+		await page.waitForLoadState('networkidle');
 
 		await expect(page.locator('iframe')).toHaveCount(0);
 		const sandboxHandle = await page.evaluateHandle(() => {
