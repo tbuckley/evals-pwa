@@ -31,7 +31,7 @@ export class WebFileSystemStorage {
 		}
 
 		const re = picomatch.makeRe(glob, { windows: false, cwd: '/' });
-		const basedir = await this.getSubdirHandle(base);
+		const basedir = await handleNotFoundError(this.getSubdirHandle(base), uri);
 
 		const files: { uri: string; file: File }[] = [];
 		await fileDfs(basedir, async (filepath, handle) => {
@@ -69,7 +69,7 @@ export class WebFileSystemStorage {
 		const dirname = getDirname(filepath);
 		const filename = getFilename(filepath)!;
 
-		const dir = await this.getSubdirHandle(dirname);
+		const dir = await handleNotFoundError(this.getSubdirHandle(dirname), uri);
 		const handle = await handleNotFoundError(dir.getFileHandle(filename, { create: false }), uri);
 		return handle.getFile();
 	}
@@ -81,7 +81,7 @@ export class WebFileSystemStorage {
 		const parts = getAbsPathDirectories(path); // Should not contain a trailing slash, unless the path itself ends with one
 		let subdir = this.dir;
 		for (const part of parts) {
-			subdir = await handleNotFoundError(subdir.getDirectoryHandle(part, { create }), path);
+			subdir = await subdir.getDirectoryHandle(part, { create });
 		}
 		return subdir;
 	}
