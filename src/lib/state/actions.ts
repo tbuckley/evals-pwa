@@ -180,20 +180,29 @@ export async function runTests() {
 	// Show the live run immediately
 	liveRunStore.update((state) => ({
 		...state,
-		[run.id]: run
+		[run.id]: { run, abort: () => runner.abort() }
 	}));
+	const originalSelectedRunId = get(selectedRunIdStore);
 	selectedRunIdStore.set(run.id);
 
-	// Wait to finish
-	await runner.completed();
+	try {
+		// Wait to finish
+		await runner.completed();
+	} catch (err) {
+		// Run was aborted
+		console.warn('Run was aborted:', err);
+		selectedRunIdStore.set(originalSelectedRunId);
+		return;
+	} finally {
+		// Clean up and save the run
+		mgr.destroy();
+		liveRunStore.update((state) => {
+			const newState = { ...state };
+			delete newState[run.id];
+			return newState;
+		});
+	}
 
-	// Clean up and save the run
-	mgr.destroy();
-	liveRunStore.update((state) => {
-		const newState = { ...state };
-		delete newState[run.id];
-		return newState;
-	});
 	runStore.update((runs) => ({
 		...runs,
 		[run.id]: liveRunToRun(run)

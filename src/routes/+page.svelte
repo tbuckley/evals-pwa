@@ -3,7 +3,12 @@
 	import RunResultsTable from '$lib/components/run-results/run-results-table.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { chooseFolder, runTests } from '$lib/state/actions';
-	import { runTitleListStore, selectedRunStore, selectedRunTitle } from '$lib/state/derived';
+	import {
+		abortRunStore,
+		runTitleListStore,
+		selectedRunStore,
+		selectedRunTitle
+	} from '$lib/state/derived';
 	import { configStore, selectedRunIdStore } from '$lib/state/stores';
 </script>
 
@@ -51,10 +56,13 @@ tests:
 		</p>
 	{:else}
 		<Button on:click={runTests}>Run tests</Button>
+		{#if $abortRunStore !== null}
+			<Button variant="secondary" on:click={$abortRunStore}>Cancel run</Button>
+		{/if}
 	{/if}
 </article>
 
-{#if $selectedRunStore !== null}
+{#if $runTitleListStore.length > 0}
 	<div>
 		<Combobox
 			items={$runTitleListStore.map((run) => ({
@@ -64,13 +72,16 @@ tests:
 			value={$selectedRunIdStore || ''}
 			on:select={(e) => selectedRunIdStore.set(e.detail)}
 		></Combobox>
-		<h2 class="mb-4 mt-8 text-xl font-bold">
-			{$selectedRunTitle}
-		</h2>
 
-		<!-- Use a keyed block so we don't try to reuse a table that was created with a different layout -->
-		{#key $selectedRunStore.id}
-			<RunResultsTable run={$selectedRunStore} />
-		{/key}
+		{#if $selectedRunStore !== null}
+			<h2 class="mb-4 mt-8 text-xl font-bold">
+				{$selectedRunTitle}
+			</h2>
+
+			<!-- Use a keyed block so we don't try to reuse a table that was created with a different layout -->
+			{#key $selectedRunStore.id}
+				<RunResultsTable run={$selectedRunStore} />
+			{/key}
+		{/if}
 	</div>
 {/if}

@@ -137,6 +137,7 @@ export interface TestEnvironment {
 export interface TaskQueue {
 	enqueue(fn: () => Promise<void>): void;
 	completed(): Promise<void>;
+	abort(): void;
 }
 
 export type PopulatedVarSet = Record<string, string | File>;

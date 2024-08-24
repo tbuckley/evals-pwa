@@ -77,7 +77,7 @@ export const selectedRunStore = derived(
 			return null;
 		}
 		if ($selectedId in $liveRuns) {
-			return $liveRuns[$selectedId];
+			return $liveRuns[$selectedId].run;
 		}
 		if ($selectedId in $runs) {
 			// FIXME convert to live run
@@ -88,13 +88,29 @@ export const selectedRunStore = derived(
 	}
 );
 
+export const abortRunStore = derived(
+	[liveRunStore, selectedRunIdStore],
+	([$liveRuns, $selectedId]) => {
+		if ($selectedId === null) {
+			return null;
+		}
+		if ($selectedId in $liveRuns) {
+			return $liveRuns[$selectedId].abort;
+		}
+		return null;
+	}
+);
+
 interface RunLike {
 	id: string;
 	timestamp: number;
 	description?: string;
 }
 export const runTitleListStore = derived([liveRunStore, runStore], ([$liveRuns, $runs]) => {
-	const objects: RunLike[] = [...Object.values($liveRuns), ...Object.values($runs)];
+	const objects: RunLike[] = [
+		...Object.values($liveRuns).map((r) => r.run),
+		...Object.values($runs)
+	];
 	const runs = objects.sort((a, b) => b.timestamp - a.timestamp);
 	return runs.map((run) => ({
 		id: run.id,

@@ -1,12 +1,14 @@
 import type { TaskQueue } from '$lib/types';
 
 export class ParallelTaskQueue implements TaskQueue {
-	maxParallel: number;
-	queue: Array<() => Promise<void>>;
-	running: number;
+	private maxParallel: number;
+	private queue: Array<() => Promise<void>>;
+	private running: number;
 
-	completedPromise: Promise<void>;
-	markCompleted?: (() => void) | null;
+	private completedPromise: Promise<void>;
+	private markCompleted?: (() => void) | null;
+	private rejectCompleted?: (reason: unknown) => void;
+	private abortController: AbortController;
 
 	constructor(maxParallel: number) {
 		this.maxParallel = maxParallel;
@@ -14,23 +16,38 @@ export class ParallelTaskQueue implements TaskQueue {
 		this.running = 0;
 		this.markCompleted = null;
 		this.completedPromise = Promise.resolve();
+		this.abortController = new AbortController();
+	}
+	abort(): void {
+		this.abortController.abort();
+		this.rejectCompleted?.(new Error('TaskQueue was aborted'));
 	}
 	enqueue(fn: () => Promise<void>): void {
+		if (this.abortController.signal.aborted) {
+			throw new Error('TaskQueue was aborted');
+		}
+
 		if (this.markCompleted === null) {
-			this.completedPromise = new Promise((resolve) => {
+			this.completedPromise = new Promise((resolve, reject) => {
 				this.markCompleted = resolve;
+				this.rejectCompleted = reject;
 			});
 		}
 		this.queue.push(fn);
 		this.run();
 	}
-	run(): void {
+	private run(): void {
 		if (this.running >= this.maxParallel) return;
 		const fn = this.queue.shift();
 		if (!fn) return;
 		this.running++;
 		// TODO should we catch any errors?
+		// TODO pass abort signal to functions?
 		fn().finally(() => {
+			if (this.abortController.signal.aborted) {
+				// If already aborted, ignore any results
+				return;
+			}
 			this.running--;
 			if (this.queue.length === 0 && this.running === 0) {
 				// If we're the last task, signal that we're done
