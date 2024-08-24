@@ -41,7 +41,7 @@
 	closeOnOutsideClick={canClose}
 	onOpenChange={dispatchOpenState}
 >
-	<Dialog.Content hideCloseButton={!canClose}>
+	<Dialog.Content id="env-editor" hideCloseButton={!canClose}>
 		<Dialog.Header>
 			<Dialog.Title>Settings</Dialog.Title>
 			<Dialog.Description>Configure your environment</Dialog.Description>
