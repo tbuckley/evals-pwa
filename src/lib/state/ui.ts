@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 
 export interface AlertState {
+	id?: string;
 	title: string;
 	description: string[];
 	cancelText?: string | null;

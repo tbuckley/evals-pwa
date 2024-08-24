@@ -131,7 +131,7 @@
 </div>
 
 <AlertDialog.Root open={$alertStore !== null} onOpenChange={handleAlertOpenChange}>
-	<AlertDialog.Content>
+	<AlertDialog.Content id={$alertStore?.id ?? 'alert-dialog'}>
 		<AlertDialog.Header>
 			<AlertDialog.Title>{$alertStore?.title ?? 'Error'}</AlertDialog.Title>
 			<AlertDialog.Description>

@@ -39,6 +39,10 @@ export async function chooseFolder() {
 	}
 
 	// TODO don't allow the user to select a directory if it is invalid
+	await setStorageDirectory(dir);
+}
+
+export async function setStorageDirectory(dir: FileSystemDirectoryHandle) {
 	const storage = new FileSystemEvalsStorage(new WebFileSystemStorage(dir));
 	storageStore.set(storage);
 	await loadStateFromStorage();
