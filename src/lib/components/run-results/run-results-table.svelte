@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { LiveResult, LiveRun, Prompt, Provider, TestCase } from '$lib/types';
+	import type { LiveResult, LiveRun, TestCase } from '$lib/types';
 	import { createRender, createTable, Render, Subscribe } from 'svelte-headless-table';
 	import { writable, type Readable } from 'svelte/store';
 	import * as Table from '../ui/table/';
@@ -9,6 +9,7 @@
 	import Checkbox from '../ui/checkbox/checkbox.svelte';
 	import { showVarsColumnsStore } from '$lib/state/settings';
 	import GripVertical from 'lucide-svelte/icons/grip-vertical';
+	import RunResultsHeader from './run-results-header.svelte';
 
 	export let run: LiveRun;
 
@@ -19,13 +20,6 @@
 
 	const data = writable<RunRow[]>([]);
 	$: data.set(run.tests.map((test, index) => ({ test, results: run.results[index] })));
-
-	function getColumnName(env: { provider: Provider; prompt: Prompt }): string {
-		if (typeof env.provider === 'string') {
-			return env.provider + ' ' + env.prompt;
-		}
-		return env.provider.id + ' ' + env.prompt;
-	}
 
 	const table = createTable(data, {
 		resize: addResizedColumns(),
@@ -57,7 +51,7 @@
 		...run.envs.map((env, index) =>
 			table.column({
 				id: `env-${index}`,
-				header: getColumnName(env),
+				header: createRender(RunResultsHeader, { env }), //getColumnName(env),
 				accessor: (row) => row.results[index],
 				cell: ({ value }) => {
 					return createRender(RunResultsCell, { testResult: value });

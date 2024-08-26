@@ -92,18 +92,19 @@ const testCaseSchema = z.object({
 });
 export type TestCase = z.infer<typeof testCaseSchema>;
 
+export const envSchema = z.object({
+	provider: providerSchema,
+	prompt: promptSchema
+});
+export type Env = z.infer<typeof envSchema>;
+
 export const runSchema = z.object({
 	version: z.literal(1),
 
 	// Required
 	id: z.string(),
 	timestamp: z.number(),
-	envs: z.array(
-		z.object({
-			provider: providerSchema,
-			prompt: promptSchema
-		})
-	),
+	envs: z.array(envSchema),
 	tests: z.array(testCaseSchema),
 	results: z.array(z.array(testResultSchema)),
 
@@ -190,7 +191,7 @@ export interface LiveRun {
 	timestamp: number;
 	description?: string;
 
-	envs: { provider: Provider; prompt: Prompt }[];
+	envs: Env[];
 	tests: TestCase[];
 
 	// Generated
