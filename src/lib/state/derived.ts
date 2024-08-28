@@ -4,6 +4,7 @@ import { ProviderManager } from '$lib/providers/ProviderManager';
 import { envStore } from './env';
 import type { LiveRun, Run } from '$lib/types';
 import { getVarNamesForTests } from '$lib/utils/testCase';
+import { summarizeResults } from '$lib/utils/summarizeResults';
 
 function parseEnvText(env: string): Record<string, string> {
 	// Given a series of key=value pairs separated by newlines, create an object
@@ -140,6 +141,14 @@ function runToLiveRun(run: Run): LiveRun {
 	return {
 		...run,
 		varNames: getVarNamesForTests(run.tests),
+		summaries: run.envs.map((_, index) =>
+			readable(
+				summarizeResults(
+					run.results.map((row) => row[index]),
+					(r) => r.pass
+				)
+			)
+		),
 		results: run.results.map((row) =>
 			row.map((res) => {
 				const state = res.pass ? 'success' : 'error';

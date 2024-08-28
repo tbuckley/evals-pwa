@@ -196,7 +196,16 @@ export interface LiveRun {
 
 	// Generated
 	varNames: string[];
+	summaries: Readable<SummaryStats>[]; // One per env
 
 	// Dynamic
 	results: Readable<LiveResult>[][];
+}
+
+export interface SummaryStats {
+	total: number;
+	passed: number;
+	failed: number;
+	avgLatencyMillis?: number;
+	avgCostDollars?: number;
 }

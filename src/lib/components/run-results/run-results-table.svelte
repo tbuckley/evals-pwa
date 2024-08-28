@@ -51,7 +51,7 @@
 		...run.envs.map((env, index) =>
 			table.column({
 				id: `env-${index}`,
-				header: createRender(RunResultsHeader, { env }), //getColumnName(env),
+				header: createRender(RunResultsHeader, { env, summary: run.summaries[index] }),
 				accessor: (row) => row.results[index],
 				cell: ({ value }) => {
 					return createRender(RunResultsCell, { testResult: value });

@@ -1,4 +1,4 @@
-import { get, writable, type Writable } from 'svelte/store';
+import { derived, get, writable, type Writable } from 'svelte/store';
 import { configStore, liveRunStore, runStore, selectedRunIdStore, storageStore } from './stores';
 import {
 	UiError,
@@ -24,6 +24,7 @@ import { alertStore, type AlertState } from './ui';
 import { FileSystemEvalsStorage } from '$lib/storage/FileSystemEvalsStorage';
 import { WebFileSystemStorage } from '$lib/storage/WebFileSystemStorage';
 import { getVarNamesForTests } from '$lib/utils/testCase';
+import { summarizeResults } from '$lib/utils/summarizeResults';
 
 export async function chooseFolder() {
 	let dir: FileSystemDirectoryHandle;
@@ -152,17 +153,8 @@ export async function runTests() {
 	const runEnvs: RunEnv[] = getRunEnvs(globalProviders, globalPrompts);
 	const envs: TestEnvironment[] = createEnvironments(runEnvs, providerManager);
 
-	const run: LiveRun = {
-		id: crypto.randomUUID(),
-		timestamp: Date.now(),
-		description: config.description,
-		envs: runEnvs,
-		tests: globalTests,
-		varNames: getVarNamesForTests(globalTests),
-		results: []
-	};
-
 	// Run tests
+	const results: LiveRun['results'] = [];
 	const runner = new ParallelTaskQueue(5);
 	const mgr = new AssertionManager(providerManager, storage);
 	for (const test of globalTests) {
@@ -174,10 +166,33 @@ export async function runTests() {
 				await runTest(test, env, mgr, storage, result);
 			});
 		}
-		run.results.push(testResults);
+		results.push(testResults);
 	}
 
+	// Create summaries derived from the testResults
+	const summaries: LiveRun['summaries'] = runEnvs.map((_, index) =>
+		derived(
+			results.map((row) => row[index]),
+			($results) =>
+				summarizeResults($results, (r) => {
+					if (r.state === 'success') return true;
+					if (r.state === 'error') return false;
+					return null;
+				})
+		)
+	);
+
 	// Show the live run immediately
+	const run: LiveRun = {
+		id: crypto.randomUUID(),
+		timestamp: Date.now(),
+		description: config.description,
+		envs: runEnvs,
+		tests: globalTests,
+		varNames: getVarNamesForTests(globalTests),
+		results,
+		summaries
+	};
 	liveRunStore.update((state) => ({
 		...state,
 		[run.id]: { run, abort: () => runner.abort() }
@@ -263,16 +278,10 @@ async function runTest(
 	const populatedVars = await populate(test.vars, storage);
 	const output = await env.run(populatedVars);
 
-	result.update((state) => {
-		for (const [key, value] of Object.entries(output)) {
-			(state as unknown as { [key: string]: unknown })[key] = value;
-		}
-		return state;
-	});
-
 	if (output.error) {
 		result.update((state) => ({
 			...state,
+			...output,
 			state: 'error',
 			pass: false
 		}));
@@ -288,6 +297,7 @@ async function runTest(
 	}
 	result.update((state) => ({
 		...state,
+		...output,
 		state: assertionResults.every((r) => r.pass) ? 'success' : 'error',
 		assertionResults
 	}));
@@ -295,7 +305,7 @@ async function runTest(
 
 function liveRunToRun(liveRun: LiveRun): Run {
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const { varNames: _, ...rest } = liveRun;
+	const { varNames: _varNames, summaries: _summaries, ...rest } = liveRun;
 	return {
 		...rest,
 		version: 1,
