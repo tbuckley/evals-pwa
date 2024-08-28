@@ -4,8 +4,7 @@ import {
 	assertionResultSchema,
 	providerSchema,
 	type AssertionProvider,
-	type AssertionResult,
-	type FileLoader
+	type AssertionResult
 } from '$lib/types';
 import { extractAllJsonObjects } from '$lib/utils/extractAllJson';
 import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
@@ -22,8 +21,7 @@ const argsSchema = z.object({
 
 export function createLlmRubricAssertion(
 	args: unknown,
-	providerManager: ProviderManager,
-	loader: FileLoader
+	providerManager: ProviderManager
 ): AssertionProvider {
 	const parsedArgs = argsSchema.safeParse(args);
 	if (!parsedArgs.success) {
@@ -38,8 +36,7 @@ export function createLlmRubricAssertion(
 	const model = providerManager.getProvider(provider.id, provider.config);
 	const env = new SimpleEnvironment({
 		model,
-		prompt: new HandlebarsPromptFormatter(prompt ?? LLM_RUBRIC_PROMPT),
-		loader
+		prompt: new HandlebarsPromptFormatter(prompt ?? LLM_RUBRIC_PROMPT)
 	});
 
 	return {

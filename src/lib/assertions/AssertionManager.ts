@@ -60,7 +60,7 @@ export class AssertionManager {
 			case 'javascript':
 				return createJavascriptAssertion(populatedVars);
 			case 'llm-rubric':
-				return createLlmRubricAssertion(populatedVars, this.providerManager, this.fileLoader);
+				return createLlmRubricAssertion(populatedVars, this.providerManager);
 			default:
 				throw new Error(`Unknown assertion type: ${type}`);
 		}
