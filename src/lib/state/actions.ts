@@ -342,10 +342,15 @@ function deepEquals(a: unknown, b: unknown): boolean {
 	return true;
 }
 
+// FIXME need to iterate through arrays and nested objects
 async function populate(vars: VarSet, loader: FileLoader): Promise<PopulatedVarSet> {
 	const populated: PopulatedVarSet = {};
 	for (const key in vars) {
-		if (vars[key].startsWith('file:///') && isSupportedImageType(vars[key])) {
+		if (
+			typeof vars[key] === 'string' &&
+			vars[key].startsWith('file:///') &&
+			isSupportedImageType(vars[key])
+		) {
 			populated[key] = await loader.loadFile(vars[key]);
 		} else {
 			populated[key] = vars[key];

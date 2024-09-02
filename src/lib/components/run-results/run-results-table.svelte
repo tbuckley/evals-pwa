@@ -44,7 +44,14 @@
 					return row.test.vars?.[varName];
 				},
 				cell: ({ value }) => {
-					return value ?? '-N/A-';
+					// return value ?? '-N/A-';
+					if (typeof value === 'string') {
+						return value;
+					}
+					if (typeof value === 'undefined') {
+						return '-N/A-';
+					}
+					return JSON.stringify(value);
 				}
 			})
 		),

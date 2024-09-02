@@ -1,7 +1,7 @@
 import type { Readable } from 'svelte/store';
 import { z } from 'zod';
 
-const varSchema = z.string();
+const varSchema = z.any();
 
 const varSetSchema = z.record(z.string(), varSchema);
 

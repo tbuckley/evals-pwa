@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // Schemas & types for validating files match the expected structure
 
-export const fsVarSchema = z.string();
+export const fsVarSchema = z.any();
 
 export const fsVarSetSchema = z.record(z.string(), fsVarSchema);
 
