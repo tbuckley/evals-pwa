@@ -3,7 +3,8 @@ import { z } from 'zod';
 
 const argsSchema = z.object({
 	value: z.string(),
-	ignoreCase: z.boolean().optional()
+	ignoreCase: z.boolean().optional(),
+	trim: z.boolean().optional()
 });
 
 export function createEqualsAssertion(args: unknown): AssertionProvider {
@@ -12,12 +13,12 @@ export function createEqualsAssertion(args: unknown): AssertionProvider {
 		throw new Error('Invalid regex arguments');
 	}
 
-	const { value, ignoreCase } = parsedArgs.data;
+	const { value, ignoreCase, trim } = parsedArgs.data;
 	const groundTruth = ignoreCase ? value.toLocaleLowerCase() : value;
 	return {
 		run: function (output: string): AssertionResult {
 			const outputValue = ignoreCase ? output.toLocaleLowerCase() : output;
-			const pass = outputValue === groundTruth;
+			const pass = trim ? outputValue.trim() === groundTruth.trim() : outputValue === groundTruth;
 			return {
 				pass,
 				message: pass ? undefined : `Does not equal: "${value}"`
