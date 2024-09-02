@@ -96,6 +96,9 @@ function getCost(model: string, prompt: number, completion: number): number | un
 	if (model.startsWith('gpt-4o-mini')) {
 		inputCostPerMillion = 0.15;
 		outputCostPerMillion = 0.6;
+	} else if (model.startsWith('gpt-4o-2024-08-06')) {
+		inputCostPerMillion = 2.5;
+		outputCostPerMillion = 10;
 	} else if (model.startsWith('gpt-4o')) {
 		inputCostPerMillion = 5;
 		outputCostPerMillion = 15;

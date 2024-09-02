@@ -142,8 +142,8 @@ function getCost(model: string, prompt: number, completion: number): number | un
 		inputCostPerMillion = prompt > 128_000 ? 7 : 3.5;
 		outputCostPerMillion = prompt > 128_000 ? 21 : 10.5;
 	} else if (model.startsWith('gemini-1.5-flash')) {
-		inputCostPerMillion = prompt > 128_000 ? 0.7 : 0.35;
-		outputCostPerMillion = prompt > 128_000 ? 2.1 : 1.05;
+		inputCostPerMillion = prompt > 128_000 ? 0.15 : 0.075;
+		outputCostPerMillion = prompt > 128_000 ? 0.6 : 0.3;
 	} else {
 		return undefined;
 	}
