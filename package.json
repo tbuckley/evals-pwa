@@ -44,7 +44,7 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@sveltejs/adapter-static": "^3.0.3",
+		"@sveltejs/adapter-static": "^3.0.4",
 		"@types/wicg-file-system-access": "^2023.10.5",
 		"bits-ui": "^0.21.13",
 		"clsx": "^2.1.1",
