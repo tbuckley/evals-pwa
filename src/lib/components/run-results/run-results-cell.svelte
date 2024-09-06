@@ -1,6 +1,9 @@
 <script lang="ts">
 	import type { LiveResult, TestResult } from '$lib/types';
 	import type { Readable } from 'svelte/store';
+	import { resultDialogStore } from '$lib/state/ui';
+	import Button from '../ui/button/button.svelte';
+	import SquareCode from 'lucide-svelte/icons/square-code';
 
 	export let testResult: Readable<LiveResult>;
 
@@ -9,9 +12,16 @@
 		($testResult.assertionResults ?? []).filter(
 			(assertion) => !assertion.pass && assertion.message
 		)[0]?.message ?? null;
+
+	function openRawPromptDialog() {
+		resultDialogStore.set({
+			title: `Raw Prompt`,
+			result: $testResult
+		});
+	}
 </script>
 
-<div>
+<div class="relative">
 	{#if $testResult.state === 'success'}
 		<div
 			class="mb-2 inline-block rounded-sm border border-green-700 bg-green-100 p-1 text-green-700"
@@ -30,6 +40,14 @@
 	<div class="whitespace-pre-wrap">
 		{$testResult.error ?? $testResult.output ?? '--no output--'}
 	</div>
+	<Button
+		on:click={openRawPromptDialog}
+		variant="ghost"
+		size="icon"
+		class="absolute right-0 top-0 text-gray-500"
+	>
+		<SquareCode class="h-5 w-5"></SquareCode>
+	</Button>
 	{#if typeof $testResult.latencyMillis === 'number'}
 		<div class="mt-2 text-xs font-bold text-gray-500">{$testResult.latencyMillis}ms</div>
 	{/if}

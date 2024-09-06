@@ -10,6 +10,9 @@
 		selectedRunTitle
 	} from '$lib/state/derived';
 	import { configStore, selectedRunIdStore } from '$lib/state/stores';
+	import { resultDialogStore } from '$lib/state/ui';
+	import * as Dialog from '$lib/components/ui/dialog';
+	import { Description } from '$lib/components/ui/alert-dialog';
 </script>
 
 <article class="prose">
@@ -85,3 +88,31 @@ tests:
 		{/if}
 	</div>
 {/if}
+
+<!-- Keep the global dialog component -->
+<Dialog.Root
+	open={$resultDialogStore.result !== null}
+	onOpenChange={(open) =>
+		resultDialogStore.update((state) => ({ ...state, result: open ? state.result : null }))}
+>
+	<Dialog.Content>
+		<Dialog.Header>
+			<Dialog.Title>{$resultDialogStore.title}</Dialog.Title>
+			<Dialog.Description>View the raw prompt and output for a test result.</Dialog.Description>
+		</Dialog.Header>
+		<div class="max-h-[50vh] overflow-y-scroll">
+			<h3 class="my-2 font-bold">Prompt</h3>
+			<pre class="whitespace-pre-wrap rounded-md bg-gray-100 p-2">{JSON.stringify(
+					$resultDialogStore.result?.rawPrompt,
+					null,
+					2
+				)}</pre>
+			<h3 class="my-2 font-bold">Output</h3>
+			<pre class="whitespace-pre-wrap rounded-md bg-gray-100 p-2">{JSON.stringify(
+					$resultDialogStore.result?.rawOutput,
+					null,
+					2
+				)}</pre>
+		</div>
+	</Dialog.Content>
+</Dialog.Root>

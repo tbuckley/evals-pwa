@@ -1,3 +1,4 @@
+import type { LiveResult } from '$lib/types';
 import { writable } from 'svelte/store';
 
 export interface AlertState {
@@ -10,3 +11,13 @@ export interface AlertState {
 }
 
 export const alertStore = writable<AlertState | null>(null);
+
+export interface ResultDialogState {
+	title: string;
+	result: LiveResult | null;
+}
+
+export const resultDialogStore = writable<ResultDialogState>({
+	title: '',
+	result: null
+});
