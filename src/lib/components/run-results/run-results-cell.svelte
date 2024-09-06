@@ -37,7 +37,7 @@
 			{$testResult.state === 'in-progress' ? 'IN PROGRESS' : 'WAITING'}
 		</div>
 	{/if}
-	<div class="whitespace-pre-wrap">
+	<div class="whitespace-pre-wrap break-words">
 		{$testResult.error ?? $testResult.output ?? '--no output--'}
 	</div>
 	<Button
