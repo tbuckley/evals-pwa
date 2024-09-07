@@ -8,6 +8,7 @@ import {
 } from '$lib/utils/path';
 import * as yaml from 'yaml';
 import { FileReference } from './FileReference';
+import { MissingFileError } from './WebFileSystemStorage';
 
 export interface FileStorage {
 	load(path: string): Promise<File | { uri: string; file: File }[]>;
@@ -18,6 +19,7 @@ export interface DereferenceOptions {
 	absolutePath?: string;
 	visited?: Set<string>;
 	markGlobs?: boolean;
+	ignoreMissing?: boolean;
 }
 
 const GLOB_TYPE = Symbol('GLOB_TYPE');
@@ -38,7 +40,18 @@ export async function dereferenceFilePaths(
 				throw new Error(`Generated invalid file URI: ${fileUri} (from ${val})`);
 			}
 
-			const res = await options.storage.load(fileUri);
+			let res;
+			try {
+				res = await options.storage.load(fileUri);
+			} catch (err) {
+				// Throw missing file errors if ignoreMissing is not set
+				if (err instanceof MissingFileError && !options.ignoreMissing) {
+					throw err;
+				}
+				// Otherwise, return the filename
+				return val;
+			}
+
 			if (Array.isArray(res)) {
 				const arr = await Promise.all(
 					res.map(async ({ uri, file }) => handleFile(uri, file, options))

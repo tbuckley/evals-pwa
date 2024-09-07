@@ -75,7 +75,11 @@ export class FileSystemEvalsStorage implements StorageProvider {
 			files.map(async ({ file }) => {
 				const text = await file.text();
 				const json = JSON.parse(text);
-				const dereferenced = await dereferenceFilePaths(json, { storage: this.fs });
+				// TODO should we still catch MissingFileError here?
+				const dereferenced = await dereferenceFilePaths(json, {
+					storage: this.fs,
+					ignoreMissing: true
+				});
 				return runSchema.parse(dereferenced);
 			})
 		);
