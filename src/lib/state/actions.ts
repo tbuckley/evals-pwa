@@ -8,11 +8,9 @@ import {
 	type LiveRun,
 	type NormalizedProvider,
 	type NormalizedTestCase,
-	type PopulatedVarSet,
 	type Prompt,
 	type Run,
-	type TestEnvironment,
-	type VarSet
+	type TestEnvironment
 } from '$lib/types';
 import { ProviderManager } from '$lib/providers/ProviderManager';
 import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
@@ -285,8 +283,7 @@ async function runTest(
 		state: 'in-progress'
 	}));
 	// TODO should this be safeRun if it will catch all errors?
-	const populatedVars = await populate(test.vars, storage);
-	const output = await env.run(populatedVars);
+	const output = await env.run(test.vars);
 
 	if (output.error) {
 		result.update((state) => ({
@@ -350,25 +347,4 @@ function deepEquals(a: unknown, b: unknown): boolean {
 		}
 	}
 	return true;
-}
-
-// FIXME need to iterate through arrays and nested objects
-async function populate(vars: VarSet, loader: FileLoader): Promise<PopulatedVarSet> {
-	const populated: PopulatedVarSet = {};
-	for (const key in vars) {
-		if (
-			typeof vars[key] === 'string' &&
-			vars[key].startsWith('file:///') &&
-			isSupportedImageType(vars[key])
-		) {
-			populated[key] = await loader.loadFile(vars[key]);
-		} else {
-			populated[key] = vars[key];
-		}
-	}
-	return populated;
-}
-
-function isSupportedImageType(path: string): boolean {
-	return path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg');
 }

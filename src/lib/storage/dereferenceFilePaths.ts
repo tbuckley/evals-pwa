@@ -7,6 +7,7 @@ import {
 	pathToFileUri
 } from '$lib/utils/path';
 import * as yaml from 'yaml';
+import { FileReference } from './FileReference';
 
 export interface FileStorage {
 	load(path: string): Promise<File | { uri: string; file: File }[]>;
@@ -104,6 +105,12 @@ async function handleFile(absoluteFileUri: string, file: File, options: Derefere
 		// TODO handle js files (for javascript assertions) independently
 		const text = await file.text();
 		return text;
+	} else if (isSupportedImageType(file.name)) {
+		return new FileReference(absoluteFileUri, file);
 	}
 	return absoluteFileUri;
+}
+
+function isSupportedImageType(path: string): boolean {
+	return path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg');
 }

@@ -6,6 +6,7 @@ import {
 	type StorageProvider
 } from '$lib/types';
 import { dereferenceFilePaths } from './dereferenceFilePaths';
+import { FileReference } from './FileReference';
 import { normalizeConfig } from './normalizeConfig';
 import { fsConfigSchema } from './types';
 import { MissingFileError, type WebFileSystemStorage } from './WebFileSystemStorage';
@@ -74,7 +75,8 @@ export class FileSystemEvalsStorage implements StorageProvider {
 			files.map(async ({ file }) => {
 				const text = await file.text();
 				const json = JSON.parse(text);
-				return runSchema.parse(json);
+				const dereferenced = await dereferenceFilePaths(json, { storage: this.fs });
+				return runSchema.parse(dereferenced);
 			})
 		);
 	}
@@ -83,7 +85,15 @@ export class FileSystemEvalsStorage implements StorageProvider {
 		// TODO switch to yaml?
 		// TODO also add a uuid to guarantee uniqueness
 		// TODO format as datetime string
-		await this.fs.writeText(`file:///runs/${run.timestamp}.json`, JSON.stringify(run));
+		await this.fs.writeText(
+			`file:///runs/${run.timestamp}.json`,
+			JSON.stringify(run, (_key, value) => {
+				if (value instanceof FileReference) {
+					return value.path;
+				}
+				return value;
+			})
+		);
 	}
 
 	loadFile(uri: string): Promise<File> {

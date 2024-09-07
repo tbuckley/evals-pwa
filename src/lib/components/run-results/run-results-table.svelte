@@ -10,6 +10,7 @@
 	import { showVarsColumnsStore } from '$lib/state/settings';
 	import GripVertical from 'lucide-svelte/icons/grip-vertical';
 	import RunResultsHeader from './run-results-header.svelte';
+	import RunResultsVar from './run-results-var.svelte';
 
 	export let run: LiveRun;
 
@@ -44,14 +45,7 @@
 					return row.test.vars?.[varName];
 				},
 				cell: ({ value }) => {
-					// return value ?? '-N/A-';
-					if (typeof value === 'string') {
-						return value;
-					}
-					if (typeof value === 'undefined') {
-						return '-N/A-';
-					}
-					return JSON.stringify(value);
+					return createRender(RunResultsVar, { value });
 				}
 			})
 		),

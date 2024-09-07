@@ -6,6 +6,7 @@ import {
 } from '$lib/types';
 import Handlebars from 'handlebars';
 import { convertAllStringsToHandlebarSafe } from './handlebars';
+import { FileReference } from '$lib/storage/FileReference';
 
 export class HandlebarsPromptFormatter implements PromptFormatter {
 	prompt: HandlebarsTemplateDelegate;
@@ -18,8 +19,8 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
 		const placeholderVars: Record<string, unknown> = { ...vars };
 		const files: Record<string, File> = {};
 		for (const key in placeholderVars) {
-			if (placeholderVars[key] instanceof File) {
-				files[key] = placeholderVars[key];
+			if (placeholderVars[key] instanceof FileReference) {
+				files[key] = placeholderVars[key].file;
 				placeholderVars[key] = `__FILE_PLACEHOLDER_${key}__`;
 			}
 		}
