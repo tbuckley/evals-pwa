@@ -1,5 +1,6 @@
 import type { Readable } from 'svelte/store';
 import { z } from 'zod';
+import { FileReference } from './storage/FileReference';
 
 const varSchema = z.any();
 
@@ -49,7 +50,8 @@ export const assertionResultSchema = z.object({
 	pass: z.boolean(),
 
 	// Optional
-	message: z.string().optional()
+	message: z.string().optional(),
+	visuals: z.array(z.union([z.string(), z.instanceof(FileReference)])).optional()
 });
 export type AssertionResult = z.infer<typeof assertionResultSchema>;
 

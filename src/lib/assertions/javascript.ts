@@ -1,3 +1,4 @@
+import { FileReference } from '$lib/storage/FileReference';
 import {
 	assertionResultSchema,
 	type AssertionProvider,
@@ -5,10 +6,15 @@ import {
 	type NormalizedTestCase
 } from '$lib/types';
 import { CodeSandbox } from '$lib/utils/CodeSandbox';
+import { objectDfsMap } from '$lib/utils/objectDFS';
 import { z } from 'zod';
 
 const argsSchema = z.object({
 	code: z.string()
+});
+
+const jsResultSchema = assertionResultSchema.extend({
+	visuals: z.array(z.union([z.string(), z.instanceof(Blob)])).optional()
 });
 
 export function createJavascriptAssertion(
@@ -23,11 +29,39 @@ export function createJavascriptAssertion(
 	const code = parsedArgs.data.code;
 	const sandbox = new CodeSandbox(code);
 
+	// Replace FileReferences with files
+	const vars = objectDfsMap(testVars, (val) => {
+		if (val instanceof FileReference) {
+			return val.file;
+		}
+		return val;
+	});
+
 	return {
 		async run(output: string): Promise<AssertionResult> {
 			try {
-				const res = await sandbox.execute(output, { vars: testVars });
-				return assertionResultSchema.parse(res);
+				const res = await sandbox.execute(output, { vars });
+				const parsed = jsResultSchema.parse(res);
+				const visuals: AssertionResult['visuals'] = parsed.visuals
+					? await Promise.all(
+							parsed.visuals.map(async (v) => {
+								// Convert Blob to FileReference
+								if (v instanceof Blob) {
+									const hash = await hashBlob(v);
+									const ext = getFileExtension(v.type);
+									const filename = hash + ext;
+									const file = new File([v], filename, { type: v.type });
+									return new FileReference('file:///runs/' + filename, file);
+								}
+								return v;
+							})
+						)
+					: undefined;
+				return {
+					pass: parsed.pass,
+					message: parsed.message,
+					visuals
+				};
 			} catch (e) {
 				const errorMessage = e instanceof Error ? e.message : String(e);
 				const lineNumber =
@@ -54,4 +88,35 @@ export function createJavascriptAssertion(
 			sandbox.destroy();
 		}
 	};
+}
+
+async function hashBlob(blob: Blob): Promise<string> {
+	const fileReader = new FileReader();
+	fileReader.readAsArrayBuffer(blob);
+
+	return new Promise((resolve, reject) => {
+		fileReader.onloadend = async () => {
+			try {
+				const hashBuffer = await crypto.subtle.digest('SHA-256', fileReader.result as ArrayBuffer);
+				const hashArray = Array.from(new Uint8Array(hashBuffer));
+				const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+				resolve(hashHex);
+			} catch (err) {
+				reject(err);
+			}
+		};
+	});
+}
+
+function getFileExtension(type: string): string {
+	const extensionMap: Record<string, string> = {
+		'image/png': '.png',
+		'image/jpeg': '.jpg'
+	};
+
+	if (type in extensionMap) {
+		return extensionMap[type];
+	}
+
+	throw new Error(`Unsupported file type: ${type}`);
 }

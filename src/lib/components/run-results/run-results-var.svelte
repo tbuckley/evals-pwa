@@ -7,7 +7,7 @@
 		const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
 		return (
 			val instanceof FileReference &&
-			imageExtensions.some((ext) => val.path.toLowerCase().endsWith(ext))
+			imageExtensions.some((ext) => val.uri.toLowerCase().endsWith(ext))
 		);
 	}
 </script>

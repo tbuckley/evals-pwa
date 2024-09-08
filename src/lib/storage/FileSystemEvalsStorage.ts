@@ -89,15 +89,28 @@ export class FileSystemEvalsStorage implements StorageProvider {
 		// TODO switch to yaml?
 		// TODO also add a uuid to guarantee uniqueness
 		// TODO format as datetime string
-		await this.fs.writeText(
-			`file:///runs/${run.timestamp}.json`,
-			JSON.stringify(run, (_key, value) => {
-				if (value instanceof FileReference) {
-					return value.path;
+		const files: FileReference[] = [];
+		const data = JSON.stringify(run, (_key, value) => {
+			if (value instanceof FileReference) {
+				files.push(value);
+				return value.uri;
+			}
+			return value;
+		});
+
+		// First, make sure all the files exist, or create them
+		await Promise.all(
+			files.map(async (file) => {
+				try {
+					await this.fs.loadFile(file.uri);
+				} catch {
+					await this.fs.writeFile(file.uri, file.file);
 				}
-				return value;
 			})
 		);
+
+		// Then save the run
+		await this.fs.writeFile(`file:///runs/${run.timestamp}.json`, data);
 	}
 
 	loadFile(uri: string): Promise<File> {

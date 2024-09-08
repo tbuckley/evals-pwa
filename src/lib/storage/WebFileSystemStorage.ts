@@ -45,7 +45,7 @@ export class WebFileSystemStorage {
 		return files;
 	}
 
-	async writeText(uri: string, text: string): Promise<void> {
+	async writeFile(uri: string, data: string | Blob): Promise<void> {
 		const filepath = fileUriToPath(uri);
 		if (!pathIsFile(filepath)) {
 			throw new Error(`Cannot write to a directory: ${uri}`);
@@ -57,7 +57,7 @@ export class WebFileSystemStorage {
 		const handle = await dir.getFileHandle(filename, { create: true });
 
 		const writable = await handle.createWritable();
-		await writable.write(text);
+		await writable.write(data);
 		await writable.close();
 	}
 
