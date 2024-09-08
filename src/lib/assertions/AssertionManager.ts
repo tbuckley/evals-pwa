@@ -1,4 +1,4 @@
-import type { Assertion, AssertionProvider, FileLoader, NormalizedTestCase } from '$lib/types';
+import type { Assertion, AssertionProvider, NormalizedTestCase } from '$lib/types';
 import { convertAllStringsToHandlebarSafe } from '$lib/utils/handlebars';
 import { createContainsAssertion } from './contains';
 import { createJavascriptAssertion } from './javascript';
@@ -11,10 +11,7 @@ import type { ProviderManager } from '$lib/providers/ProviderManager';
 export class AssertionManager {
 	assertions: AssertionProvider[] = [];
 
-	constructor(
-		public providerManager: ProviderManager,
-		public fileLoader: FileLoader
-	) {}
+	constructor(public providerManager: ProviderManager) {}
 
 	getAssertion(assertion: Assertion, testVars: NormalizedTestCase['vars']): AssertionProvider {
 		const provider = this.createAssertion(assertion.type, assertion.vars, testVars);

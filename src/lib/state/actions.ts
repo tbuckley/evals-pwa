@@ -164,7 +164,7 @@ export async function runTests() {
 	// Run tests
 	const results: LiveRun['results'] = [];
 	const runner = new ParallelTaskQueue(5);
-	const mgr = new AssertionManager(providerManager, storage);
+	const mgr = new AssertionManager(providerManager);
 	for (const test of globalTests) {
 		const testResults: Writable<LiveResult>[] = [];
 		for (const env of envs) {
