@@ -4,7 +4,8 @@ import {
 	assertionResultSchema,
 	providerSchema,
 	type AssertionProvider,
-	type AssertionResult
+	type AssertionResult,
+	type NormalizedTestCase
 } from '$lib/types';
 import { extractAllJsonObjects } from '$lib/utils/extractAllJson';
 import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
@@ -21,6 +22,7 @@ const argsSchema = z.object({
 
 export function createLlmRubricAssertion(
 	args: unknown,
+	testVars: NormalizedTestCase['vars'],
 	providerManager: ProviderManager
 ): AssertionProvider {
 	const parsedArgs = argsSchema.safeParse(args);
@@ -38,10 +40,12 @@ export function createLlmRubricAssertion(
 		model,
 		prompt: new HandlebarsPromptFormatter(prompt ?? LLM_RUBRIC_PROMPT)
 	});
+	// TODO also populate placeholders in the rubric
+	// TODO make rubric optional if prompt is provided
 
 	return {
 		run: async function (output: string): Promise<AssertionResult> {
-			const result = await env.run({ output, rubric });
+			const result = await env.run({ output, rubric, ...testVars });
 			const rubricOutput = result.output;
 			if (!rubricOutput) {
 				return {

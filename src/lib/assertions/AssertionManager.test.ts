@@ -1,7 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { AssertionManager } from './AssertionManager';
 import { ProviderManager } from '$lib/providers/ProviderManager';
-import { type FileLoader } from '$lib/types';
 
 describe('AssertionManager', () => {
 	test('substitutes variables', async function () {
@@ -56,6 +55,7 @@ describe('AssertionManager', () => {
 		const res2 = await assertion.run('hello!');
 		expect(res2.pass).toBe(false);
 	});
+
 	test('supports llm-rubric', async function () {
 		const mgr = createAssertionManager();
 		const assertion = mgr.getAssertion(
@@ -73,14 +73,26 @@ describe('AssertionManager', () => {
 		// expect(res.pass).toBe(true);
 		expect(res.message).toBe('Output: hello');
 	});
+	test('substitutes variables in llm-rubric', async function () {
+		const mgr = createAssertionManager();
+		const assertion = mgr.getAssertion(
+			{
+				type: 'llm-rubric',
+				vars: {
+					rubric: 'THIS IS IGNORED BECAUSE {{ rubric }} IS NOT IN THE PROMPT',
+					prompt: '} "{{ output }} {{ first }} :tuptuO" :"egassem" ,eurt :"ssap" {',
+					provider: 'reverser:whatever'
+				}
+			},
+			{ first: 'ho' }
+		);
+		const res = await assertion.run('olleh');
+		// expect(res.pass).toBe(true);
+		expect(res.message).toBe('Output: oh hello');
+	});
 });
 
 function createAssertionManager(): AssertionManager {
 	const provider = new ProviderManager({});
-	const loader: FileLoader = {
-		loadFile() {
-			throw new Error('unsupported');
-		}
-	};
-	return new AssertionManager(provider, loader);
+	return new AssertionManager(provider);
 }

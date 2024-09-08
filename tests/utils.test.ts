@@ -40,4 +40,26 @@ test.describe('CodeSandbox', () => {
 
 		await page.evaluate((sandbox) => sandbox.destroy(), sandboxHandle);
 	});
+
+	test('forwards any errors from the sandbox', async ({ page }) => {
+		await page.goto('/__playwright');
+		await page.waitForLoadState('networkidle');
+
+		const sandboxHandle = await page.evaluateHandle(() => {
+			const sandbox = new window.__dev.CodeSandbox(`
+				function execute(arr) { throw new Error('This is a test error'); }
+			`);
+			return sandbox;
+		});
+
+		try {
+			await page.evaluate(async (sandbox) => await sandbox.execute('test'), sandboxHandle);
+			throw new Error('The expected error was not thrown');
+		} catch (e) {
+			expect(e).toBeInstanceOf(Error);
+			expect((e as Error).message).toContain('This is a test error');
+		}
+
+		await page.evaluate((sandbox) => sandbox.destroy(), sandboxHandle);
+	});
 });

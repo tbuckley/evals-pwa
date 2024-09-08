@@ -34,12 +34,20 @@ export class CodeSandbox {
             <script type="module">
                 ${js}
                 window.addEventListener('message', async (event) => {
-                    const result = await execute(...event.data.args);
-                    window.parent.postMessage({
-                        type: "execute-output",
-                        nonce: event.data.nonce,
-                        result,
-                    }, '*');
+					try {
+						const result = await execute(...event.data.args);
+						window.parent.postMessage({
+							type: "execute-output",
+							nonce: event.data.nonce,
+							result,
+						}, '*');
+					} catch (e) {
+						window.parent.postMessage({
+							type: 'execute-error',
+							nonce: event.data.nonce,
+							error: e instanceof Error ? e.message : String(e)
+						}, '*');
+					}
                 });
 				window.parent.postMessage({ type: 'register', nonce: '${nonce}' }, '*');
             </script>
@@ -53,10 +61,14 @@ export class CodeSandbox {
 		// Add a nonce so we can identify responses from this iframe
 		const nonce = crypto.randomUUID();
 
-		return new Promise((resolve) => {
+		return new Promise((resolve, reject) => {
 			const listener = (event: MessageEvent) => {
-				if (event.data.type === 'execute-output' && event.data.nonce === nonce) {
-					resolve(event.data.result);
+				if (event?.data?.nonce === nonce) {
+					if (event.data.type === 'execute-output') {
+						resolve(event.data.result);
+					} else if (event.data.type === 'execute-error') {
+						reject(new Error(event.data.error));
+					}
 					window.removeEventListener('message', listener);
 				}
 			};

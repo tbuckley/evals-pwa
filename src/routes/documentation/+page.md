@@ -179,7 +179,7 @@ tests:
 
 ## Javascript Assertions
 
-For `javascript` assertions, your code must provide a function `execute(output: string): Promise<AssertionResult>`.
+For `javascript` assertions, your code must provide a function `execute(output: string, context: { vars: Record<string, unknown> }): Promise<AssertionResult>`.
 
 ```typescript
 interface AssertionResult {
@@ -191,12 +191,12 @@ interface AssertionResult {
 For example:
 
 ```js
-function execute(output) {
+function execute(output, context) {
 	return { pass: output.length > 100; }
 }
 ```
 
-The code is run inside a sandboxed iframe with `<script type="module">`. You can import libraries from a CDN, but you cannot reference other files in your directory.
+The code is run inside a sandboxed iframe with `<script type="module">`. You can import libraries from a CDN, but you cannot reference other files in your directory. Errors will be shown in the UI.
 
 Note: Currently, every javascript assertion will be instantiated once per test case using it. In future we plan to only instantiate each unique script a single time and reuse it across test cases. Please avoid creating any global state that would affect following test cases.
 

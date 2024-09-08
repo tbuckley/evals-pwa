@@ -29,37 +29,35 @@ export class AssertionManager {
 		vars: Assertion['vars'],
 		testVars: NormalizedTestCase['vars']
 	): AssertionProvider {
-		const populatedVars = { ...vars };
-		const safeVars = convertAllStringsToHandlebarSafe(testVars ?? {});
-		// For llmRubric, ensure {{ output }} is still in the result...
-		// Though this will break for any functions :-/
-		// TODO fix
-		if (!('output' in safeVars)) {
-			safeVars['output'] = new Handlebars.SafeString('{{ output }}');
-		}
-		if (!('rubric' in safeVars)) {
-			safeVars['rubric'] = new Handlebars.SafeString('{{ rubric }}');
-		}
-		for (const key in populatedVars) {
-			if (typeof populatedVars[key] === 'string') {
-				const template = Handlebars.compile(populatedVars[key]);
-				populatedVars[key] = template(safeVars);
-			}
-		}
-
-		switch (type) {
-			case 'equals':
-				return createEqualsAssertion(populatedVars);
-			case 'contains':
-				return createContainsAssertion(populatedVars);
-			case 'regex':
-				return createRegexAssertion(populatedVars);
-			case 'javascript':
-				return createJavascriptAssertion(populatedVars);
-			case 'llm-rubric':
-				return createLlmRubricAssertion(populatedVars, this.providerManager);
-			default:
-				throw new Error(`Unknown assertion type: ${type}`);
+		if (type === 'equals') {
+			const populatedVars = prePopulateVars(vars, testVars);
+			return createEqualsAssertion(populatedVars);
+		} else if (type === 'contains') {
+			const populatedVars = prePopulateVars(vars, testVars);
+			return createContainsAssertion(populatedVars);
+		} else if (type === 'regex') {
+			const populatedVars = prePopulateVars(vars, testVars);
+			return createRegexAssertion(populatedVars);
+		} else if (type === 'javascript') {
+			return createJavascriptAssertion(vars, testVars);
+		} else if (type === 'llm-rubric') {
+			return createLlmRubricAssertion(vars, testVars, this.providerManager);
+		} else {
+			throw new Error(`Unknown assertion type: ${type}`);
 		}
 	}
+}
+
+function prePopulateVars(vars: Assertion['vars'], testVars: NormalizedTestCase['vars']) {
+	const populatedVars = { ...vars };
+	const safeVars = convertAllStringsToHandlebarSafe(testVars ?? {});
+
+	for (const key in populatedVars) {
+		if (typeof populatedVars[key] === 'string') {
+			const template = Handlebars.compile(populatedVars[key]);
+			populatedVars[key] = template(safeVars);
+		}
+	}
+
+	return populatedVars;
 }
