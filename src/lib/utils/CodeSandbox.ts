@@ -45,7 +45,9 @@ export class CodeSandbox {
 						window.parent.postMessage({
 							type: 'execute-error',
 							nonce: event.data.nonce,
-							error: e instanceof Error ? e.message : String(e)
+							error: e instanceof Error ? e.message : String(e),
+							stack: e instanceof Error ? e.stack : undefined,
+							lineNumber: e instanceof Error && 'lineNumber' in e ? e.lineNumber : undefined
 						}, '*');
 					}
                 });
@@ -67,7 +69,10 @@ export class CodeSandbox {
 					if (event.data.type === 'execute-output') {
 						resolve(event.data.result);
 					} else if (event.data.type === 'execute-error') {
-						reject(new Error(event.data.error));
+						const error = new Error(event.data.error);
+						error.stack = event.data.stack;
+						(error as any).lineNumber = event.data.lineNumber;
+						reject(error);
 					}
 					window.removeEventListener('message', listener);
 				}
