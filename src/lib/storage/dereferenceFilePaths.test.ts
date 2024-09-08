@@ -1,6 +1,7 @@
 import picomatch from 'picomatch';
 import { describe, expect, test } from 'vitest';
 import { dereferenceFilePaths } from './dereferenceFilePaths';
+import { FileReference } from './FileReference';
 
 class InMemoryFileStorage {
 	files: Record<string, string> = {};
@@ -17,16 +18,16 @@ class InMemoryFileStorage {
 		return new File([this.files[path]], filename);
 	}
 
-	async load(path: string): Promise<File | { path: string; file: File }[]> {
+	async load(path: string): Promise<File | { uri: string; file: File }[]> {
 		const { isGlob } = picomatch.scan(path);
 		if (isGlob) {
 			const globPattern = path; // FIXME delete this
 			const re = picomatch.makeRe(path);
-			const files: { path: string; file: File }[] = [];
+			const files: { uri: string; file: File }[] = [];
 			for (const path of Object.keys(this.files)) {
 				if (re.test(path)) {
 					files.push({
-						path: globPattern, // FIXME should just be `path: path,`
+						uri: globPattern, // FIXME should just be `path: path,`
 						file: await this.getFile(path)
 					});
 				}
@@ -103,14 +104,21 @@ describe('dereferenceFilePaths', () => {
 		expect(output).toEqual({ values: ['a', 'b', 'c'] });
 	});
 
-	test('leaves image files untouched', async () => {
+	test('embeds image files as FileReference', async () => {
 		const storage = new InMemoryFileStorage();
 		storage.register('file:///a.txt', 'a');
 		storage.register('file:///b.png', 'b');
 
 		const input = { txt: 'file:///a.txt', img: 'file:///b.png' };
 		const output = await dereferenceFilePaths(input, { storage });
-		expect(output).toEqual({ txt: 'a', img: 'file:///b.png' });
+
+		// expect(output).toHaveProperty('txt');
+		// expect(output).toHaveProperty('img');
+		expect(output).property('txt').to.equal('a');
+		expect(output).property('img').to.be.instanceOf(FileReference);
+		expect(output).property('img').property('path').to.equal('file:///b.png');
+		expect(output).property('img').property('file').to.be.instanceOf(File);
+		expect(output).property('img').property('file').property('name').to.equal('b.png');
 	});
 
 	test('supports relative paths', async () => {
@@ -125,10 +133,14 @@ describe('dereferenceFilePaths', () => {
 
 		const input = { tests: ['file:///tests/a.yaml'] };
 		const output = await dereferenceFilePaths(input, { storage });
-		expect(output).toEqual({
-			tests: [
-				{ vars: { foo: 1, bar: 2, baz: 'file:///tests/baz/c.png' }, assert: 'code', abs: 'code' }
-			]
+		expect(output).toMatchObject({
+			tests: [{ vars: { foo: 1, bar: 2 }, assert: 'code', abs: 'code' }]
 		});
+		expect(output)
+			.property('tests')
+			.property('0')
+			.property('vars')
+			.property('baz')
+			.to.be.instanceOf(FileReference);
 	});
 });

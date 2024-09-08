@@ -1,11 +1,5 @@
-import {
-	type MultiPartPrompt,
-	type PopulatedVarSet,
-	type Prompt,
-	type PromptFormatter
-} from '$lib/types';
+import { type MultiPartPrompt, type Prompt, type PromptFormatter, type VarSet } from '$lib/types';
 import Handlebars from 'handlebars';
-import { convertAllStringsToHandlebarSafe } from './handlebars';
 import { FileReference } from '$lib/storage/FileReference';
 
 export class HandlebarsPromptFormatter implements PromptFormatter {
@@ -14,33 +8,51 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
 	constructor(prompt: Prompt) {
 		this.prompt = Handlebars.compile(prompt);
 	}
-	format(vars: PopulatedVarSet): MultiPartPrompt {
-		// Replace files with placeholders, which will be split out at the end
-		const placeholderVars: Record<string, unknown> = { ...vars };
+	format(vars: VarSet): MultiPartPrompt {
 		const files: Record<string, File> = {};
-		for (const key in placeholderVars) {
-			if (placeholderVars[key] instanceof FileReference) {
-				files[key] = placeholderVars[key].file;
-				placeholderVars[key] = `__FILE_PLACEHOLDER_${key}__`;
+		const placeholderVars = objectDfsMap(vars, (val, path) => {
+			if (val instanceof FileReference) {
+				// Replace files with placeholders, which will be split out at the end
+				files[path] = val.file;
+				return `__FILE_PLACEHOLDER_${path}__`;
 			}
-		}
+			if (typeof val === 'string') {
+				return new Handlebars.SafeString(val);
+			}
+			return val;
+		});
 
-		// Indicate that all strings are safe, otherwise they will be escaped
-		const safeVars = convertAllStringsToHandlebarSafe(placeholderVars);
-
-		const rendered = this.prompt(safeVars);
+		const rendered = this.prompt(placeholderVars);
 
 		// Find all file placeholders, and use the image
 		const parsed: MultiPartPrompt = [];
-		rendered.split(/(__FILE_PLACEHOLDER_[a-zA-Z0-9_-]+__)/).forEach((part) => {
+		rendered.split(/(__FILE_PLACEHOLDER_[a-zA-Z0-9_\-[\].$]+?__)/).forEach((part) => {
 			if (part.startsWith('__FILE_PLACEHOLDER_')) {
 				const key = part.slice(19, -2);
 				parsed.push({ image: files[key] });
-			} else {
+			} else if (part.length > 0) {
 				parsed.push({ text: part });
 			}
 		});
 
 		return parsed;
 	}
+}
+
+function objectDfsMap(
+	val: unknown,
+	map: (val: unknown, path: string) => unknown,
+	path = '$'
+): unknown {
+	if (Array.isArray(val)) {
+		return val.map((v, i) => objectDfsMap(v, map, path + '[' + i + ']'));
+	}
+	if (typeof val === 'object' && val !== null && Object.getPrototypeOf(val) === Object.prototype) {
+		const obj: Record<string, unknown> = {};
+		for (const [key, value] of Object.entries(val)) {
+			obj[key] = objectDfsMap(value as unknown, map, path + '.' + key);
+		}
+		return obj;
+	}
+	return map(val, path);
 }

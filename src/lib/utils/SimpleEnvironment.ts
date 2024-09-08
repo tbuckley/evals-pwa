@@ -4,7 +4,7 @@ import type {
 	TestOutput,
 	PromptFormatter,
 	TokenUsage,
-	PopulatedVarSet
+	VarSet
 } from '$lib/types';
 
 export interface Config {
@@ -21,7 +21,7 @@ export class SimpleEnvironment implements TestEnvironment {
 		this.prompt = options.prompt;
 	}
 
-	async run(vars: PopulatedVarSet): Promise<TestOutput> {
+	async run(vars: VarSet): Promise<TestOutput> {
 		const prompt = this.prompt.format(vars);
 
 		const start = Date.now();

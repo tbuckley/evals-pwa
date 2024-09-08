@@ -141,9 +141,8 @@ export interface TaskQueue {
 	abort(): void;
 }
 
-export type PopulatedVarSet = Record<string, string | File>;
 export interface PromptFormatter {
-	format(vars: PopulatedVarSet): MultiPartPrompt;
+	format(vars: VarSet): MultiPartPrompt;
 }
 
 export interface FileLoader {
