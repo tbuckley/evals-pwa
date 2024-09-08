@@ -65,6 +65,15 @@ describe('dereferenceFilePaths', () => {
 		expect(ouput).toEqual({ a: 1, b: { c: 3, d: [5, 6] } });
 	});
 
+	test('inserts json files', async () => {
+		const storage = new InMemoryFileStorage();
+		storage.register('file:///a.json', '{"c": 3, "d": [5, 6]}');
+
+		const input = { a: 1, b: 'file:///a.json' };
+		const ouput = await dereferenceFilePaths(input, { storage });
+		expect(ouput).toEqual({ a: 1, b: { c: 3, d: [5, 6] } });
+	});
+
 	test('allows referenced yaml to reference additional files', async () => {
 		const storage = new InMemoryFileStorage();
 		storage.register('file:///a.yaml', 'c: 3\nd: file:///b.txt');
@@ -116,7 +125,7 @@ describe('dereferenceFilePaths', () => {
 		// expect(output).toHaveProperty('img');
 		expect(output).property('txt').to.equal('a');
 		expect(output).property('img').to.be.instanceOf(FileReference);
-		expect(output).property('img').property('path').to.equal('file:///b.png');
+		expect(output).property('img').property('uri').to.equal('file:///b.png');
 		expect(output).property('img').property('file').to.be.instanceOf(File);
 		expect(output).property('img').property('file').property('name').to.equal('b.png');
 	});

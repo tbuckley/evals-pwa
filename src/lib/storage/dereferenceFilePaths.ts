@@ -114,6 +114,14 @@ async function handleFile(absoluteFileUri: string, file: File, options: Derefere
 			absolutePath: getDirname(fileUriToPath(absoluteFileUri)),
 			visited: newVisited
 		});
+	} else if (file.name.endsWith('.json')) {
+		const text = await file.text();
+		const newVisited = new Set([...visited, absoluteFileUri]); // Track file to detect cycles
+		return dereferenceFilePaths(JSON.parse(text), {
+			...options,
+			absolutePath: getDirname(fileUriToPath(absoluteFileUri)),
+			visited: newVisited
+		});
 	} else if (file.name.endsWith('.txt') || file.name.endsWith('.js')) {
 		// TODO handle js files (for javascript assertions) independently
 		const text = await file.text();
