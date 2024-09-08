@@ -59,7 +59,7 @@
 				},
 				plugins: {
 					resize: {
-						initialWidth: 200
+						initialWidth: 300
 					}
 				}
 			})
