@@ -71,7 +71,7 @@ export class CodeSandbox {
 					} else if (event.data.type === 'execute-error') {
 						const error = new Error(event.data.error);
 						error.stack = event.data.stack;
-						(error as any).lineNumber = event.data.lineNumber;
+						(error as unknown as { lineNumber: number }).lineNumber = event.data.lineNumber;
 						reject(error);
 					}
 					window.removeEventListener('message', listener);

@@ -31,7 +31,9 @@ export function createJavascriptAssertion(
 			} catch (e) {
 				const errorMessage = e instanceof Error ? e.message : String(e);
 				const lineNumber =
-					e instanceof Error && 'lineNumber' in e ? (e as any).lineNumber : undefined;
+					e instanceof Error && 'lineNumber' in e
+						? (e as { lineNumber: number }).lineNumber
+						: undefined;
 				const stackTrace = e instanceof Error ? e.stack : undefined;
 
 				let formattedMessage = `Error in javascript assertion: ${errorMessage}`;
