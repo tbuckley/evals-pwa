@@ -15,27 +15,27 @@ description: A short description
 # Note: your description will be shown in a dropdown to help you select a run
 
 providers:
-	- gemini:gemini-1.5-pro-latest
-	- gemini:gemini-1.5-flash-latest
+  - gemini:gemini-1.5-pro-latest
+  - gemini:gemini-1.5-flash-latest
 
 prompts:
-	- Speak like a pirate. {{request}}
-	- Only respond with a haiku. {{request}}
-	# For multi-line prompts, you probably want to use ">-"
-	# See https://yaml-multiline.info/
-	- >-
-	  This is a multi-line string where all the
-	  newlines will be replaced with spaces,
-	  and there will be no newline at the end.
+  - Speak like a pirate. {{request}}
+  - Only respond with a haiku. {{request}}
+  # For multi-line prompts, you probably want to use ">-"
+  # See https://yaml-multiline.info/
+  - >-
+    This is a multi-line string where all the
+    newlines will be replaced with spaces,
+    and there will be no newline at the end.
 
 tests:
-	- description: foo
-		vars:
-			request: Who was the first US president?
-		assert:
-			- type: contains
-				vars:
-					needle: washington
+  - description: foo
+    vars:
+      request: Who was the first US president?
+    asserts:
+      - type: contains
+        vars:
+          needle: washington
 ```
 
 ## Providers
@@ -66,14 +66,14 @@ When providers are defined in the expanded form, additional configuration option
 
 ```yaml
 providers:
-	- id: ollama:llama3:8b
-		config:
-			apiBaseUrl: http://localhost:11434
-			response_format: { type: 'json_object' }
-	- id: gemini:gemini-1.5-flash-latest
-		config:
-			generationConfig:
-			responseMimeType: application/json
+  - id: ollama:llama3:8b
+    config:
+      apiBaseUrl: http://localhost:11434
+      response_format: { type: 'json_object' }
+  - id: gemini:gemini-1.5-flash-latest
+    config:
+      generationConfig:
+        responseMimeType: application/json
 ```
 
 #### Gemini Config
@@ -96,26 +96,26 @@ Format:
 ```typescript
 type Prompt = string;
 interface Config {
-	prompts: string | Prompt[];
+	prompts: Prompt[];
 	// ...
 }
 ```
 
-`prompts` is either an array of prompts, or a `file:///` glob referencing the prompts. You can store prompts in separate `.txt` files, just reference it using `file:///`. Or import multiple with a glob, such as `file:///prompts/*.txt`.
+`prompts` is an array of prompts.
 
 Unlike Promptfoo, these use [Handlebars](https://handlebarsjs.com/) format instead. Test case variables are considered "safe" strings and will not be escaped.
 
-If a var starts with `file:///` and ends with .png, .jpg, or .jpeg then it will be loaded as an image. Note that not all providers support images.
+If a var references an image file (.png, .jpg, or .jpeg), . Note that not all providers support images.
 
 ```yaml
 prompts:
-	- '{{image}} What is this?'
-	# Will be sent as {image: ...}, {text: " What is this?"}
-	# Note the whitespace
+  - '{{image}} What is this?'
+  # Will be sent as {image: ...}, {text: " What is this?"}
+  # Note the whitespace
 
 tests:
-	- vars:
-			image: file:///foo.png
+  - vars:
+      image: file:///foo.png
 ```
 
 ## Tests
@@ -124,13 +124,13 @@ Format:
 
 ```typescript
 interface Config {
-	tests: string | Array<TestCase | string>[];
+	tests: Array<TestCase>[];
 	defaultTest?: Partial<TestCase>;
 	// ...
 }
 interface TestCase {
 	description?: string;
-	vars?: Record<string, string>;
+	vars?: Record<string, unknown>;
 	asserts?: Assertion[];
 }
 interface Assertion {
@@ -140,9 +140,7 @@ interface Assertion {
 }
 ```
 
-`tests` is either an array of tests, or a `file:///` glob referencing the tests. A test may either be an object describing the test, a `file:///` path to a `.yaml` file containing the description, or a `file:///` glob pattern to match against (e.g. `file:///tests/**/*.yaml`).
-
-Vars will be substituted into the prompt. In addition to support for image files (shown above), `file:///` paths to `.txt` or `.js` files will also be loaded as a string variable.
+`tests` is an array of tests. A test is an object describing the test. Vars will be substituted into the prompt.
 
 Supported assertion types:
 
@@ -155,36 +153,36 @@ Supported assertion types:
 - [ ] latency
 - [x] llm-rubric -- ask an LLM to validate the output. Provider defaults to `gemini-1.5-pro-latest`. If you override `prompt`, it should be a template containing both `{{output}}` and `{{rubric}}`. Vars: `{ rubric: string; prompt?: string; provider?: string}`
 
-Any assertion vars that are strings will be treated as Handlebars templates, and the test case's vars will be populated.
-This makes it easy to define assertions inside defaultTest, using variables to tweak the assertion for each test case.
+Any assertion vars that are strings will be treated as Handlebars templates, and the test case's vars will be populated. (Note: this does not apply to javascript assertions, which receive the test case's vars directly.)
 
-Any assertion vars that start with `file:///` and end with `.txt` or `.js` will be loaded.
+This makes it easy to define assertions inside defaultTest, using variables to tweak the assertion for each test case.
 
 ```yaml
 # ...
 defaultTest:
-	asserts:
-		- type: contains
-			vars:
-				needle: '{{translation}}'
-			ignoreCase: true
-		- type: llm-rubric
-			vars:
-				rubric: Is a poem
+  asserts:
+    - type: contains
+      vars:
+        needle: '{{translation}}'
+      ignoreCase: true
+    - type: llm-rubric
+      vars:
+        rubric: Is a poem
 tests:
-	- vars:
-			language: Spanish
-		translation: hola
+  - vars:
+      language: Spanish
+    translation: hola
 ```
 
 ## Javascript Assertions
 
-For `javascript` assertions, your code must provide a function `execute(output: string, context: { vars: Record<string, unknown> }): Promise<AssertionResult>`.
+For `javascript` assertions, your code must provide a function `execute(output: string, context: { vars: Record<string, unknown> }): Promise<AssertionResult>`. It returns whether the assertion passed, an optional message explaining the result, and an optional array of visuals to show in the UI. Visuals may be a string or an image (PNG/JPEG) as a Blob.
 
 ```typescript
 interface AssertionResult {
 	pass: boolean;
 	message?: string;
+	visuals?: (string | Blob)[];
 }
 ```
 
@@ -192,7 +190,7 @@ For example:
 
 ```js
 function execute(output, context) {
-	return { pass: output.length > 100; }
+  return { pass: output.length > 100; }
 }
 ```
 
@@ -247,5 +245,38 @@ interface TestResult {
 interface AssertionResult {
 	pass: boolean;
 	message?: string;
+	visuals?: string[];
 }
+```
+
+## Splitting across multiple files
+
+You can split your configuration across multiple files. You reference another file either with an absolute path from the root project folder (e.g. `file:///path/from/folder/file.yaml`), or via a relative path from the current file (e.g. `file://./path/from/folder/file.yaml`).
+
+Any portion of the configuration can be replaced with a reference to a `.yaml` or `.json` file.
+
+```yaml
+providers:
+  - file:///providers/gemini-pro-jsonmode.yaml
+```
+
+Any string in the configuration can be replaced with a reference to a `.txt` or `.js` file.
+
+```yaml
+prompts:
+  - file://./prompts/poem.txt
+```
+
+Any array in the configuration can be replaced with a glob, or include a glob which will be flattened into the array.
+
+```yaml
+# Glob will be expanded into an array
+prompts: file:///prompts/*.txt
+
+# Glob element in an array will be flattened
+tests:
+  - file:///tests/**/*.yaml
+  - description: foo
+    vars:
+      request: Who was the first US president?
 ```
