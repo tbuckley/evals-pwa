@@ -73,4 +73,36 @@ describe('runGenerators', () => {
 			]
 		`);
 	});
+	test('generators can spread into objects', async () => {
+		const input = {
+			'...': {
+				'=gen': `function execute() { return {a: 1} }`
+			}
+		};
+		const ouput = await runGenerators(input);
+		expect(ouput).toMatchInlineSnapshot(`
+			{
+			  "a": 1,
+			}
+		`);
+	});
+	test('multiple generators can spread into the same object', async () => {
+		const input = {
+			'...': [
+				{
+					'=gen': `function execute() { return {a: 1} }`
+				},
+				{
+					'=gen': `function execute() { return {b: 1} }`
+				}
+			]
+		};
+		const ouput = await runGenerators(input);
+		expect(ouput).toMatchInlineSnapshot(`
+			{
+			  "a": 1,
+			  "b": 1,
+			}
+		`);
+	});
 });

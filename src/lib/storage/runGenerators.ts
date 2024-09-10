@@ -25,6 +25,7 @@ export async function runGenerators(target: any) {
 				i += results.length - 1;
 			} else {
 				target[i] = result;
+			}
 		}
 		return target;
 	}
@@ -35,6 +36,13 @@ export async function runGenerators(target: any) {
 	}
 	for (const [key, value] of Object.entries(target)) {
 		target[key] = await runGenerators(value);
+		// Spread operator spreads objects or arrays of objects into the target.
+		if (key === '...') {
+			for (const props of Array.isArray(target[key]) ? target[key] : [target[key]]) {
+				Object.assign(target, props);
+			}
+			delete target[key];
+		}
 	}
 	return target;
 }
