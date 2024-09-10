@@ -55,4 +55,22 @@ describe('runGenerators', () => {
 			}
 		`);
 	});
+	test('generators can splice into arrays', async () => {
+		const input = [
+			1,
+			{
+				'=gen': `function execute() { return [2, 3] }`
+			},
+			4
+		];
+		const ouput = await runGenerators(input);
+		expect(ouput).toMatchInlineSnapshot(`
+			[
+			  1,
+			  2,
+			  3,
+			  4,
+			]
+		`);
+	});
 });
