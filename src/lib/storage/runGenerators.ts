@@ -36,8 +36,12 @@ export async function runGenerators(target: any) {
 	}
 	if (isGenerator(target)) {
 		const sandbox = new CodeSandbox(target['=gen']);
-		const args = ensureArray(target['args']);
-		return await sandbox.execute(...args);
+		try {
+			const args = ensureArray(target['args']);
+			return await sandbox.execute(...args);
+		} finally {
+			sandbox.destroy();
+		}
 	}
 	for (const [key, value] of Object.entries(target)) {
 		target[key] = await runGenerators(value);
