@@ -9,6 +9,11 @@ function isGenerator(target: unknown): target is Generator {
 	return typeof target === 'object' && target != null && '=gen' in target;
 }
 
+function ensureArray<T>(value: T | T[] | null | undefined): T[] {
+	if (value == null) return [];
+	return Array.isArray(value) ? value : [value];
+}
+
 export async function runGenerators(target: any) {
 	if (target == null) return target;
 	if (typeof target !== 'object') {
@@ -20,7 +25,7 @@ export async function runGenerators(target: any) {
 			const result = await runGenerators(value);
 			if (isGenerator(value)) {
 				// Flatten generated arrays into arrays.
-				const results = Array.isArray(result) ? result : [result];
+				const results = ensureArray(result);
 				target.splice(i, 1, ...results);
 				i += results.length - 1;
 			} else {
@@ -31,7 +36,7 @@ export async function runGenerators(target: any) {
 	}
 	if (isGenerator(target)) {
 		const sandbox = new CodeSandbox(target['=gen']);
-		const args = target['args'] ?? [];
+		const args = ensureArray(target['args']);
 		return await sandbox.execute(...args);
 	}
 	for (const [key, value] of Object.entries(target)) {
