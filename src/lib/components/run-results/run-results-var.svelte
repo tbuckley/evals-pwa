@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { FileReference } from '$lib/storage/FileReference';
+	import Button from '../ui/button/button.svelte';
+	import Copy from 'lucide-svelte/icons/copy';
 
 	export let value: any;
 
@@ -10,10 +12,26 @@
 			imageExtensions.some((ext) => val.uri.toLowerCase().endsWith(ext))
 		);
 	}
+
+	async function copy() {
+	  if (typeof value === 'string') {
+	  	navigator.clipboard.writeText(value);
+	  }
+	}
 </script>
 
 {#if typeof value === 'string'}
-	{value}
+	<div class="relative whitespace-pre-wrap">
+		{value}
+	<Button
+		on:click={copy}
+		variant="ghost"
+		size="icon"
+		class="absolute right-0 top-0 text-gray-500"
+	>
+		<Copy class="h-5 w-5"></Copy>
+	</Button>
+	</div>
 {:else if typeof value === 'object' && value !== null}
 	{#if isImageFile(value)}
 		<img
