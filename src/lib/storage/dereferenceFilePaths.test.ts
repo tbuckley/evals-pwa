@@ -142,14 +142,29 @@ describe('dereferenceFilePaths', () => {
 
 		const input = { tests: ['file:///tests/a.yaml'] };
 		const output = await dereferenceFilePaths(input, { storage });
-		expect(output).toMatchObject({
-			tests: [{ vars: { foo: 1, bar: 2 }, assert: 'code', abs: 'code' }]
-		});
-		expect(output)
-			.property('tests')
-			.property('0')
-			.property('vars')
-			.property('baz')
-			.to.be.instanceOf(FileReference);
+		expect(output).toMatchInlineSnapshot(`
+			{
+			  "tests": [
+			    {
+			      "abs": CodeReference {
+			        "file": File {},
+			        "uri": "file:///assert.js",
+			      },
+			      "assert": CodeReference {
+			        "file": File {},
+			        "uri": "file:///assert.js",
+			      },
+			      "vars": {
+			        "bar": 2,
+			        "baz": FileReference {
+			          "file": File {},
+			          "uri": "file:///tests/baz/c.png",
+			        },
+			        "foo": 1,
+			      },
+			    },
+			  ],
+			}
+		`);
 	});
 });

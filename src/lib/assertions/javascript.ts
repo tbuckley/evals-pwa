@@ -1,3 +1,4 @@
+import { CodeReference } from '$lib/storage/CodeReference';
 import { FileReference } from '$lib/storage/FileReference';
 import {
 	assertionResultSchema,
@@ -10,7 +11,7 @@ import { objectDfsMap } from '$lib/utils/objectDFS';
 import { z } from 'zod';
 
 const argsSchema = z.object({
-	code: z.string()
+	code: z.union([z.string(), z.custom<CodeReference>((value) => value instanceof CodeReference)])
 });
 
 const jsResultSchema = assertionResultSchema.extend({
@@ -26,9 +27,6 @@ export function createJavascriptAssertion(
 		throw new Error('Invalid javascript arguments');
 	}
 
-	const code = parsedArgs.data.code;
-	const sandbox = new CodeSandbox(code);
-
 	// Replace FileReferences with files
 	const vars = objectDfsMap(testVars, (val) => {
 		if (val instanceof FileReference) {
@@ -37,8 +35,12 @@ export function createJavascriptAssertion(
 		return val;
 	});
 
+	let sandbox: CodeSandbox | undefined;
 	return {
 		async run(output: string): Promise<AssertionResult> {
+			if (!sandbox) {
+				sandbox = new CodeSandbox(parsedArgs.data.code);
+			}
 			try {
 				const res = await sandbox.execute(output, { vars });
 				const parsed = jsResultSchema.parse(res);
@@ -85,7 +87,8 @@ export function createJavascriptAssertion(
 			}
 		},
 		destroy() {
-			sandbox.destroy();
+			sandbox?.destroy();
+			sandbox = undefined;
 		}
 	};
 }

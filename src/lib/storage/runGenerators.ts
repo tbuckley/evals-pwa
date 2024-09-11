@@ -1,7 +1,8 @@
 import { CodeSandbox } from '$lib/utils/CodeSandbox';
+import type { CodeReference } from './CodeReference';
 
 interface Generator {
-	'=gen': string;
+	'=gen': string | CodeReference;
 	args?: unknown[];
 }
 
@@ -35,7 +36,8 @@ export async function runGenerators(target: any) {
 		return target;
 	}
 	if (isGenerator(target)) {
-		const sandbox = new CodeSandbox(target['=gen']);
+		const ref = target['=gen'];
+		const sandbox = new CodeSandbox(ref);
 		try {
 			const args = ensureArray(target['args']);
 			return await sandbox.execute(...args);

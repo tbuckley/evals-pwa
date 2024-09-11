@@ -51,7 +51,7 @@ test.describe('File System', () => {
 			'Equals a value',
 			'Is >1000 characters',
 
-			'function execute(output)',
+			'"uri": "file:///code.js"',
 			'"word": "there"',
 
 			'typescript prompt'
