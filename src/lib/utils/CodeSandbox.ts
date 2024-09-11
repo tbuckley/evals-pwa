@@ -1,3 +1,17 @@
+import { CodeReference } from '$lib/storage/CodeReference';
+
+function stringToDataUrl(input: string): string {
+	// Encode the string as UTF-8
+	const utf8Encoder = new TextEncoder();
+	const utf8Bytes = utf8Encoder.encode(input);
+
+	// Convert the UTF-8 byte array to a base64 string
+	const base64String = btoa(String.fromCharCode(...utf8Bytes));
+
+	// Prepend the data URL prefix
+	return `data:text/javascript;base64,${base64String}`;
+}
+
 // CodeSandbox executes javascript in an iframe.
 // It assumes the provided code has a default export that is a function
 // with the type (output: string) => MaybePromise<AssertionResult>.
@@ -7,19 +21,24 @@ export class CodeSandbox {
 	iframe: HTMLIFrameElement;
 	loaded: Promise<void>;
 
-	constructor(js: string) {
+	constructor(code: string | CodeReference) {
 		this.iframe = document.createElement('iframe');
 		document.body.appendChild(this.iframe);
+		this.loaded = this.init(code);
+	}
 
-		const doc = this.iframe.contentDocument;
-		if (!doc) {
-			throw new Error('iframe contentDocument is null');
+	private async init(code: string | CodeReference) {
+		if (code instanceof CodeReference) {
+			if (code.file.name.endsWith('.ts')) {
+				code = `const execute = (await import("${stringToDataUrl(await code.getCode())}")).default;`;
+			} else {
+				code = await code.getCode();
+			}
 		}
 
 		const nonce = crypto.randomUUID();
-
 		let resolve: () => void;
-		this.loaded = new Promise<void>((r) => (resolve = r));
+		const ready = new Promise<void>((r) => (resolve = r));
 
 		const listener = (event: MessageEvent) => {
 			if (event.data.type === 'register' && event.data.nonce === nonce) {
@@ -29,10 +48,15 @@ export class CodeSandbox {
 		};
 		window.addEventListener('message', listener);
 
+		const doc = this.iframe.contentDocument;
+		if (!doc) {
+			throw new Error('iframe contentDocument is null');
+		}
+
 		doc.open();
 		doc.write(`
             <script type="module">
-                ${js}
+                ${code}
                 window.addEventListener('message', async (event) => {
 					try {
 						const result = await execute(...event.data.args);
@@ -55,6 +79,7 @@ export class CodeSandbox {
             </script>
         `);
 		doc.close();
+		await ready;
 	}
 
 	async execute(...args: unknown[]): Promise<unknown> {

@@ -9,7 +9,7 @@ import {
 import * as yaml from 'yaml';
 import { FileReference } from './FileReference';
 import { MissingFileError } from './WebFileSystemStorage';
-import * as esbuild from 'esbuild-wasm';
+import { CodeReference } from './CodeReference';
 
 export interface FileStorage {
 	load(path: string): Promise<File | { uri: string; file: File }[]>;
@@ -99,20 +99,6 @@ export async function dereferenceFilePaths(
 	return val;
 }
 
-let esbuildReady: Promise<void> | undefined;
-function lazyInitEsbuild() {
-	if (!esbuildReady) {
-		esbuildReady = new Promise<void>((resolve) => {
-			esbuild
-				.initialize({
-					wasmURL: new URL('../../../node_modules/esbuild-wasm/esbuild.wasm', import.meta.url).href
-				})
-				.then(resolve);
-		});
-	}
-	return esbuildReady;
-}
-
 async function handleFile(absoluteFileUri: string, file: File, options: DereferenceOptions) {
 	const visited = options.visited ?? new Set<string>();
 
@@ -137,44 +123,10 @@ async function handleFile(absoluteFileUri: string, file: File, options: Derefere
 			absolutePath: getDirname(fileUriToPath(absoluteFileUri)),
 			visited: newVisited
 		});
-	} else if (file.name.endsWith('.txt') || file.name.endsWith('.js')) {
-		// TODO handle js files (for javascript assertions) independently
-		const text = await file.text();
-		return text;
-	} else if (file.name.endsWith('.ts')) {
-		await lazyInitEsbuild();
-		const loader: esbuild.Plugin = {
-			name: 'file loader',
-			setup(build) {
-				build.onResolve({ filter: /.*/ }, (args) => {
-					const importer = args.importer === '' ? undefined : args.importer;
-					const path = new URL(args.path, importer).toString();
-					return { path, namespace: 'virtual' };
-				});
-				build.onLoad({ filter: /.*/, namespace: 'virtual' }, async (args) => {
-					const file = await options.storage.load(args.path);
-					if (Array.isArray(file)) {
-						throw new Error('cant load a glob');
-					}
-					const contents = await file.text();
-					return {
-						contents,
-						loader: 'ts'
-					};
-				});
-			}
-		};
-		const result = await esbuild.build({
-			plugins: [loader],
-			entryPoints: [absoluteFileUri],
-			target: 'es2022',
-			format: 'esm',
-			bundle: true
-		});
-		if (result.errors.length) {
-			throw new Error(result.errors.map((value) => value.text).join('\n'));
-		}
-		return result.outputFiles![0].text;
+	} else if (file.name.endsWith('.txt')) {
+		return await file.text();
+	} else if (file.name.endsWith('.js') || file.name.endsWith('.ts')) {
+		return new CodeReference(absoluteFileUri, file, options.storage);
 	} else if (isSupportedImageType(file.name)) {
 		return new FileReference(absoluteFileUri, file);
 	}

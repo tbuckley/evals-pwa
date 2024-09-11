@@ -1,4 +1,4 @@
 import { prompt } from './module.ts';
-export function execute(): string {
+export default function execute(): string {
 	return 'typescript ' + prompt;
 }
