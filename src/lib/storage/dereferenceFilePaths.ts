@@ -132,7 +132,3 @@ async function handleFile(absoluteFileUri: string, file: File, options: Derefere
 	}
 	return absoluteFileUri;
 }
-
-function isSupportedImageType(path: string): boolean {
-	return path.endsWith('.png') || path.endsWith('.jpg') || path.endsWith('.jpeg');
-}
