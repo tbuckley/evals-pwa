@@ -37,7 +37,7 @@ describe('runGenerators', () => {
 			]
 		`);
 	});
-	test('generators receive args', async () => {
+	test('generators receive args (array)', async () => {
 		const input = {
 			property: {
 				'=gen': `function execute(...args) { return args }`,
@@ -52,6 +52,22 @@ describe('runGenerators', () => {
 			    2,
 			    3,
 			  ],
+			}
+		`);
+	});
+	test('generators receive args (non-array)', async () => {
+		const input = {
+			property: {
+				'=gen': `function execute(arg) { return arg }`,
+				args: { a: 1 }
+			}
+		};
+		const ouput = await runGenerators(input);
+		expect(ouput).toMatchInlineSnapshot(`
+			{
+			  "property": {
+			    "a": 1,
+			  },
 			}
 		`);
 	});
