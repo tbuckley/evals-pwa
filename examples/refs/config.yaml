@@ -6,6 +6,7 @@ providers:
 prompts:
   - file:///promptA.txt
   - file:///prompts/*.txt
+  - =gen: file:///code.ts
 
 tests:
   - file:///testA.yaml

@@ -9,6 +9,7 @@ import {
 import * as yaml from 'yaml';
 import { FileReference } from './FileReference';
 import { MissingFileError } from './WebFileSystemStorage';
+import * as esbuild from 'esbuild-wasm';
 
 export interface FileStorage {
 	load(path: string): Promise<File | { uri: string; file: File }[]>;
@@ -98,6 +99,20 @@ export async function dereferenceFilePaths(
 	return val;
 }
 
+let esbuildReady: Promise<void> | undefined;
+function lazyInitEsbuild() {
+	if (!esbuildReady) {
+		esbuildReady = new Promise<void>((resolve) => {
+			esbuild
+				.initialize({
+					wasmURL: new URL('../../../node_modules/esbuild-wasm/esbuild.wasm', import.meta.url).href
+				})
+				.then(resolve);
+		});
+	}
+	return esbuildReady;
+}
+
 async function handleFile(absoluteFileUri: string, file: File, options: DereferenceOptions) {
 	const visited = options.visited ?? new Set<string>();
 
@@ -126,6 +141,15 @@ async function handleFile(absoluteFileUri: string, file: File, options: Derefere
 		// TODO handle js files (for javascript assertions) independently
 		const text = await file.text();
 		return text;
+	} else if (file.name.endsWith('.ts')) {
+		const text = await file.text();
+		await lazyInitEsbuild();
+		return (
+			await esbuild.transform(text, {
+				loader: 'ts',
+				target: 'es6'
+			})
+		).code;
 	} else if (isSupportedImageType(file.name)) {
 		return new FileReference(absoluteFileUri, file);
 	}
