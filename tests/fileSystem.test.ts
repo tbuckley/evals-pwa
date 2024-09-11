@@ -52,7 +52,9 @@ test.describe('File System', () => {
 			'Is >1000 characters',
 
 			'function execute(output)',
-			'"word": "there"'
+			'"word": "there"',
+
+			'typescript prompt'
 		];
 		for (const line of lines) {
 			await expect(page.locator('pre')).toContainText(line);
