@@ -148,16 +148,19 @@ describe('dereferenceFilePaths', () => {
 			    {
 			      "abs": CodeReference {
 			        "file": File {},
+			        "type": "code",
 			        "uri": "file:///assert.js",
 			      },
 			      "assert": CodeReference {
 			        "file": File {},
+			        "type": "code",
 			        "uri": "file:///assert.js",
 			      },
 			      "vars": {
 			        "bar": 2,
 			        "baz": FileReference {
 			          "file": File {},
+			          "type": "image",
 			          "uri": "file:///tests/baz/c.png",
 			        },
 			        "foo": 1,

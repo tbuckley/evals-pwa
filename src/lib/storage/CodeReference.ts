@@ -19,7 +19,7 @@ function lazyInitEsbuild() {
 export class CodeReference extends FileReference {
 	readonly #storage: FileStorage;
 	constructor(uri: string, file: File, storage: FileStorage) {
-		super(uri, file);
+		super(uri, file, 'code');
 		this.#storage = storage;
 	}
 	async getCode() {

@@ -127,7 +127,7 @@ async function handleFile(absoluteFileUri: string, file: File, options: Derefere
 		return await file.text();
 	} else if (file.name.endsWith('.js') || file.name.endsWith('.ts')) {
 		return new CodeReference(absoluteFileUri, file, options.storage);
-	} else if (isSupportedImageType(file.name)) {
+	} else {
 		return new FileReference(absoluteFileUri, file);
 	}
 	return absoluteFileUri;

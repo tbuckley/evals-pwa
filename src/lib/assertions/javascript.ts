@@ -27,14 +27,6 @@ export function createJavascriptAssertion(
 		throw new Error('Invalid javascript arguments');
 	}
 
-	// Replace FileReferences with files
-	const vars = objectDfsMap(testVars, (val) => {
-		if (val instanceof FileReference) {
-			return val.file;
-		}
-		return val;
-	});
-
 	let sandbox: CodeSandbox | undefined;
 	return {
 		async run(output: string): Promise<AssertionResult> {
@@ -42,7 +34,7 @@ export function createJavascriptAssertion(
 				sandbox = new CodeSandbox(parsedArgs.data.code);
 			}
 			try {
-				const res = await sandbox.execute(output, { vars });
+				const res = await sandbox.execute(output, { vars: testVars });
 				const parsed = jsResultSchema.parse(res);
 				const visuals: AssertionResult['visuals'] = parsed.visuals
 					? await Promise.all(
