@@ -142,14 +142,39 @@ async function handleFile(absoluteFileUri: string, file: File, options: Derefere
 		const text = await file.text();
 		return text;
 	} else if (file.name.endsWith('.ts')) {
-		const text = await file.text();
 		await lazyInitEsbuild();
-		return (
-			await esbuild.transform(text, {
-				loader: 'ts',
-				target: 'es6'
-			})
-		).code;
+		const loader: esbuild.Plugin = {
+			name: 'file loader',
+			setup(build) {
+				build.onResolve({ filter: /.*/ }, (args) => {
+					const importer = args.importer === '' ? undefined : args.importer;
+					const path = new URL(args.path, importer).toString();
+					return { path, namespace: 'virtual' };
+				});
+				build.onLoad({ filter: /.*/, namespace: 'virtual' }, async (args) => {
+					const file = await options.storage.load(args.path);
+					if (Array.isArray(file)) {
+						throw new Error('cant load a glob');
+					}
+					const contents = await file.text();
+					return {
+						contents,
+						loader: 'ts'
+					};
+				});
+			}
+		};
+		const result = await esbuild.build({
+			plugins: [loader],
+			entryPoints: [absoluteFileUri],
+			target: 'es2022',
+			format: 'esm',
+			bundle: true
+		});
+		if (result.errors.length) {
+			throw new Error(result.errors.map((value) => value.text).join('\n'));
+		}
+		return result.outputFiles![0].text;
 	} else if (isSupportedImageType(file.name)) {
 		return new FileReference(absoluteFileUri, file);
 	}
