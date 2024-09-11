@@ -7,6 +7,7 @@ import {
 } from '$lib/types';
 import { dereferenceFilePaths } from './dereferenceFilePaths';
 import { FileReference } from './FileReference';
+import { runGenerators } from './runGenerators';
 import { normalizeConfig } from './normalizeConfig';
 import { fsConfigSchema } from './types';
 import { MissingFileError, type WebFileSystemStorage } from './WebFileSystemStorage';
@@ -52,6 +53,8 @@ export class FileSystemEvalsStorage implements StorageProvider {
 			}
 			throw err;
 		}
+
+		await runGenerators(dereferenced);
 
 		const parsed = fsConfigSchema.safeParse(dereferenced);
 		if (!parsed.success) {
