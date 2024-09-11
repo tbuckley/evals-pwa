@@ -13,9 +13,13 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
 		const files: Record<string, File> = {};
 		const placeholderVars = objectDfsMap(vars, (val, path) => {
 			if (val instanceof FileReference) {
-				// Replace files with placeholders, which will be split out at the end
-				files[path] = val.file;
-				return `__FILE_PLACEHOLDER_${path}__`;
+				if (val.type === 'image') {
+					// Replace files with placeholders, which will be split out at the end
+					files[path] = val.file;
+					return `__FILE_PLACEHOLDER_${path}__`;
+				} else {
+					return val.uri;
+				}
 			}
 			if (typeof val === 'string') {
 				return new Handlebars.SafeString(val);

@@ -30,7 +30,7 @@ export class WebFileSystemStorage {
 			throw new Error(`Invalid glob base: ${base}`);
 		}
 
-		const re = picomatch.makeRe(glob, { windows: false, cwd: '/' });
+		const re = picomatch.makeRe(glob, { windows: false, cwd: '/', dot: true });
 		const basedir = await handleNotFoundError(this.getSubdirHandle(base), uri);
 
 		const files: { uri: string; file: File }[] = [];
