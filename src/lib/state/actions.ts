@@ -4,6 +4,7 @@ import {
 	UiError,
 	type AssertionResult,
 	type FileLoader,
+	type FileStorage,
 	type LiveResult,
 	type LiveRun,
 	type NormalizedProvider,
@@ -24,6 +25,7 @@ import { WebFileSystemStorage } from '$lib/storage/WebFileSystemStorage';
 import { getVarNamesForTests } from '$lib/utils/testCase';
 import { summarizeResults } from '$lib/utils/summarizeResults';
 import * as idb from 'idb-keyval';
+import { InMemoryStorage } from '$lib/storage/InMemoryStorage';
 
 const folder = await idb.get<FileSystemDirectoryHandle>('folder');
 if (folder) {
@@ -51,8 +53,59 @@ export async function chooseFolder() {
 }
 
 export async function setStorageDirectory(dir: FileSystemDirectoryHandle) {
-	const storage = new FileSystemEvalsStorage(new WebFileSystemStorage(dir));
+	const storage = new WebFileSystemStorage(dir);
 	await idb.set('folder', dir);
+	setStorage(storage);
+}
+
+export async function setInMemoryConfig(config: string) {
+	const storage = new InMemoryStorage();
+	storage.writeFile('file:///config.yaml', config);
+	await idb.del('folder');
+	setStorage(storage);
+}
+
+export async function saveInMemoryConfigToFileSystem(config?: string) {
+	const $storageStore = get(storageStore);
+
+	let dir: FileSystemDirectoryHandle;
+	try {
+		dir = await window.showDirectoryPicker({
+			mode: 'readwrite',
+			id: 'evals-pwa', // Remember the last used location
+			startIn: 'documents' // Default to the documents folder
+		});
+	} catch (err) {
+		console.error(err);
+		return;
+	}
+
+	const storage = new WebFileSystemStorage(dir);
+	if (
+		$storageStore instanceof FileSystemEvalsStorage &&
+		$storageStore.fs instanceof InMemoryStorage
+	) {
+		// Copy over all files from in-memory storage to the new location
+		const files = (await $storageStore.fs.load('file://./**/*')) as { uri: string; file: File }[];
+		for (const { uri, file } of files) {
+			console.log('writing', uri);
+			await storage.writeFile(uri, file);
+		}
+	} else {
+		await storage.writeFile('file:///config.yaml', config ?? '');
+	}
+
+	await idb.set('folder', dir);
+	setStorage(storage);
+}
+
+export async function setStorage(fileStorage: FileStorage | null) {
+	if (!fileStorage) {
+		storageStore.set(null);
+		return;
+	}
+
+	const storage = new FileSystemEvalsStorage(fileStorage);
 	storageStore.set(storage);
 	await loadStateFromStorage();
 }

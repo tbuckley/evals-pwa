@@ -124,6 +124,16 @@ export interface StorageProvider {
 	addRun(run: Run): Promise<void>;
 }
 
+export interface ReadonlyFileStorage {
+	load(path: string): Promise<File | { uri: string; file: File }[]>;
+	loadFile(path: string): Promise<File>;
+}
+
+export interface FileStorage extends ReadonlyFileStorage {
+	getName(): string;
+	writeFile(path: string, data: string | Blob): Promise<void>;
+}
+
 export type PromptPart = { text: string } | { image: File };
 export type MultiPartPrompt = Array<PromptPart>;
 
@@ -168,6 +178,11 @@ export class UiError extends Error {
 		message?: string
 	) {
 		super(message);
+	}
+}
+export class MissingFileError extends Error {
+	constructor(public path: string) {
+		super(`File not found: ${path}`);
 	}
 }
 

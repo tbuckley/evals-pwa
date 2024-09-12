@@ -1,3 +1,4 @@
+import { MissingFileError, type FileStorage } from '$lib/types';
 import {
 	fileUriToPath,
 	getDirname,
@@ -11,7 +12,7 @@ import {
 } from '$lib/utils/path';
 import picomatch from 'picomatch';
 
-export class WebFileSystemStorage {
+export class WebFileSystemStorage implements FileStorage {
 	constructor(public dir: FileSystemDirectoryHandle) {}
 
 	getName(): string {
@@ -135,10 +136,4 @@ function getAbsPathDirectories(path: string): string[] {
 		throw new Error(`Path is not a directory: ${path}`);
 	}
 	return parts.slice(1, -1);
-}
-
-export class MissingFileError extends Error {
-	constructor(public path: string) {
-		super(`File not found: ${path}`);
-	}
 }

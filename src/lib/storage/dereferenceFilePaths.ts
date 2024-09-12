@@ -8,15 +8,11 @@ import {
 } from '$lib/utils/path';
 import * as yaml from 'yaml';
 import { FileReference } from './FileReference';
-import { MissingFileError } from './WebFileSystemStorage';
 import { CodeReference } from './CodeReference';
-
-export interface FileStorage {
-	load(path: string): Promise<File | { uri: string; file: File }[]>;
-}
+import { MissingFileError, type ReadonlyFileStorage } from '$lib/types';
 
 export interface DereferenceOptions {
-	storage: FileStorage;
+	storage: ReadonlyFileStorage;
 	absolutePath?: string;
 	visited?: Set<string>;
 	markGlobs?: boolean;

@@ -1,6 +1,8 @@
 import {
+	MissingFileError,
 	runSchema,
 	UiError,
+	type FileStorage,
 	type NormalizedConfig,
 	type Run,
 	type StorageProvider
@@ -10,11 +12,10 @@ import { FileReference } from './FileReference';
 import { runGenerators } from './runGenerators';
 import { normalizeConfig } from './normalizeConfig';
 import { fsConfigSchema } from './types';
-import { MissingFileError, type WebFileSystemStorage } from './WebFileSystemStorage';
 import * as yaml from 'yaml';
 
 export class FileSystemEvalsStorage implements StorageProvider {
-	constructor(private fs: WebFileSystemStorage) {}
+	constructor(public fs: FileStorage) {}
 
 	getName(): string {
 		return this.fs.getName();
