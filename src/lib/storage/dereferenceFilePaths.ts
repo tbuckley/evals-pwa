@@ -24,6 +24,19 @@ const GLOB_TYPE = Symbol('GLOB_TYPE');
 export async function dereferenceFilePaths(
 	val: unknown,
 	options: DereferenceOptions
+): Promise<{ result: unknown; changed: boolean }> {
+	const state = { changed: false };
+	const result = await dereferenceFilePathsImpl(val, options, state);
+	return {
+		result,
+		changed: state.changed
+	};
+}
+
+export async function dereferenceFilePathsImpl(
+	val: unknown,
+	options: DereferenceOptions,
+	state: { changed: boolean }
 ): Promise<unknown> {
 	if (typeof val === 'string') {
 		if (isValidFileUri(val)) {
@@ -51,7 +64,7 @@ export async function dereferenceFilePaths(
 
 			if (Array.isArray(res)) {
 				const arr = await Promise.all(
-					res.map(async ({ uri, file }) => handleFile(uri, file, options))
+					res.map(async ({ uri, file }) => handleFile(uri, file, options, state))
 				);
 
 				// If markGlobs is true, return a special object so we can flatten it later
@@ -59,14 +72,14 @@ export async function dereferenceFilePaths(
 			}
 
 			const file = res;
-			return handleFile(fileUri, file, options);
+			return handleFile(fileUri, file, options, state);
 		}
 		return val;
 	}
 	if (Array.isArray(val)) {
 		// Use markGlobs:true so we can flatten the results into the array
 		const parts = await Promise.all(
-			val.map(async (v) => dereferenceFilePaths(v, { ...options, markGlobs: true }))
+			val.map(async (v) => dereferenceFilePathsImpl(v, { ...options, markGlobs: true }, state))
 		);
 		const arr: unknown[] = [];
 		for (const part of parts) {
@@ -85,17 +98,26 @@ export async function dereferenceFilePaths(
 		}
 		return arr;
 	}
+	if (val instanceof FileReference) {
+		return val;
+	}
 	if (typeof val === 'object' && val !== null) {
 		const obj: Record<string, unknown> = {};
 		for (const [key, value] of Object.entries(val)) {
-			obj[key] = await dereferenceFilePaths(value as unknown, options);
+			obj[key] = await dereferenceFilePathsImpl(value as unknown, options, state);
 		}
 		return obj;
 	}
 	return val;
 }
 
-async function handleFile(absoluteFileUri: string, file: File, options: DereferenceOptions) {
+async function handleFile(
+	absoluteFileUri: string,
+	file: File,
+	options: DereferenceOptions,
+	state: { changed: boolean }
+) {
+	state.changed = true;
 	const visited = options.visited ?? new Set<string>();
 
 	// If we've already seen this file, throw an error
@@ -106,19 +128,27 @@ async function handleFile(absoluteFileUri: string, file: File, options: Derefere
 	if (file.name.endsWith('.yaml')) {
 		const text = await file.text();
 		const newVisited = new Set([...visited, absoluteFileUri]); // Track file to detect cycles
-		return dereferenceFilePaths(yaml.parse(text), {
-			...options,
-			absolutePath: getDirname(fileUriToPath(absoluteFileUri)),
-			visited: newVisited
-		});
+		return dereferenceFilePathsImpl(
+			yaml.parse(text),
+			{
+				...options,
+				absolutePath: getDirname(fileUriToPath(absoluteFileUri)),
+				visited: newVisited
+			},
+			state
+		);
 	} else if (file.name.endsWith('.json')) {
 		const text = await file.text();
 		const newVisited = new Set([...visited, absoluteFileUri]); // Track file to detect cycles
-		return dereferenceFilePaths(JSON.parse(text), {
-			...options,
-			absolutePath: getDirname(fileUriToPath(absoluteFileUri)),
-			visited: newVisited
-		});
+		return dereferenceFilePathsImpl(
+			JSON.parse(text),
+			{
+				...options,
+				absolutePath: getDirname(fileUriToPath(absoluteFileUri)),
+				visited: newVisited
+			},
+			state
+		);
 	} else if (file.name.endsWith('.txt')) {
 		return await file.text();
 	} else if (file.name.endsWith('.js') || file.name.endsWith('.ts')) {
@@ -126,5 +156,4 @@ async function handleFile(absoluteFileUri: string, file: File, options: Derefere
 	} else {
 		return new FileReference(absoluteFileUri, file);
 	}
-	return absoluteFileUri;
 }

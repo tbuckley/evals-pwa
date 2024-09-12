@@ -45,19 +45,28 @@ export class FileSystemEvalsStorage implements StorageProvider {
 			throw new UiError({ type: 'invalid-config', errors: ['Invalid YAML'] });
 		}
 
-		let dereferenced;
-		try {
-			dereferenced = await dereferenceFilePaths(raw, { storage: this.fs });
-		} catch (err) {
-			if (err instanceof MissingFileError) {
-				throw new UiError({ type: 'missing-config-reference', path: err.path });
+		let result = raw;
+		let changed;
+		do {
+			changed = false;
+			try {
+				const derefResult = await dereferenceFilePaths(result, {
+					storage: this.fs
+				});
+				changed ||= derefResult.changed;
+				result = derefResult.result;
+			} catch (err) {
+				if (err instanceof MissingFileError) {
+					throw new UiError({ type: 'missing-config-reference', path: err.path });
+				}
+				throw err;
 			}
-			throw err;
-		}
+			const genResult = await runGenerators(result);
+			result = genResult.result;
+			changed ||= genResult.changed;
+		} while (changed);
 
-		await runGenerators(dereferenced);
-
-		const parsed = fsConfigSchema.safeParse(dereferenced);
+		const parsed = fsConfigSchema.safeParse(result);
 		if (!parsed.success) {
 			const errors = parsed.error.issues.map(
 				(issue) => `${issue.path.join('.')}: ${issue.message}`
@@ -84,7 +93,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
 					storage: this.fs,
 					ignoreMissing: true
 				});
-				return runSchema.parse(dereferenced);
+				return runSchema.parse(dereferenced.result);
 			})
 		);
 	}

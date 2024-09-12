@@ -6,8 +6,9 @@ import { getFilename } from '$lib/utils/path';
 describe('runGenerators', () => {
 	test('returns a normal object untouched', async () => {
 		const input = { a: 1, b: [2, 3], c: { d: 4 } };
-		const ouput = await runGenerators(input);
-		expect(ouput).toEqual(input);
+		const { result, changed } = await runGenerators(input);
+		expect(changed).toEqual(false);
+		expect(result).toEqual(input);
 	});
 	test('runs generators on properties', async () => {
 		const input = {
@@ -18,7 +19,10 @@ describe('runGenerators', () => {
 		const ouput = await runGenerators(input);
 		expect(ouput).toMatchInlineSnapshot(`
 			{
-			  "property": "yes",
+			  "changed": true,
+			  "result": {
+			    "property": "yes",
+			  },
 			}
 		`);
 	});
@@ -32,11 +36,14 @@ describe('runGenerators', () => {
 		];
 		const ouput = await runGenerators(input);
 		expect(ouput).toMatchInlineSnapshot(`
-			[
-			  1,
-			  2,
-			  3,
-			]
+			{
+			  "changed": true,
+			  "result": [
+			    1,
+			    2,
+			    3,
+			  ],
+			}
 		`);
 	});
 	test('generators receive args (array)', async () => {
@@ -49,11 +56,14 @@ describe('runGenerators', () => {
 		const ouput = await runGenerators(input);
 		expect(ouput).toMatchInlineSnapshot(`
 			{
-			  "property": [
-			    1,
-			    2,
-			    3,
-			  ],
+			  "changed": true,
+			  "result": {
+			    "property": [
+			      1,
+			      2,
+			      3,
+			    ],
+			  },
 			}
 		`);
 	});
@@ -67,8 +77,11 @@ describe('runGenerators', () => {
 		const ouput = await runGenerators(input);
 		expect(ouput).toMatchInlineSnapshot(`
 			{
-			  "property": {
-			    "a": 1,
+			  "changed": true,
+			  "result": {
+			    "property": {
+			      "a": 1,
+			    },
 			  },
 			}
 		`);
@@ -83,12 +96,15 @@ describe('runGenerators', () => {
 		];
 		const ouput = await runGenerators(input);
 		expect(ouput).toMatchInlineSnapshot(`
-			[
-			  1,
-			  2,
-			  3,
-			  4,
-			]
+			{
+			  "changed": true,
+			  "result": [
+			    1,
+			    2,
+			    3,
+			    4,
+			  ],
+			}
 		`);
 	});
 	test('generators can spread into objects', async () => {
@@ -100,7 +116,10 @@ describe('runGenerators', () => {
 		const ouput = await runGenerators(input);
 		expect(ouput).toMatchInlineSnapshot(`
 			{
-			  "a": 1,
+			  "changed": true,
+			  "result": {
+			    "a": 1,
+			  },
 			}
 		`);
 	});
@@ -118,8 +137,11 @@ describe('runGenerators', () => {
 		const ouput = await runGenerators(input);
 		expect(ouput).toMatchInlineSnapshot(`
 			{
-			  "a": 1,
-			  "b": 1,
+			  "changed": true,
+			  "result": {
+			    "a": 1,
+			    "b": 1,
+			  },
 			}
 		`);
 	});
@@ -131,9 +153,31 @@ describe('runGenerators', () => {
 			}
 		};
 		const ouput = await runGenerators(input);
-		expect(ouput).toEqual({
-			tests: [{ vars: { a: '1', b: '2', c: '3' } }, { vars: { a: '4', b: '5', c: '6' } }]
-		});
+		expect(ouput).toMatchInlineSnapshot(`
+			{
+			  "changed": true,
+			  "result": {
+			    "tests": [
+			      {
+			        "description": undefined,
+			        "vars": {
+			          "a": "1",
+			          "b": "2",
+			          "c": "3",
+			        },
+			      },
+			      {
+			        "description": undefined,
+			        "vars": {
+			          "a": "4",
+			          "b": "5",
+			          "c": "6",
+			        },
+			      },
+			    ],
+			  },
+			}
+		`);
 	});
 	test('=gen-tests supports csv files with special __description column', async () => {
 		const csvFile = createFakeFileReference(
@@ -146,12 +190,31 @@ describe('runGenerators', () => {
 			}
 		};
 		const ouput = await runGenerators(input);
-		expect(ouput).toEqual({
-			tests: [
-				{ description: 'The first', vars: { a: '1', b: '2', c: '3' } },
-				{ description: 'The second', vars: { a: '4', b: '5', c: '6' } }
-			]
-		});
+		expect(ouput).toMatchInlineSnapshot(`
+			{
+			  "changed": true,
+			  "result": {
+			    "tests": [
+			      {
+			        "description": "The first",
+			        "vars": {
+			          "a": "1",
+			          "b": "2",
+			          "c": "3",
+			        },
+			      },
+			      {
+			        "description": "The second",
+			        "vars": {
+			          "a": "4",
+			          "b": "5",
+			          "c": "6",
+			        },
+			      },
+			    ],
+			  },
+			}
+		`);
 	});
 	test('=gen-tests supports csv files mixed with normal tests', async () => {
 		const csvFile = createFakeFileReference('test.csv', 'a,b,c\n1,2,3\n4,5,6');
@@ -164,13 +227,38 @@ describe('runGenerators', () => {
 			]
 		};
 		const ouput = await runGenerators(input);
-		expect(ouput).toEqual({
-			tests: [
-				{ vars: { a: '1', b: '2', c: '3' } },
-				{ vars: { a: '4', b: '5', c: '6' } },
-				{ vars: { a: '7', b: '8', c: '9' } }
-			]
-		});
+		expect(ouput).toMatchInlineSnapshot(`
+			{
+			  "changed": true,
+			  "result": {
+			    "tests": [
+			      {
+			        "description": undefined,
+			        "vars": {
+			          "a": "1",
+			          "b": "2",
+			          "c": "3",
+			        },
+			      },
+			      {
+			        "description": undefined,
+			        "vars": {
+			          "a": "4",
+			          "b": "5",
+			          "c": "6",
+			        },
+			      },
+			      {
+			        "vars": {
+			          "a": "7",
+			          "b": "8",
+			          "c": "9",
+			        },
+			      },
+			    ],
+			  },
+			}
+		`);
 	});
 });
 
