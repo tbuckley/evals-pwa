@@ -30,7 +30,10 @@ export class CodeSandbox {
 	private async init(code: string | CodeReference) {
 		if (code instanceof CodeReference) {
 			if (code.file.name.endsWith('.ts')) {
-				code = `const execute = (await import("${stringToDataUrl(await code.getCode())}")).default;`;
+				code = `
+					const module = (await import("${stringToDataUrl(await code.getCode())}"));
+					const execute = module.execute ?? module.default;
+				`;
 			} else {
 				code = await code.getCode();
 			}
