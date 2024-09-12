@@ -24,6 +24,7 @@
 		"@types/node": "^22.5.0",
 		"@types/picomatch": "^3.0.1",
 		"autoprefixer": "^10.4.20",
+		"dedent": "^1.5.3",
 		"eslint": "^9.10.0",
 		"eslint-config-prettier": "^9.1.0",
 		"eslint-plugin-svelte": "^2.43.0",
