@@ -31,7 +31,8 @@ export class CodeReference extends FileReference {
 				setup(build) {
 					build.onResolve({ filter: /.*/ }, (args) => {
 						const importer = args.importer === '' ? undefined : args.importer;
-						const path = new URL(args.path, importer).toString();
+						const ext = args.path.endsWith('.ts') ? '' : '.ts';
+						const path = new URL(args.path, importer).toString() + ext;
 						return { path, namespace: 'virtual' };
 					});
 					build.onLoad({ filter: /.*/, namespace: 'virtual' }, async (args) => {
