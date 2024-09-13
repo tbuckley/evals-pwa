@@ -54,7 +54,8 @@ test.describe('File System', () => {
 			'"uri": "file:///code.js"',
 			'"word": "there"',
 
-			'typescript prompt'
+			'typescript prompt',
+			'No, sentence from CSV'
 		];
 		for (const line of lines) {
 			await expect(page.locator('pre')).toContainText(line);

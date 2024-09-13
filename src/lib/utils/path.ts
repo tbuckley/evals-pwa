@@ -52,6 +52,17 @@ export function getFilename(path: string): string | null {
 	}
 	return path.split('/').pop()!;
 }
+
+export function getFileExtension(path: string): string | null {
+	const filename = getFilename(path);
+	if (!filename) {
+		return null;
+	}
+
+	// Return the string after the last period
+	return filename.split('.').pop() ?? null;
+}
+
 export function getDirname(path: string): string {
 	return pathIsDirectory(path) ? path : path.split('/').slice(0, -1).join('/') + '/';
 }

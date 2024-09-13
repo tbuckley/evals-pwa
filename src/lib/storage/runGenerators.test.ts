@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { runGenerators } from './runGenerators';
+import { FileReference } from './FileReference';
+import { getFilename } from '$lib/utils/path';
 
 describe('runGenerators', () => {
 	test('returns a normal object untouched', async () => {
@@ -121,4 +123,58 @@ describe('runGenerators', () => {
 			}
 		`);
 	});
+	test('=gen-tests supports csv files', async () => {
+		const csvFile = createFakeFileReference('test.csv', 'a,b,c\n1,2,3\n4,5,6');
+		const input = {
+			tests: {
+				'=gen-tests': csvFile
+			}
+		};
+		const ouput = await runGenerators(input);
+		expect(ouput).toEqual({
+			tests: [
+				{
+					vars: {
+						a: '1',
+						b: '2',
+						c: '3'
+					}
+				},
+				{
+					vars: {
+						a: '4',
+						b: '5',
+						c: '6'
+					}
+				}
+			]
+		});
+	});
+	test('=gen-tests supports csv files mixed with normal tests', async () => {
+		const csvFile = createFakeFileReference('test.csv', 'a,b,c\n1,2,3\n4,5,6');
+		const input = {
+			tests: [
+				{
+					'=gen-tests': csvFile
+				},
+				{ vars: { a: '7', b: '8', c: '9' } }
+			]
+		};
+		const ouput = await runGenerators(input);
+		expect(ouput).toEqual({
+			tests: [
+				{ vars: { a: '1', b: '2', c: '3' } },
+				{ vars: { a: '4', b: '5', c: '6' } },
+				{ vars: { a: '7', b: '8', c: '9' } }
+			]
+		});
+	});
 });
+
+function createFakeFileReference(uri: string, content: string) {
+	const filename = getFilename(uri);
+	if (!filename) {
+		throw new Error('Invalid uri');
+	}
+	return new FileReference(uri, new File([content], filename), 'file');
+}

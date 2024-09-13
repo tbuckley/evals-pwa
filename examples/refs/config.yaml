@@ -19,3 +19,4 @@ tests:
         type: contains
         vars:
           needle: ereht
+  - =gen-tests: file:///tests.csv
