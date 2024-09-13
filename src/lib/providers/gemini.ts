@@ -1,4 +1,5 @@
 import type { ModelProvider, MultiPartPrompt, TokenUsage } from '$lib/types';
+import { iterateStream } from '$lib/utils/iterateStream';
 import { fileToBase64, mimeTypeForFile } from '$lib/utils/media';
 import { z } from 'zod';
 
@@ -89,9 +90,9 @@ export class GeminiProvider implements ModelProvider {
 		public config: object = {}
 	) {}
 
-	async run(prompt: MultiPartPrompt): Promise<unknown> {
+	async *run(prompt: MultiPartPrompt): AsyncGenerator<string, unknown, void> {
 		const resp = await fetch(
-			`https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`,
+			`https://generativelanguage.googleapis.com/v1beta/models/${this.model}:streamGenerateContent?alt=sse&key=${this.apiKey}`,
 			{
 				method: 'POST',
 				headers: {
@@ -106,9 +107,23 @@ export class GeminiProvider implements ModelProvider {
 		if (!resp.ok) {
 			throw new Error(`Failed to run model: ${resp.statusText}`);
 		}
+		const stream = resp.body;
+		let fullText = '';
+		let lastResponseJson: unknown;
+		if (!stream) throw new Error(`Failed to run model: no response`);
+		for await (const chunk of iterateStream(stream.pipeThrough(new TextDecoderStream()))) {
+			if (chunk.startsWith('data: ')) {
+				const value = chunk.substring(6);
+				lastResponseJson = JSON.parse(value);
+				const text = this.extractOutput(lastResponseJson);
+				fullText += text;
+				yield text;
+			}
+		}
 
-		const json = await resp.json();
-		return generateContentResponseSchema.parse(json);
+		const parsed = generateContentResponseSchema.parse(lastResponseJson);
+		parsed.candidates[0].content.parts[0] = { text: fullText };
+		return parsed;
 	}
 
 	extractOutput(response: unknown): string {

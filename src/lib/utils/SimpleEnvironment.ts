@@ -21,13 +21,21 @@ export class SimpleEnvironment implements TestEnvironment {
 		this.prompt = options.prompt;
 	}
 
-	async run(vars: VarSet): Promise<TestOutput> {
+	async *run(vars: VarSet): AsyncGenerator<string, TestOutput, void> {
 		const prompt = this.prompt.format(vars);
 
 		const start = Date.now();
 		let resp: unknown;
 		try {
-			resp = await this.model.run(prompt);
+			const generator = this.model.run(prompt);
+			let next;
+			while (!next || !next.done) {
+				next = await generator.next();
+				if (!next.done) {
+					yield next.value;
+				}
+			}
+			resp = next.value;
 		} catch (e) {
 			if (e instanceof Error) {
 				return {

@@ -4,18 +4,26 @@ import { ReverserProvider } from './reverser';
 describe('ReverserProvider', () => {
 	test('reverses its input', async function () {
 		const provider = new ReverserProvider();
-		const resp = await provider.run([{ text: 'hello' }]);
-		const output = provider.extractOutput(resp);
+		const resp = provider.run([{ text: 'hello' }]);
+		let next;
+		do {
+			next = await resp.next();
+		} while (!next.done);
+		const output = provider.extractOutput(next.value);
 		expect(output).toBe('olleh');
 	});
 	test('supports multi-part', async function () {
 		const provider = new ReverserProvider();
-		const resp = await provider.run([
+		const resp = provider.run([
 			{ text: 'hello' },
 			{ image: new File([], 'foo.png') },
 			{ text: 'world' }
 		]);
-		const output = provider.extractOutput(resp);
+		let next;
+		do {
+			next = await resp.next();
+		} while (!next.done);
+		const output = provider.extractOutput(next.value);
 		expect(output).toBe('dlrow\nolleh');
 	});
 });

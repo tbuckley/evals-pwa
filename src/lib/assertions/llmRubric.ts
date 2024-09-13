@@ -45,7 +45,13 @@ export function createLlmRubricAssertion(
 
 	return {
 		run: async function (output: string): Promise<AssertionResult> {
-			const result = await env.run({ output, rubric, ...testVars });
+			const generator = env.run({ output, rubric, ...testVars });
+			let next;
+			while (!next || !next.done) {
+				// Skip over the streaming responses.
+				next = await generator.next();
+			}
+			const result = next.value;
 			const rubricOutput = result.output;
 			if (!rubricOutput) {
 				return {

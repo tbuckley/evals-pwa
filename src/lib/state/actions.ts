@@ -336,7 +336,20 @@ async function runTest(
 		state: 'in-progress'
 	}));
 	// TODO should this be safeRun if it will catch all errors?
-	const output = await env.run(test.vars);
+	const generator = env.run(test.vars);
+	let next;
+	while (!next || !next.done) {
+		next = await generator.next();
+		if (!next.done) {
+			const newText = next.value;
+			result.update((state) => ({
+				...state,
+				state: 'in-progress',
+				output: (state.output ?? '') + newText
+			}));
+		}
+	}
+	const output = next.value;
 
 	if (output.error) {
 		result.update((state) => ({
