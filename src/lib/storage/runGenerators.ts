@@ -78,8 +78,10 @@ async function generateTests(value: unknown): Promise<TestCase[]> {
 		const data = parseCSV(csv);
 
 		return data.map((row) => {
+			const { __description: description, ...vars } = row;
 			return {
-				vars: row
+				description,
+				vars
 			};
 		});
 	}

@@ -132,21 +132,24 @@ describe('runGenerators', () => {
 		};
 		const ouput = await runGenerators(input);
 		expect(ouput).toEqual({
+			tests: [{ vars: { a: '1', b: '2', c: '3' } }, { vars: { a: '4', b: '5', c: '6' } }]
+		});
+	});
+	test('=gen-tests supports csv files with special __description column', async () => {
+		const csvFile = createFakeFileReference(
+			'test.csv',
+			'__description,a,b,c\n"The first",1,2,3\n"The second",4,5,6'
+		);
+		const input = {
+			tests: {
+				'=gen-tests': csvFile
+			}
+		};
+		const ouput = await runGenerators(input);
+		expect(ouput).toEqual({
 			tests: [
-				{
-					vars: {
-						a: '1',
-						b: '2',
-						c: '3'
-					}
-				},
-				{
-					vars: {
-						a: '4',
-						b: '5',
-						c: '6'
-					}
-				}
+				{ description: 'The first', vars: { a: '1', b: '2', c: '3' } },
+				{ description: 'The second', vars: { a: '4', b: '5', c: '6' } }
 			]
 		});
 	});
