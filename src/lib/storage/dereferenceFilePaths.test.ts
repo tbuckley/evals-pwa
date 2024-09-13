@@ -7,8 +7,9 @@ describe('dereferenceFilePaths', () => {
 	test('returns a normal object untouched', async () => {
 		const storage = new InMemoryStorage();
 		const input = { a: 1, b: [2, 3], c: { d: 4 } };
-		const ouput = await dereferenceFilePaths(input, { storage });
-		expect(ouput).toEqual(input);
+		const { result, changed } = await dereferenceFilePaths(input, { storage });
+		expect(changed).toEqual(false);
+		expect(result).toEqual(input);
 	});
 
 	test('inserts text files', async () => {
@@ -17,7 +18,15 @@ describe('dereferenceFilePaths', () => {
 
 		const input = { a: 1, b: 'file:///a.txt' };
 		const ouput = await dereferenceFilePaths(input, { storage });
-		expect(ouput).toEqual({ a: 1, b: 'hello world!' });
+		expect(ouput).toMatchInlineSnapshot(`
+			{
+			  "changed": true,
+			  "result": {
+			    "a": 1,
+			    "b": "hello world!",
+			  },
+			}
+		`);
 	});
 
 	test('inserts yaml files', async () => {
@@ -26,7 +35,21 @@ describe('dereferenceFilePaths', () => {
 
 		const input = { a: 1, b: 'file:///a.yaml' };
 		const ouput = await dereferenceFilePaths(input, { storage });
-		expect(ouput).toEqual({ a: 1, b: { c: 3, d: [5, 6] } });
+		expect(ouput).toMatchInlineSnapshot(`
+			{
+			  "changed": true,
+			  "result": {
+			    "a": 1,
+			    "b": {
+			      "c": 3,
+			      "d": [
+			        5,
+			        6,
+			      ],
+			    },
+			  },
+			}
+		`);
 	});
 
 	test('inserts json files', async () => {
@@ -35,7 +58,21 @@ describe('dereferenceFilePaths', () => {
 
 		const input = { a: 1, b: 'file:///a.json' };
 		const ouput = await dereferenceFilePaths(input, { storage });
-		expect(ouput).toEqual({ a: 1, b: { c: 3, d: [5, 6] } });
+		expect(ouput).toMatchInlineSnapshot(`
+			{
+			  "changed": true,
+			  "result": {
+			    "a": 1,
+			    "b": {
+			      "c": 3,
+			      "d": [
+			        5,
+			        6,
+			      ],
+			    },
+			  },
+			}
+		`);
 	});
 
 	test('allows referenced yaml to reference additional files', async () => {
@@ -45,7 +82,18 @@ describe('dereferenceFilePaths', () => {
 
 		const input = { a: 1, b: 'file:///a.yaml' };
 		const ouput = await dereferenceFilePaths(input, { storage });
-		expect(ouput).toEqual({ a: 1, b: { c: 3, d: 'hello world!' } });
+		expect(ouput).toMatchInlineSnapshot(`
+			{
+			  "changed": true,
+			  "result": {
+			    "a": 1,
+			    "b": {
+			      "c": 3,
+			      "d": "hello world!",
+			    },
+			  },
+			}
+		`);
 	});
 
 	test('throws an error on recursive cycles', async () => {
@@ -64,7 +112,17 @@ describe('dereferenceFilePaths', () => {
 
 		const input = { values: 'file:///*.txt' };
 		const output = await dereferenceFilePaths(input, { storage });
-		expect(output).toEqual({ values: ['a', 'b'] });
+		expect(output).toMatchInlineSnapshot(`
+			{
+			  "changed": true,
+			  "result": {
+			    "values": [
+			      "a",
+			      "b",
+			    ],
+			  },
+			}
+		`);
 	});
 
 	test('flattens any glob references within an array', async () => {
@@ -74,7 +132,18 @@ describe('dereferenceFilePaths', () => {
 
 		const input = { values: ['file:///*.txt', 'c'] };
 		const output = await dereferenceFilePaths(input, { storage });
-		expect(output).toEqual({ values: ['a', 'b', 'c'] });
+		expect(output).toMatchInlineSnapshot(`
+			{
+			  "changed": true,
+			  "result": {
+			    "values": [
+			      "a",
+			      "b",
+			      "c",
+			    ],
+			  },
+			}
+		`);
 	});
 
 	test('embeds image files as FileReference', async () => {
@@ -83,7 +152,7 @@ describe('dereferenceFilePaths', () => {
 		await storage.writeFile('file:///b.png', 'b');
 
 		const input = { txt: 'file:///a.txt', img: 'file:///b.png' };
-		const output = await dereferenceFilePaths(input, { storage });
+		const { result: output } = await dereferenceFilePaths(input, { storage });
 
 		// expect(output).toHaveProperty('txt');
 		// expect(output).toHaveProperty('img');
@@ -108,29 +177,32 @@ describe('dereferenceFilePaths', () => {
 		const output = await dereferenceFilePaths(input, { storage });
 		expect(output).toMatchInlineSnapshot(`
 			{
-			  "tests": [
-			    {
-			      "abs": CodeReference {
-			        "file": File {},
-			        "type": "code",
-			        "uri": "file:///assert.js",
-			      },
-			      "assert": CodeReference {
-			        "file": File {},
-			        "type": "code",
-			        "uri": "file:///assert.js",
-			      },
-			      "vars": {
-			        "bar": 2,
-			        "baz": FileReference {
+			  "changed": true,
+			  "result": {
+			    "tests": [
+			      {
+			        "abs": CodeReference {
 			          "file": File {},
-			          "type": "image",
-			          "uri": "file:///tests/baz/c.png",
+			          "type": "code",
+			          "uri": "file:///assert.js",
 			        },
-			        "foo": 1,
+			        "assert": CodeReference {
+			          "file": File {},
+			          "type": "code",
+			          "uri": "file:///assert.js",
+			        },
+			        "vars": {
+			          "bar": 2,
+			          "baz": FileReference {
+			            "file": File {},
+			            "type": "image",
+			            "uri": "file:///tests/baz/c.png",
+			          },
+			          "foo": 1,
+			        },
 			      },
-			    },
-			  ],
+			    ],
+			  },
 			}
 		`);
 	});

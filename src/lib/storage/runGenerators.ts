@@ -24,6 +24,12 @@ function ensureArray<T>(value: T | T[] | null | undefined): T[] {
 }
 
 export async function runGenerators(target: any) {
+	const state = { changed: false };
+	const result = await runGeneratorsImpl(target, state);
+	return { result, changed: state.changed };
+}
+
+export async function runGeneratorsImpl(target: any, state: { changed: boolean }) {
 	if (target == null) return target;
 	if (typeof target !== 'object') {
 		return target;
@@ -31,7 +37,7 @@ export async function runGenerators(target: any) {
 	if (Array.isArray(target)) {
 		for (let i = 0; i < target.length; i++) {
 			const value = target[i];
-			const result = await runGenerators(value);
+			const result = await runGeneratorsImpl(value, state);
 			if (isGenerator(value) || hasKey(value, '=gen-tests')) {
 				// Flatten generated arrays into arrays.
 				const results = ensureArray(result);
@@ -44,6 +50,7 @@ export async function runGenerators(target: any) {
 		return target;
 	}
 	if (isGenerator(target)) {
+		state.changed = true;
 		const ref = target['=gen'];
 		const sandbox = new CodeSandbox(ref);
 		try {
@@ -56,11 +63,12 @@ export async function runGenerators(target: any) {
 
 	// Check for built-in generators
 	if (hasKey(target, '=gen-tests')) {
+		state.changed = true;
 		return generateTests(target['=gen-tests']);
 	}
 
 	for (const [key, value] of Object.entries(target)) {
-		target[key] = await runGenerators(value);
+		target[key] = await runGeneratorsImpl(value, state);
 		// Spread operator spreads objects or arrays of objects into the target.
 		if (key === '...') {
 			for (const props of Array.isArray(target[key]) ? target[key] : [target[key]]) {
