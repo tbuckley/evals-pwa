@@ -138,13 +138,13 @@ export type PromptPart = { text: string } | { image: File };
 export type MultiPartPrompt = Array<PromptPart>;
 
 export interface ModelProvider {
-	run(prompt: MultiPartPrompt): Promise<unknown>;
+	run(prompt: MultiPartPrompt): AsyncGenerator<string, unknown, void>;
 	extractOutput(response: unknown): string;
 	extractTokenUsage(response: unknown): TokenUsage;
 }
 
 export interface TestEnvironment {
-	run(test: TestCase): Promise<TestOutput>;
+	run(test: TestCase): AsyncGenerator<string, TestOutput, void>;
 }
 
 export interface TaskQueue {

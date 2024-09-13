@@ -15,7 +15,8 @@ declare global {
 }
 
 export class ChromeProvider implements ModelProvider {
-	async run(prompt: MultiPartPrompt) {
+	async *run(prompt: MultiPartPrompt) {
+		yield '';
 		const session = await window.ai.createTextSession();
 		return session.prompt(prompt.map((part) => ('text' in part ? part.text : '')).join('\n'));
 	}
