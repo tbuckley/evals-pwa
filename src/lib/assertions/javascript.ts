@@ -1,5 +1,5 @@
 import { CodeReference } from '$lib/storage/CodeReference';
-import { FileReference } from '$lib/storage/FileReference';
+import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 import {
 	assertionResultSchema,
 	type AssertionProvider,
@@ -7,7 +7,6 @@ import {
 	type NormalizedTestCase
 } from '$lib/types';
 import { CodeSandbox } from '$lib/utils/CodeSandbox';
-import { objectDfsMap } from '$lib/utils/objectDFS';
 import { z } from 'zod';
 
 const argsSchema = z.object({
@@ -41,11 +40,10 @@ export function createJavascriptAssertion(
 							parsed.visuals.map(async (v) => {
 								// Convert Blob to FileReference
 								if (v instanceof Blob) {
-									const hash = await hashBlob(v);
-									const ext = getFileExtension(v.type);
-									const filename = hash + ext;
-									const file = new File([v], filename, { type: v.type });
-									return new FileReference('file:///runs/' + filename, file);
+									if (!['image/png', 'image/jpeg'].includes(v.type)) {
+										throw new Error(`Unsupported file type: ${v.type}`);
+									}
+									return blobToFileReference(v);
 								}
 								return v;
 							})
@@ -83,35 +81,4 @@ export function createJavascriptAssertion(
 			sandbox = undefined;
 		}
 	};
-}
-
-async function hashBlob(blob: Blob): Promise<string> {
-	const fileReader = new FileReader();
-	fileReader.readAsArrayBuffer(blob);
-
-	return new Promise((resolve, reject) => {
-		fileReader.onloadend = async () => {
-			try {
-				const hashBuffer = await crypto.subtle.digest('SHA-256', fileReader.result as ArrayBuffer);
-				const hashArray = Array.from(new Uint8Array(hashBuffer));
-				const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-				resolve(hashHex);
-			} catch (err) {
-				reject(err);
-			}
-		};
-	});
-}
-
-function getFileExtension(type: string): string {
-	const extensionMap: Record<string, string> = {
-		'image/png': '.png',
-		'image/jpeg': '.jpg'
-	};
-
-	if (type in extensionMap) {
-		return extensionMap[type];
-	}
-
-	throw new Error(`Unsupported file type: ${type}`);
 }

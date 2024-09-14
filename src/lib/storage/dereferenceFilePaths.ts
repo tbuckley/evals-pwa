@@ -101,6 +101,9 @@ export async function dereferenceFilePathsImpl(
 	if (val instanceof FileReference) {
 		return val;
 	}
+	if (val instanceof Blob) {
+		return handleBlob(val, options, state);
+	}
 	if (typeof val === 'object' && val !== null) {
 		const obj: Record<string, unknown> = {};
 		for (const [key, value] of Object.entries(val)) {
@@ -156,4 +159,66 @@ async function handleFile(
 	} else {
 		return new FileReference(absoluteFileUri, file);
 	}
+}
+
+async function handleBlob(
+	blob: Blob | File,
+	options: DereferenceOptions,
+	state: { changed: boolean }
+) {
+	const hash = await hashBlob(blob);
+	const ext = getFileExtension(blob);
+	const filename = hash + ext;
+	const file = new File([blob], filename, { type: blob.type });
+	return handleFile('file:///runs/' + filename, file, options, state);
+}
+
+/**
+ * Converts a blob to a FileReference, but does *not* recursively expand
+ * .yaml or .json, or return a .txt file as a string.
+ */
+export async function blobToFileReference(blob: Blob | File) {
+	const hash = await hashBlob(blob);
+	const ext = getFileExtension(blob);
+	const filename = hash + ext;
+	const file = new File([blob], filename, { type: blob.type });
+	return new FileReference('file:///runs/' + filename, file);
+}
+
+async function hashBlob(blob: Blob): Promise<string> {
+	const fileReader = new FileReader();
+	fileReader.readAsArrayBuffer(blob);
+
+	return new Promise((resolve, reject) => {
+		fileReader.onloadend = async () => {
+			try {
+				const hashBuffer = await crypto.subtle.digest('SHA-256', fileReader.result as ArrayBuffer);
+				const hashArray = Array.from(new Uint8Array(hashBuffer));
+				const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+				resolve(hashHex);
+			} catch (err) {
+				reject(err);
+			}
+		};
+	});
+}
+
+function getFileExtension(blob: Blob): string {
+	if (blob instanceof File) {
+		return blob.name.match(/[^.]*?$/)?.[0] ?? '';
+	}
+	const extensionMap: Record<string, string> = {
+		'image/png': '.png',
+		'image/jpeg': '.jpg',
+		'application/json': '.json',
+		'application/x-yaml': '.yaml',
+		'application/typescript': '.ts',
+		'application/javascript': '.js',
+		'text/plain': '.txt'
+	};
+
+	if (blob.type in extensionMap) {
+		return extensionMap[blob.type];
+	}
+	return '';
 }

@@ -55,6 +55,7 @@ test.describe('File System', () => {
 			'"word": "there"',
 
 			'typescript prompt',
+			'js return blob',
 			'No, sentence from CSV'
 		];
 		for (const line of lines) {
