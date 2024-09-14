@@ -140,7 +140,7 @@ interface Assertion {
 }
 ```
 
-`tests` is an array of tests. A test is an object describing the test. Vars will be substituted into the prompt.
+`tests` is an array of tests. A test is an object describing the test. Vars will be substituted into the prompt. If no tests are provided, a default test will be added to test the prompt + provider combinations.
 
 Supported assertion types:
 
