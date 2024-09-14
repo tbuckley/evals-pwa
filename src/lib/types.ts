@@ -137,14 +137,18 @@ export interface FileStorage extends ReadonlyFileStorage {
 export type PromptPart = { text: string } | { image: File };
 export type MultiPartPrompt = Array<PromptPart>;
 
+export interface RunContext {
+	abortSignal: AbortSignal;
+}
+
 export interface ModelProvider {
-	run(prompt: MultiPartPrompt): AsyncGenerator<string, unknown, void>;
+	run(prompt: MultiPartPrompt, context: RunContext): AsyncGenerator<string, unknown, void>;
 	extractOutput(response: unknown): string;
 	extractTokenUsage(response: unknown): TokenUsage;
 }
 
 export interface TestEnvironment {
-	run(test: TestCase): AsyncGenerator<string, TestOutput, void>;
+	run(test: TestCase, context: RunContext): AsyncGenerator<string, TestOutput, void>;
 }
 
 export interface TaskQueue {

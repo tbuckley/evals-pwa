@@ -1,4 +1,4 @@
-import type { ModelProvider, MultiPartPrompt, TokenUsage } from '$lib/types';
+import type { ModelProvider, MultiPartPrompt, RunContext, TokenUsage } from '$lib/types';
 import { iterateStream } from '$lib/utils/iterateStream';
 import { fileToBase64, mimeTypeForFile } from '$lib/utils/media';
 import { z } from 'zod';
@@ -90,7 +90,7 @@ export class GeminiProvider implements ModelProvider {
 		public config: object = {}
 	) {}
 
-	async *run(prompt: MultiPartPrompt): AsyncGenerator<string, unknown, void> {
+	async *run(prompt: MultiPartPrompt, context: RunContext): AsyncGenerator<string, unknown, void> {
 		const resp = await fetch(
 			`https://generativelanguage.googleapis.com/v1beta/models/${this.model}:streamGenerateContent?alt=sse&key=${this.apiKey}`,
 			{
@@ -101,7 +101,8 @@ export class GeminiProvider implements ModelProvider {
 				body: JSON.stringify({
 					...this.config,
 					contents: [{ parts: await multiPartPromptToGemini(prompt) }]
-				})
+				}),
+				signal: context.abortSignal
 			}
 		);
 		if (!resp.ok) {

@@ -1,8 +1,10 @@
 import type { TaskQueue } from '$lib/types';
 
+export type TaskFn = (opts: { abortSignal: AbortSignal }) => Promise<void>;
+
 export class ParallelTaskQueue implements TaskQueue {
 	private maxParallel: number;
-	private queue: Array<() => Promise<void>>;
+	private queue: Array<TaskFn>;
 	private running: number;
 
 	private completedPromise: Promise<void>;
@@ -22,7 +24,7 @@ export class ParallelTaskQueue implements TaskQueue {
 		this.abortController.abort();
 		this.rejectCompleted?.(new Error('TaskQueue was aborted'));
 	}
-	enqueue(fn: () => Promise<void>): void {
+	enqueue(fn: TaskFn): void {
 		if (this.abortController.signal.aborted) {
 			throw new Error('TaskQueue was aborted');
 		}
@@ -43,7 +45,7 @@ export class ParallelTaskQueue implements TaskQueue {
 		this.running++;
 		// TODO should we catch any errors?
 		// TODO pass abort signal to functions?
-		fn().finally(() => {
+		fn({ abortSignal: this.abortController.signal }).finally(() => {
 			if (this.abortController.signal.aborted) {
 				// If already aborted, ignore any results
 				return;
