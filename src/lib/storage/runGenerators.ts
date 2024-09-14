@@ -52,10 +52,11 @@ export async function runGeneratorsImpl(target: any, state: { changed: boolean }
 	if (isGenerator(target)) {
 		state.changed = true;
 		const ref = target['=gen'];
-		const sandbox = new CodeSandbox(ref);
+		const sandbox = new CodeSandbox();
+		const execute = await sandbox.bind(ref);
 		try {
 			const args = ensureArray(target['args']);
-			return await sandbox.execute(...args);
+			return await execute(...args);
 		} finally {
 			sandbox.destroy();
 		}

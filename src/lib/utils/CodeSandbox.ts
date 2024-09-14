@@ -12,105 +12,135 @@ function stringToDataUrl(input: string): string {
 	return `data:text/javascript;base64,${base64String}`;
 }
 
-// CodeSandbox executes javascript in an iframe.
-// It assumes the provided code has a default export that is a function
-// with the type (output: string) => MaybePromise<AssertionResult>.
-// CodeSandbox.execute(args: unknown) will use postMessage to run the function
-// and return the result.
 export class CodeSandbox {
-	iframe: HTMLIFrameElement;
-	loaded: Promise<void>;
+	private iframe: HTMLIFrameElement | null = null;
+	private loaded: Promise<void> | null = null;
 
-	constructor(code: string | CodeReference) {
+	private initIframe() {
+		if (this.iframe) return this.loaded;
+
+		// Create and configure the iframe
 		this.iframe = document.createElement('iframe');
+		this.iframe.sandbox.add('allow-scripts'); // Allow scripts but restrict other capabilities
 		document.body.appendChild(this.iframe);
-		this.loaded = this.init(code);
-	}
 
-	private async init(code: string | CodeReference) {
-		if (code instanceof CodeReference) {
-			if (code.file.name.endsWith('.ts')) {
-				code = `
-					const module = (await import("${stringToDataUrl(await code.getCode())}"));
-					const execute = module.execute ?? module.default;
-				`;
-			} else {
-				code = await code.getCode();
-			}
-		}
-
-		const nonce = crypto.randomUUID();
-		let resolve: () => void;
-		const ready = new Promise<void>((r) => (resolve = r));
-
-		const listener = (event: MessageEvent) => {
-			if (event.data.type === 'register' && event.data.nonce === nonce) {
-				resolve();
-				window.removeEventListener('message', listener);
-			}
-		};
-		window.addEventListener('message', listener);
-
-		const doc = this.iframe.contentDocument;
-		if (!doc) {
-			throw new Error('iframe contentDocument is null');
-		}
-
-		doc.open();
-		doc.write(`
+		// Set up the iframe content
+		const iframeContent = `
             <script type="module">
-                ${code}
                 window.addEventListener('message', async (event) => {
-					try {
-						const result = await execute(...event.data.args);
-						window.parent.postMessage({
-							type: "execute-output",
-							nonce: event.data.nonce,
-							result,
-						}, '*');
-					} catch (e) {
-						window.parent.postMessage({
-							type: 'execute-error',
-							nonce: event.data.nonce,
-							error: e instanceof Error ? e.message : String(e),
-							stack: e instanceof Error ? e.stack : undefined,
-							lineNumber: e instanceof Error && 'lineNumber' in e ? e.lineNumber : undefined
-						}, '*');
-					}
+                    if (event.data.type === 'bind') {
+                        const { code, port } = event.data;
+                        const codePort = port;
+                        try {
+                            // Dynamically import the code module
+                            const module = await import(code);
+                            const execute = module.default ?? module.execute;
+                            if (typeof execute !== 'function') {
+                                codePort.postMessage({ type: 'error', error: 'Module does not export a function' });
+                                return;
+                            }
+                            // Listen for function calls on the codePort
+                            codePort.onmessage = async (event) => {
+                                const { args, port } = event.data;
+                                const callPort = port;
+                                try {
+                                    const result = await execute(...args);
+                                    callPort.postMessage({ type: 'result', result });
+                                } catch (e) {
+                                    callPort.postMessage({
+                                        type: 'error',
+                                        error: e instanceof Error ? e.message : String(e),
+                                        stack: e instanceof Error ? e.stack : undefined
+                                    });
+                                }
+                            };
+                            codePort.postMessage({ type: 'ok' });
+                        } catch (e) {
+                            codePort.postMessage({
+                                type: 'error',
+                                error: e instanceof Error ? e.message : String(e),
+                                stack: e instanceof Error ? e.stack : undefined
+                            });
+                        }
+                    }
                 });
-				window.parent.postMessage({ type: 'register', nonce: '${nonce}' }, '*');
             </script>
-        `);
-		doc.close();
-		await ready;
+        `;
+
+		// Use srcdoc to set the iframe's content
+		this.iframe.srcdoc = iframeContent;
+		this.loaded = new Promise<void>((resolve) => {
+			this.iframe!.addEventListener('load', () => {
+				resolve();
+			});
+		});
+
+		return this.loaded;
 	}
 
-	async execute(...args: unknown[]): Promise<unknown> {
-		await this.loaded;
+	async bind(code: CodeReference | string): Promise<(...args: unknown[]) => Promise<unknown>> {
+		await this.initIframe();
 
-		// Add a nonce so we can identify responses from this iframe
-		const nonce = crypto.randomUUID();
+		// Retrieve code content if it's a CodeReference
+		if (code instanceof CodeReference) {
+			code = await code.getCode();
+		} else {
+			code = `${code}
+
+export {execute};`;
+		}
+
+		// Convert the code to a data URL
+		const codeDataUrl = stringToDataUrl(code);
+
+		// Set up a message channel for communication with the iframe
+		const codePortChannel = new MessageChannel();
+		const codePort = codePortChannel.port1;
+		const iframeWindow = this.iframe!.contentWindow!;
+		iframeWindow.postMessage(
+			{ type: 'bind', code: codeDataUrl, port: codePortChannel.port2 },
+			'*',
+			[codePortChannel.port2]
+		);
 
 		return new Promise((resolve, reject) => {
-			const listener = (event: MessageEvent) => {
-				if (event?.data?.nonce === nonce) {
-					if (event.data.type === 'execute-output') {
-						resolve(event.data.result);
-					} else if (event.data.type === 'execute-error') {
-						const error = new Error(event.data.error);
-						error.stack = event.data.stack;
-						(error as unknown as { lineNumber: number }).lineNumber = event.data.lineNumber;
-						reject(error);
-					}
-					window.removeEventListener('message', listener);
+			codePort.onmessage = (event) => {
+				const data = event.data;
+				if (data.type === 'ok') {
+					// Return the bound function
+					const boundFunction = (...args: unknown[]) => {
+						return new Promise<unknown>((resolve, reject) => {
+							const callPortChannel = new MessageChannel();
+							const callPort = callPortChannel.port1;
+							callPort.onmessage = (event) => {
+								const data = event.data;
+								if (data.type === 'result') {
+									resolve(data.result);
+								} else if (data.type === 'error') {
+									const error = new Error(data.error);
+									error.stack = data.stack;
+									reject(error);
+								}
+							};
+							// Send the function call along with arguments
+							codePort.postMessage({ args, port: callPortChannel.port2 }, [callPortChannel.port2]);
+						});
+					};
+					resolve(boundFunction);
+				} else if (data.type === 'error') {
+					const error = new Error(data.error);
+					error.stack = data.stack;
+					reject(error);
 				}
 			};
-			window.addEventListener('message', listener);
-			this.iframe.contentWindow?.postMessage({ args, nonce }, '*');
 		});
 	}
 
 	destroy() {
-		document.body.removeChild(this.iframe);
+		if (this.iframe) {
+			document.body.removeChild(this.iframe);
+			this.iframe = null;
+			this.loaded = null;
+		}
 	}
 }
