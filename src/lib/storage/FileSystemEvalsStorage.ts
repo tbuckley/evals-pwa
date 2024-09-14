@@ -47,11 +47,13 @@ export class FileSystemEvalsStorage implements StorageProvider {
 
 		let result = raw;
 		let changed;
+		const cache = new Map<string, WeakRef<FileReference>>();
 		do {
 			changed = false;
 			try {
 				const derefResult = await dereferenceFilePaths(result, {
-					storage: this.fs
+					storage: this.fs,
+					cache
 				});
 				changed ||= derefResult.changed;
 				result = derefResult.result;

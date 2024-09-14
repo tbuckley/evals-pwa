@@ -1,6 +1,6 @@
 import * as esbuild from 'esbuild-wasm';
-import type { FileStorage } from './dereferenceFilePaths';
 import { FileReference } from './FileReference';
+import type { ReadonlyFileStorage } from '$lib/types';
 
 let esbuildReady: Promise<void> | undefined;
 function lazyInitEsbuild() {
@@ -17,13 +17,16 @@ function lazyInitEsbuild() {
 }
 
 export class CodeReference extends FileReference {
-	readonly #storage: FileStorage;
-	constructor(uri: string, file: File, storage: FileStorage) {
+	readonly #storage: ReadonlyFileStorage;
+	#bundle?: string;
+
+	constructor(uri: string, file: File, storage: ReadonlyFileStorage) {
 		super(uri, file, 'code');
 		this.#storage = storage;
 	}
 	async getCode() {
 		if (this.file.name.endsWith('.ts')) {
+			if (this.#bundle) return this.#bundle;
 			await lazyInitEsbuild();
 			const storage = this.#storage;
 			const loader: esbuild.Plugin = {
@@ -58,7 +61,7 @@ export class CodeReference extends FileReference {
 			if (result.errors.length) {
 				throw new Error(result.errors.map((value) => value.text).join('\n'));
 			}
-			return result.outputFiles![0].text;
+			return (this.#bundle = result.outputFiles![0].text);
 		}
 		return await this.file.text();
 	}
