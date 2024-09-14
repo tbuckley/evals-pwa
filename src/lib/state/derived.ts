@@ -140,6 +140,7 @@ function getRunTitle(run: RunLike): string {
 function runToLiveRun(run: Run): LiveRun {
 	return {
 		...run,
+		canceled: run.canceled ?? false,
 		varNames: getVarNamesForTests(run.tests),
 		summaries: run.envs.map((_, index) =>
 			readable(
@@ -152,7 +153,6 @@ function runToLiveRun(run: Run): LiveRun {
 		results: run.results.map((row) =>
 			row.map((res) => {
 				const state = res.pass ? 'success' : 'error';
-				// eslint-disable-next-line @typescript-eslint/no-unused-vars
 				const { pass: _, rawPrompt, ...rest } = res;
 				return readable({
 					...rest,

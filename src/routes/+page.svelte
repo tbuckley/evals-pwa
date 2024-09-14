@@ -12,7 +12,7 @@
 	import { configStore, selectedRunIdStore } from '$lib/state/stores';
 	import { resultDialogStore } from '$lib/state/ui';
 	import * as Dialog from '$lib/components/ui/dialog';
-	import { Description } from '$lib/components/ui/alert-dialog';
+	import CancelIcon from 'lucide-svelte/icons/ban';
 </script>
 
 <article class="prose">
@@ -77,8 +77,16 @@ tests:
 		></Combobox>
 
 		{#if $selectedRunStore !== null}
-			<h2 class="mb-4 mt-8 text-xl font-bold">
-				{$selectedRunTitle}
+			<h2 class="mb-4 mt-8 flex items-center gap-2 text-xl font-bold">
+				<div>{$selectedRunTitle}</div>
+				{#if $selectedRunStore.canceled}
+					<div
+						class="inline-flex items-center gap-1 rounded-md border border-red-500 bg-red-50 px-1 text-red-500"
+					>
+						<CancelIcon class="inline-block h-5 w-5"></CancelIcon>
+						Canceled
+					</div>
+				{/if}
 			</h2>
 
 			<!-- Use a keyed block so we don't try to reuse a table that was created with a different layout -->

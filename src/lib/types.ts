@@ -111,7 +111,8 @@ export const runSchema = z.object({
 	results: z.array(z.array(testResultSchema)),
 
 	// Optional
-	description: z.string().optional()
+	description: z.string().optional(),
+	canceled: z.boolean().optional()
 });
 export type Run = z.infer<typeof runSchema>;
 
@@ -210,6 +211,7 @@ export interface LiveRun {
 	id: string;
 	timestamp: number;
 	description?: string;
+	canceled: boolean;
 
 	envs: Env[];
 	tests: TestCase[];
