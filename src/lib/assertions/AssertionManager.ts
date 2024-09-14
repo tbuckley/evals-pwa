@@ -1,5 +1,4 @@
 import type { Assertion, AssertionProvider, NormalizedTestCase } from '$lib/types';
-import { convertAllStringsToHandlebarSafe } from '$lib/utils/handlebars';
 import { createContainsAssertion } from './contains';
 import { createJavascriptAssertion } from './javascript';
 import Handlebars from 'handlebars';
@@ -7,6 +6,7 @@ import { createRegexAssertion } from './regex';
 import { createEqualsAssertion } from './equals';
 import { createLlmRubricAssertion } from './llmRubric';
 import type { ProviderManager } from '$lib/providers/ProviderManager';
+import { objectDfsMap } from '$lib/utils/objectDFS';
 
 export class AssertionManager {
 	assertions: AssertionProvider[] = [];
@@ -50,7 +50,12 @@ export class AssertionManager {
 
 function prePopulateVars(vars: Assertion['vars'], testVars: NormalizedTestCase['vars']) {
 	const populatedVars = { ...vars };
-	const safeVars = convertAllStringsToHandlebarSafe(testVars ?? {});
+	const safeVars = objectDfsMap(testVars ?? {}, (val) => {
+		if (typeof val === 'string') {
+			return new Handlebars.SafeString(val);
+		}
+		return val;
+	});
 
 	for (const key in populatedVars) {
 		if (typeof populatedVars[key] === 'string') {
