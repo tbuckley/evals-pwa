@@ -1,4 +1,10 @@
-import type { ModelProvider, MultiPartPrompt, PromptPart, TokenUsage } from '$lib/types';
+import type {
+	ModelProvider,
+	MultiPartPrompt,
+	PromptPart,
+	RunContext,
+	TokenUsage
+} from '$lib/types';
 import { iterateStream } from '$lib/utils/iterateStream';
 import { fileToBase64 } from '$lib/utils/media';
 import { z } from 'zod';
@@ -52,7 +58,7 @@ export class OpenaiProvider implements ModelProvider {
 		this.request = request;
 	}
 
-	async *run(prompt: MultiPartPrompt) {
+	async *run(prompt: MultiPartPrompt, context: RunContext) {
 		yield '';
 		const resp = await fetch(`${this.apiBaseUrl}/v1/chat/completions`, {
 			method: 'POST',
@@ -73,7 +79,8 @@ export class OpenaiProvider implements ModelProvider {
 						content: await Promise.all(prompt.map(multiPartPromptToOpenAI))
 					}
 				]
-			})
+			}),
+			signal: context.abortSignal
 		});
 		if (!resp.ok) {
 			throw new Error(`Failed to run model: ${resp.statusText}`);

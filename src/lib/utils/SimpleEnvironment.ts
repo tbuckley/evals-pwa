@@ -4,7 +4,8 @@ import type {
 	TestOutput,
 	PromptFormatter,
 	TokenUsage,
-	VarSet
+	VarSet,
+	RunContext
 } from '$lib/types';
 
 export interface Config {
@@ -21,13 +22,13 @@ export class SimpleEnvironment implements TestEnvironment {
 		this.prompt = options.prompt;
 	}
 
-	async *run(vars: VarSet): AsyncGenerator<string, TestOutput, void> {
+	async *run(vars: VarSet, context: RunContext): AsyncGenerator<string, TestOutput, void> {
 		const prompt = this.prompt.format(vars);
 
 		const start = Date.now();
 		let resp: unknown;
 		try {
-			const generator = this.model.run(prompt);
+			const generator = this.model.run(prompt, context);
 			let next;
 			while (!next || !next.done) {
 				next = await generator.next();

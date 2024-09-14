@@ -3,7 +3,6 @@ import { configStore, liveRunStore, runStore, selectedRunIdStore, storageStore }
 import {
 	UiError,
 	type AssertionResult,
-	type FileLoader,
 	type FileStorage,
 	type LiveResult,
 	type LiveRun,
@@ -11,6 +10,7 @@ import {
 	type NormalizedTestCase,
 	type Prompt,
 	type Run,
+	type RunContext,
 	type TestEnvironment
 } from '$lib/types';
 import { ProviderManager } from '$lib/providers/ProviderManager';
@@ -223,8 +223,8 @@ export async function runTests() {
 		for (const env of envs) {
 			const result = writable<LiveResult>({ rawPrompt: null, state: 'waiting' });
 			testResults.push(result);
-			runner.enqueue(async () => {
-				await runTest(test, env, mgr, storage, result);
+			runner.enqueue(async ({ abortSignal }) => {
+				await runTest(test, env, mgr, result, { abortSignal });
 			});
 		}
 		results.push(testResults);
@@ -328,15 +328,15 @@ async function runTest(
 	test: NormalizedTestCase,
 	env: TestEnvironment,
 	assertionManager: AssertionManager,
-	storage: FileLoader,
-	result: Writable<LiveResult>
+	result: Writable<LiveResult>,
+	context: RunContext
 ): Promise<void> {
 	result.update((state) => ({
 		...state,
 		state: 'in-progress'
 	}));
 	// TODO should this be safeRun if it will catch all errors?
-	const generator = env.run(test.vars);
+	const generator = env.run(test.vars, context);
 	let next;
 	while (!next || !next.done) {
 		next = await generator.next();
