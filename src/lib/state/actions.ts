@@ -248,6 +248,7 @@ export async function runTests() {
 		id: crypto.randomUUID(),
 		timestamp: Date.now(),
 		description: config.description,
+		canceled: false,
 		envs: runEnvs,
 		tests: globalTests,
 		varNames: getVarNamesForTests(globalTests),
@@ -258,7 +259,6 @@ export async function runTests() {
 		...state,
 		[run.id]: { run, abort: () => runner.abort() }
 	}));
-	const originalSelectedRunId = get(selectedRunIdStore);
 	selectedRunIdStore.set(run.id);
 
 	try {
@@ -267,8 +267,7 @@ export async function runTests() {
 	} catch (err) {
 		// Run was aborted
 		console.warn('Run was aborted:', err);
-		selectedRunIdStore.set(originalSelectedRunId);
-		return;
+		run.canceled = true;
 	} finally {
 		// Clean up and save the run
 		mgr.destroy();
@@ -377,7 +376,6 @@ async function runTest(
 }
 
 function liveRunToRun(liveRun: LiveRun): Run {
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	const { varNames: _varNames, summaries: _summaries, ...rest } = liveRun;
 	return {
 		...rest,
