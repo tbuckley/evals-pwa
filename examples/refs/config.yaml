@@ -7,6 +7,10 @@ prompts:
   - file:///promptA.txt
   - file:///prompts/*.txt
   - =gen: file:///code.ts
+  - =gen: >-
+      function execute() {
+        return new Blob(["js" + " return blob"], { type: "text/plain" })
+      }
 
 tests:
   - file:///testA.yaml
