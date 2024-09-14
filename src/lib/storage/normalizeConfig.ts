@@ -38,7 +38,7 @@ function normalizeTestCases(
 	defaultTest: FsConfig['defaultTest']
 ): NormalizedTestCase[] {
 	if (!tests) {
-		return [];
+		return [{ vars: {}, assert: [] }];
 	}
 	return tests.map((test) => normalizeTestCase(test, defaultTest ?? {}));
 }
