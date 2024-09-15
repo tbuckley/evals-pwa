@@ -58,6 +58,14 @@ export class OpenaiProvider implements ModelProvider {
 		this.request = request;
 	}
 
+	mimeTypes = [
+		// Image
+		'image/png',
+		'image/jpeg',
+		'image/webp',
+		'image/gif'
+	];
+
 	async *run(prompt: MultiPartPrompt, context: RunContext) {
 		yield '';
 		const resp = await fetch(`${this.apiBaseUrl}/v1/chat/completions`, {
@@ -180,8 +188,8 @@ type Part =
 async function multiPartPromptToOpenAI(part: PromptPart): Promise<Part> {
 	if ('text' in part) {
 		return { type: 'text', text: part.text };
-	} else if ('image' in part) {
-		const b64 = await fileToBase64(part.image);
+	} else if ('file' in part) {
+		const b64 = await fileToBase64(part.file);
 
 		return {
 			type: 'image_url',

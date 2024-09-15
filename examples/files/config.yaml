@@ -1,0 +1,20 @@
+description: Test Gemini's file support
+
+providers:
+  - gemini:gemini-1.5-flash-latest
+  - openai:gpt-4o-mini
+
+prompts:
+  - "{{ file }} Summarize this file"
+
+tests:
+  - description: Image file
+    vars:
+      file: file:///puppy.jpg
+  - description: Audio file
+    vars:
+      file: file:///Man-of-war.wav
+      # Samuel Dove, CC BY-SA 4.0 <https://creativecommons.org/licenses/by-sa/4.0>, via Wikimedia Commons
+  - description: PDF document
+    vars:
+      file: file:///document.pdf

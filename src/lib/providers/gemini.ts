@@ -1,6 +1,6 @@
 import type { ModelProvider, MultiPartPrompt, RunContext, TokenUsage } from '$lib/types';
 import { iterateStream } from '$lib/utils/iterateStream';
-import { fileToBase64, mimeTypeForFile } from '$lib/utils/media';
+import { fileToBase64 } from '$lib/utils/media';
 import { z } from 'zod';
 
 export const partSchema = z.union([
@@ -90,6 +90,37 @@ export class GeminiProvider implements ModelProvider {
 		public config: object = {}
 	) {}
 
+	mimeTypes = [
+		// Image
+		'image/png',
+		'image/jpeg',
+		'image/webp',
+		'image/heic',
+		'image/heif',
+
+		// Video
+		'video/mp4',
+		'video/mpeg',
+		'video/mov',
+		'video/avi',
+		'video/x-flv',
+		'video/mpg',
+		'video/webm',
+		'video/wmv',
+		'video/3gpp',
+
+		// Audio
+		'audio/wav',
+		'audio/mp3',
+		'audio/aiff',
+		'audio/aac',
+		'audio/ogg',
+		'audio/flac',
+
+		// Document
+		'application/pdf'
+	];
+
 	async *run(prompt: MultiPartPrompt, context: RunContext): AsyncGenerator<string, unknown, void> {
 		const resp = await fetch(
 			`https://generativelanguage.googleapis.com/v1beta/models/${this.model}:streamGenerateContent?alt=sse&key=${this.apiKey}`,
@@ -172,13 +203,13 @@ async function multiPartPromptToGemini(prompt: MultiPartPrompt): Promise<Part[]>
 	for (const part of prompt) {
 		if ('text' in part) {
 			parts.push({ text: part.text });
-		} else if ('image' in part) {
-			const b64 = await fileToBase64(part.image);
+		} else if ('file' in part) {
+			const b64 = await fileToBase64(part.file);
 			const firstComma = b64.indexOf(',');
 
 			parts.push({
 				inlineData: {
-					mimeType: mimeTypeForFile(part.image),
+					mimeType: part.file.type,
 					data: b64.slice(firstComma + 1)
 				}
 			});

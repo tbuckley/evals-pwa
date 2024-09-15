@@ -8,11 +8,17 @@
 
 	export let testResult: Readable<LiveResult>;
 
-	let firstFailedAssertionMessage: string | null;
-	$: firstFailedAssertionMessage =
-		($testResult.assertionResults ?? []).filter(
-			(assertion) => !assertion.pass && assertion.message
-		)[0]?.message ?? null;
+	$: errorMessage = getErrorMessage($testResult);
+	function getErrorMessage(result: LiveResult): string | null {
+		if (result.error) {
+			return result.error;
+		}
+		if (!$testResult.assertionResults) {
+			return null;
+		}
+		const failureMessages = $testResult.assertionResults.filter((res) => !res.pass && res.message);
+		return failureMessages[0]?.message ?? null;
+	}
 
 	function openRawPromptDialog() {
 		resultDialogStore.set({
@@ -39,7 +45,7 @@
 		</div>
 	{:else if $testResult.state === 'error'}
 		<div class="mb-2 inline-block rounded-sm border border-red-700 bg-red-100 p-1 text-red-700">
-			FAIL {firstFailedAssertionMessage ? ' - ' + firstFailedAssertionMessage : ''}
+			FAIL {errorMessage ? ' - ' + errorMessage : ''}
 		</div>
 	{:else}
 		<div class="mb-2 inline-block rounded-sm border border-gray-700 bg-gray-100 p-1 text-gray-700">
