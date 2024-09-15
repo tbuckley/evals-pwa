@@ -26,14 +26,11 @@ export function createJavascriptAssertion(
 		throw new Error('Invalid javascript arguments');
 	}
 
-	let sandbox: CodeSandbox | undefined;
 	let execute: (...args: unknown[]) => Promise<unknown>;
 	return {
 		async run(output: string): Promise<AssertionResult> {
-			if (!sandbox) {
-				// sandbox = new CodeSandbox(parsedArgs.data.code);
-				sandbox = new CodeSandbox();
-				execute = await sandbox.bind(parsedArgs.data.code);
+			if (!execute) {
+				execute = await CodeSandbox.bind(parsedArgs.data.code);
 			}
 			try {
 				const res = await execute(output, { vars: testVars });
@@ -78,10 +75,6 @@ export function createJavascriptAssertion(
 					message: formattedMessage
 				};
 			}
-		},
-		destroy() {
-			sandbox?.destroy();
-			sandbox = undefined;
 		}
 	};
 }

@@ -13,6 +13,7 @@ import { runGenerators } from './runGenerators';
 import { normalizeConfig } from './normalizeConfig';
 import { fsConfigSchema } from './types';
 import * as yaml from 'yaml';
+import { CodeSandbox } from '$lib/utils/CodeSandbox';
 
 export class FileSystemEvalsStorage implements StorageProvider {
 	constructor(public fs: FileStorage) {}
@@ -46,27 +47,31 @@ export class FileSystemEvalsStorage implements StorageProvider {
 		}
 
 		let result = raw;
-		let changed;
-		const cache = new Map<string, WeakRef<FileReference>>();
-		do {
-			changed = false;
-			try {
-				const derefResult = await dereferenceFilePaths(result, {
-					storage: this.fs,
-					cache
-				});
-				changed ||= derefResult.changed;
-				result = derefResult.result;
-			} catch (err) {
-				if (err instanceof MissingFileError) {
-					throw new UiError({ type: 'missing-config-reference', path: err.path });
+		try {
+			let changed;
+			const cache = new Map<string, WeakRef<FileReference>>();
+			do {
+				changed = false;
+				try {
+					const derefResult = await dereferenceFilePaths(result, {
+						storage: this.fs,
+						cache
+					});
+					changed ||= derefResult.changed;
+					result = derefResult.result;
+				} catch (err) {
+					if (err instanceof MissingFileError) {
+						throw new UiError({ type: 'missing-config-reference', path: err.path });
+					}
+					throw err;
 				}
-				throw err;
-			}
-			const genResult = await runGenerators(result);
-			result = genResult.result;
-			changed ||= genResult.changed;
-		} while (changed);
+				const genResult = await runGenerators(result);
+				result = genResult.result;
+				changed ||= genResult.changed;
+			} while (changed);
+		} finally {
+			CodeSandbox.destroy();
+		}
 
 		const parsed = fsConfigSchema.safeParse(result);
 		if (!parsed.success) {

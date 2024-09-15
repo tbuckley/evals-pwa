@@ -26,6 +26,7 @@ import { getVarNamesForTests } from '$lib/utils/testCase';
 import { summarizeResults } from '$lib/utils/summarizeResults';
 import * as idb from 'idb-keyval';
 import { InMemoryStorage } from '$lib/storage/InMemoryStorage';
+import { CodeSandbox } from '$lib/utils/CodeSandbox';
 
 const folder = await idb.get<FileSystemDirectoryHandle>('folder');
 if (folder) {
@@ -218,16 +219,20 @@ export async function runTests() {
 	const results: LiveRun['results'] = [];
 	const runner = new ParallelTaskQueue(5);
 	const mgr = new AssertionManager(providerManager);
-	for (const test of globalTests) {
-		const testResults: Writable<LiveResult>[] = [];
-		for (const env of envs) {
-			const result = writable<LiveResult>({ rawPrompt: null, state: 'waiting' });
-			testResults.push(result);
-			runner.enqueue(async ({ abortSignal }) => {
-				await runTest(test, env, mgr, result, { abortSignal });
-			});
+	try {
+		for (const test of globalTests) {
+			const testResults: Writable<LiveResult>[] = [];
+			for (const env of envs) {
+				const result = writable<LiveResult>({ rawPrompt: null, state: 'waiting' });
+				testResults.push(result);
+				runner.enqueue(async ({ abortSignal }) => {
+					await runTest(test, env, mgr, result, { abortSignal });
+				});
+			}
+			results.push(testResults);
 		}
-		results.push(testResults);
+	} finally {
+		CodeSandbox.destroy();
 	}
 
 	// Create summaries derived from the testResults

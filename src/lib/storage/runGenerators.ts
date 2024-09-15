@@ -52,14 +52,9 @@ export async function runGeneratorsImpl(target: any, state: { changed: boolean }
 	if (isGenerator(target)) {
 		state.changed = true;
 		const ref = target['=gen'];
-		const sandbox = new CodeSandbox();
-		const execute = await sandbox.bind(ref);
-		try {
-			const args = ensureArray(target['args']);
-			return await execute(...args);
-		} finally {
-			sandbox.destroy();
-		}
+		const execute = await CodeSandbox.bind(ref);
+		const args = ensureArray(target['args']);
+		return await execute(...args);
 	}
 
 	// Check for built-in generators

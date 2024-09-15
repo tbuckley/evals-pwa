@@ -13,10 +13,11 @@ function stringToDataUrl(input: string): string {
 }
 
 export class CodeSandbox {
-	private iframe: HTMLIFrameElement | null = null;
-	private loaded: Promise<void> | null = null;
+	private static iframe: HTMLIFrameElement | null = null;
+	private static loaded: Promise<void> | null = null;
+	private static instance = 0;
 
-	private initIframe() {
+	private static initIframe() {
 		if (this.iframe) return this.loaded;
 
 		// Create and configure the iframe
@@ -78,7 +79,9 @@ export class CodeSandbox {
 		return this.loaded;
 	}
 
-	async bind(code: CodeReference | string): Promise<(...args: unknown[]) => Promise<unknown>> {
+	static async bind(
+		code: CodeReference | string
+	): Promise<(...args: unknown[]) => Promise<unknown>> {
 		await this.initIframe();
 
 		// Retrieve code content if it's a CodeReference
@@ -103,6 +106,7 @@ export {execute};`;
 			[codePortChannel.port2]
 		);
 
+		const currentInstance = this.instance;
 		return new Promise((resolve, reject) => {
 			codePort.onmessage = (event) => {
 				const data = event.data;
@@ -122,6 +126,9 @@ export {execute};`;
 									reject(error);
 								}
 							};
+							if (this.instance !== currentInstance) {
+								throw new Error('Attempt to call bound function after destroy');
+							}
 							// Send the function call along with arguments
 							codePort.postMessage({ args, port: callPortChannel.port2 }, [callPortChannel.port2]);
 						});
@@ -136,7 +143,8 @@ export {execute};`;
 		});
 	}
 
-	destroy() {
+	static destroy() {
+		this.instance++;
 		if (this.iframe) {
 			document.body.removeChild(this.iframe);
 			this.iframe = null;
