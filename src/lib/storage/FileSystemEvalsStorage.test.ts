@@ -6,7 +6,7 @@ import { FileSystemEvalsStorage } from './FileSystemEvalsStorage';
 describe('FileSystemEvalsStorage', () => {
   test('adds a default test', async () => {
     const storage = new InMemoryStorage();
-    storage.writeFile(
+    await storage.writeFile(
       'file:///config.yaml',
       dedent`
             prompts:

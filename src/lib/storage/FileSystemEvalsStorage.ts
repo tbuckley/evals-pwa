@@ -13,7 +13,7 @@ import { runGenerators } from './runGenerators';
 import { normalizeConfig } from './normalizeConfig';
 import { fsConfigSchema } from './types';
 import * as yaml from 'yaml';
-import { CodeSandbox } from '$lib/utils/CodeSandbox';
+import * as CodeSandbox from '$lib/utils/CodeSandbox';
 
 export class FileSystemEvalsStorage implements StorageProvider {
   constructor(public fs: FileStorage) {}
@@ -99,7 +99,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
     return Promise.all(
       files.map(async ({ file }) => {
         const text = await file.text();
-        const json = JSON.parse(text);
+        const json = JSON.parse(text) as unknown;
         // TODO should we still catch MissingFileError here?
         const dereferenced = await dereferenceFilePaths(json, {
           storage: this.fs,
@@ -120,7 +120,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
         files.push(value);
         return value.uri;
       }
-      return value;
+      return value as unknown;
     });
 
     // First, make sure all the files exist, or create them

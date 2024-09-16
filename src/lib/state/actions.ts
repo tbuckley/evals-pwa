@@ -26,7 +26,7 @@ import { getVarNamesForTests } from '$lib/utils/testCase';
 import { summarizeResults } from '$lib/utils/summarizeResults';
 import * as idb from 'idb-keyval';
 import { InMemoryStorage } from '$lib/storage/InMemoryStorage';
-import { CodeSandbox } from '$lib/utils/CodeSandbox';
+import * as CodeSandbox from '$lib/utils/CodeSandbox';
 
 const folder = await idb.get<FileSystemDirectoryHandle>('folder');
 if (folder) {
@@ -262,7 +262,12 @@ export async function runTests() {
   };
   liveRunStore.update((state) => ({
     ...state,
-    [run.id]: { run, abort: () => { runner.abort(); } },
+    [run.id]: {
+      run,
+      abort: () => {
+        runner.abort();
+      },
+    },
   }));
   selectedRunIdStore.set(run.id);
 
@@ -296,7 +301,10 @@ export async function runTests() {
   }
 }
 
-interface RunEnv { provider: NormalizedProvider; prompt: Prompt }
+interface RunEnv {
+  provider: NormalizedProvider;
+  prompt: Prompt;
+}
 function getRunEnvs(providers: NormalizedProvider[], prompts: Prompt[]): RunEnv[] {
   const envs: RunEnv[] = [];
   for (const provider of providers) {
@@ -409,9 +417,7 @@ function deepEquals(a: unknown, b: unknown): boolean {
   if (keysA.length !== keysB.length) return false;
   for (const key of keysA) {
     if (!keysB.includes(key)) return false;
-    if (
-      !deepEquals((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
-    ) {
+    if (!deepEquals((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) {
       return false;
     }
   }

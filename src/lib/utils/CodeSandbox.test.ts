@@ -1,9 +1,9 @@
 import { describe, expect, test, afterEach } from 'vitest';
-import { CodeSandbox } from './CodeSandbox';
+import * as CodeSandbox from './CodeSandbox';
 
 describe('CodeSandbox', () => {
-  afterEach(() => {
-    CodeSandbox.destroy();
+  afterEach(async () => {
+    await CodeSandbox.destroy();
   });
   test('can run code', async () => {
     const execute = await CodeSandbox.bind('export function execute(a, b) { return a + b; }');
@@ -40,7 +40,7 @@ describe('CodeSandbox', () => {
     const execute = await CodeSandbox.bind(`
 				export function execute() { }
 			`);
-    CodeSandbox.destroy();
+    await CodeSandbox.destroy();
 
     try {
       await execute('test');
