@@ -3,6 +3,7 @@ import { GeminiProvider } from './gemini';
 import { OpenaiProvider, type OpenaiConfig } from './openai';
 import { ReverserProvider } from './reverser';
 import { ChromeProvider } from './chrome';
+import { OllamaProvider } from './ollama';
 
 export class ProviderManager {
 	constructor(public env: Record<string, string>) {}
@@ -37,7 +38,7 @@ export class ProviderManager {
 				}
 				(config as OpenaiConfig).apiBaseUrl = this.env.OLLAMA_ENDPOINT;
 			}
-			return new OpenaiProvider(modelName, 'no-key', config, () => 0);
+			return new OllamaProvider(modelName, 'no-key', config);
 		}
 		throw new Error(`Unknown provider: ${providerId}`);
 	}

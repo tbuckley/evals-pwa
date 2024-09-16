@@ -2,6 +2,7 @@ import { type MultiPartPrompt, type Prompt, type PromptFormatter, type VarSet } 
 import Handlebars from 'handlebars';
 import { FileReference } from '$lib/storage/FileReference';
 import { asyncObjectDfsMap } from './objectDFS';
+import { matchesMimeType } from './media';
 
 export class HandlebarsPromptFormatter implements PromptFormatter {
 	prompt: HandlebarsTemplateDelegate;
@@ -14,7 +15,7 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
 		const errorFiles: Record<string, FileReference> = {};
 		const placeholderVars = await asyncObjectDfsMap(vars, async (val, path) => {
 			if (val instanceof FileReference) {
-				if (mimeTypes && mimeTypes.includes(val.file.type)) {
+				if (mimeTypes && mimeTypes.some((pattern) => matchesMimeType(pattern, val.file.type))) {
 					// Replace files with placeholders, which will be split out at the end
 					files[path] = val;
 					return `__FILE_PLACEHOLDER_${path}__`;
