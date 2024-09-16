@@ -1,4 +1,4 @@
-import { CodeReference } from '$lib/storage/CodeReference';
+import { CodeReference, toCodeReference } from '$lib/storage/CodeReference';
 import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 import {
 	assertionResultSchema,
@@ -6,7 +6,6 @@ import {
 	type AssertionResult,
 	type NormalizedTestCase
 } from '$lib/types';
-import { CodeSandbox } from '$lib/utils/CodeSandbox';
 import { z } from 'zod';
 
 const argsSchema = z.object({
@@ -31,7 +30,8 @@ export function createJavascriptAssertion(
 		async run(output: string): Promise<AssertionResult> {
 			try {
 				if (!execute) {
-					execute = await CodeSandbox.bind(parsedArgs.data.code);
+					const code = await toCodeReference(parsedArgs.data.code);
+					execute = await code.bind();
 				}
 				const res = await execute(output, { vars: testVars });
 				const parsed = jsResultSchema.parse(res);
