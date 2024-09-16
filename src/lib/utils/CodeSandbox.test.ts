@@ -6,7 +6,7 @@ describe('CodeSandbox', () => {
 		CodeSandbox.destroy();
 	});
 	test('can run code', async () => {
-		const execute = await CodeSandbox.bind('function execute(a, b) { return a + b; }');
+		const execute = await CodeSandbox.bind('export function execute(a, b) { return a + b; }');
 
 		const res = await execute(1, 2);
 		expect(res).toBe(3);
@@ -16,7 +16,7 @@ describe('CodeSandbox', () => {
 		const execute = await CodeSandbox.bind(`
 				import _ from 'https://cdn.jsdelivr.net/npm/lodash@4.17.21/+esm';
 
-				function execute(arr) { return _.uniq(arr); }
+				export function execute(arr) { return _.uniq(arr); }
 			`);
 
 		const res = await execute([1, 2, 1, 3, 2, 4]);
@@ -25,7 +25,7 @@ describe('CodeSandbox', () => {
 
 	test('forwards any errors from the sandbox', async () => {
 		const execute = await CodeSandbox.bind(`
-				function execute(arr) { throw new Error('This is a test error'); }
+				export function execute(arr) { throw new Error('This is a test error'); }
 			`);
 
 		try {
@@ -38,7 +38,7 @@ describe('CodeSandbox', () => {
 
 	test('errors if a function is reused after destroy', async () => {
 		const execute = await CodeSandbox.bind(`
-				function execute() { }
+				export function execute() { }
 			`);
 		CodeSandbox.destroy();
 

@@ -79,19 +79,8 @@ export class CodeSandbox {
 		return this.loaded;
 	}
 
-	static async bind(
-		code: CodeReference | string
-	): Promise<(...args: unknown[]) => Promise<unknown>> {
+	static async bind(code: string): Promise<(...args: unknown[]) => Promise<unknown>> {
 		await this.initIframe();
-
-		// Retrieve code content if it's a CodeReference
-		if (code instanceof CodeReference) {
-			code = await code.getCode();
-		} else {
-			code = `${code}
-
-export {execute};`;
-		}
 
 		// Convert the code to a data URL
 		const codeDataUrl = stringToDataUrl(code);

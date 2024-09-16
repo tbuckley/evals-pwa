@@ -1,8 +1,7 @@
 import type { TestCase } from '$lib/types';
-import { CodeSandbox } from '$lib/utils/CodeSandbox';
 import { parseCSV } from '$lib/utils/csv';
 import { getFileExtension } from '$lib/utils/path';
-import type { CodeReference } from './CodeReference';
+import { CodeReference, toCodeReference } from './CodeReference';
 import { FileReference } from './FileReference';
 
 interface Generator {
@@ -51,8 +50,8 @@ export async function runGeneratorsImpl(target: any, state: { changed: boolean }
 	}
 	if (isGenerator(target)) {
 		state.changed = true;
-		const ref = target['=gen'];
-		const execute = await CodeSandbox.bind(ref);
+		const code = await toCodeReference(target['=gen']);
+		const execute = await code.bind();
 		const args = ensureArray(target['args']);
 		return await execute(...args);
 	}
