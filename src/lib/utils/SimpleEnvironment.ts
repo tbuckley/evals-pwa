@@ -5,7 +5,8 @@ import type {
 	PromptFormatter,
 	TokenUsage,
 	VarSet,
-	RunContext
+	RunContext,
+	MultiPartPrompt
 } from '$lib/types';
 
 export interface Config {
@@ -23,7 +24,17 @@ export class SimpleEnvironment implements TestEnvironment {
 	}
 
 	async *run(vars: VarSet, context: RunContext): AsyncGenerator<string, TestOutput, void> {
-		const prompt = this.prompt.format(vars);
+		let prompt: MultiPartPrompt;
+		try {
+			prompt = await this.prompt.format(vars, this.model.mimeTypes);
+		} catch (e) {
+			if (e instanceof Error) {
+				return {
+					error: e.toString()
+				};
+			}
+			throw e;
+		}
 
 		const start = Date.now();
 		let resp: unknown;

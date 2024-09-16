@@ -1,9 +1,10 @@
-import type {
-	ModelProvider,
-	MultiPartPrompt,
-	PromptPart,
-	RunContext,
-	TokenUsage
+import {
+	normalizedProviderConfigSchema,
+	type ModelProvider,
+	type MultiPartPrompt,
+	type PromptPart,
+	type RunContext,
+	type TokenUsage
 } from '$lib/types';
 import { iterateStream } from '$lib/utils/iterateStream';
 import { fileToBase64 } from '$lib/utils/media';
@@ -36,8 +37,8 @@ const generateContentResponseSchema = z.object({
 		.optional()
 });
 
-const configSchema = z
-	.object({
+const configSchema = normalizedProviderConfigSchema
+	.extend({
 		apiBaseUrl: z.string().optional()
 	})
 	.passthrough();
@@ -53,10 +54,21 @@ export class OpenaiProvider implements ModelProvider {
 		config = {},
 		public costFunction: typeof getCost = getCost
 	) {
-		const { apiBaseUrl, ...request } = configSchema.parse(config);
+		const { apiBaseUrl, mimeTypes, ...request } = configSchema.parse(config);
+		if (mimeTypes) {
+			this.mimeTypes = mimeTypes;
+		}
 		this.apiBaseUrl = apiBaseUrl ?? 'https://api.openai.com';
 		this.request = request;
 	}
+
+	mimeTypes = [
+		// Image
+		'image/png',
+		'image/jpeg',
+		'image/webp',
+		'image/gif'
+	];
 
 	async *run(prompt: MultiPartPrompt, context: RunContext) {
 		yield '';
@@ -180,8 +192,8 @@ type Part =
 async function multiPartPromptToOpenAI(part: PromptPart): Promise<Part> {
 	if ('text' in part) {
 		return { type: 'text', text: part.text };
-	} else if ('image' in part) {
-		const b64 = await fileToBase64(part.image);
+	} else if ('file' in part) {
+		const b64 = await fileToBase64(part.file);
 
 		return {
 			type: 'image_url',

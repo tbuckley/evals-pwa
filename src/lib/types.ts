@@ -14,9 +14,13 @@ const assertionSchema = z.object({
 	description: z.string().optional(),
 	vars: z.record(z.string(), z.unknown()).optional()
 });
+export const normalizedProviderConfigSchema = z.object({
+	mimeTypes: z.array(z.string()).optional()
+});
+export type NormalizedProviderConfig = z.infer<typeof normalizedProviderConfigSchema>;
 const normalizedProviderSchema = z.object({
 	id: z.string(),
-	config: z.object({}).passthrough().optional(),
+	config: normalizedProviderConfigSchema.passthrough().optional(),
 	prompts: z.array(z.string()).optional()
 });
 export const providerSchema = z.union([z.string(), normalizedProviderSchema]);
@@ -135,7 +139,7 @@ export interface FileStorage extends ReadonlyFileStorage {
 	writeFile(path: string, data: string | Blob): Promise<void>;
 }
 
-export type PromptPart = { text: string } | { image: File };
+export type PromptPart = { text: string } | { file: File };
 export type MultiPartPrompt = Array<PromptPart>;
 
 export interface RunContext {
@@ -146,6 +150,7 @@ export interface ModelProvider {
 	run(prompt: MultiPartPrompt, context: RunContext): AsyncGenerator<string, unknown, void>;
 	extractOutput(response: unknown): string;
 	extractTokenUsage(response: unknown): TokenUsage;
+	mimeTypes?: string[];
 }
 
 export interface TestEnvironment {
@@ -159,7 +164,7 @@ export interface TaskQueue {
 }
 
 export interface PromptFormatter {
-	format(vars: VarSet): MultiPartPrompt;
+	format(vars: VarSet, mimeTypes: string[] | undefined): Promise<MultiPartPrompt>;
 }
 
 export interface FileLoader {
