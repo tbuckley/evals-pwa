@@ -1,8 +1,8 @@
 {
-    "version": 1,
-    "id": "bar",
-    "description": "Puppy",
-    "vars": {
-        "image": "file:///files/puppy.jpg"
-    }
+  "version": 1,
+  "id": "bar",
+  "description": "Puppy",
+  "vars": {
+    "image": "file:///files/puppy.jpg"
+  }
 }

@@ -6,5 +6,5 @@ export const envStore = writable<string>(defaultEnv);
 // Store in localStorage
 // TODO make this configurable
 envStore.subscribe((env) => {
-	localStorage.setItem('env', env);
+  localStorage.setItem('env', env);
 });

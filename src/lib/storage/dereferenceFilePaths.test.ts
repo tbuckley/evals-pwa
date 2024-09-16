@@ -4,21 +4,21 @@ import { FileReference } from './FileReference';
 import { InMemoryStorage } from './InMemoryStorage';
 
 describe('dereferenceFilePaths', () => {
-	test('returns a normal object untouched', async () => {
-		const storage = new InMemoryStorage();
-		const input = { a: 1, b: [2, 3], c: { d: 4 } };
-		const { result, changed } = await dereferenceFilePaths(input, { storage });
-		expect(changed).toEqual(false);
-		expect(result).toEqual(input);
-	});
+  test('returns a normal object untouched', async () => {
+    const storage = new InMemoryStorage();
+    const input = { a: 1, b: [2, 3], c: { d: 4 } };
+    const { result, changed } = await dereferenceFilePaths(input, { storage });
+    expect(changed).toEqual(false);
+    expect(result).toEqual(input);
+  });
 
-	test('inserts text files', async () => {
-		const storage = new InMemoryStorage();
-		await storage.writeFile('file:///a.txt', 'hello world!');
+  test('inserts text files', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile('file:///a.txt', 'hello world!');
 
-		const input = { a: 1, b: 'file:///a.txt' };
-		const ouput = await dereferenceFilePaths(input, { storage });
-		expect(ouput).toMatchInlineSnapshot(`
+    const input = { a: 1, b: 'file:///a.txt' };
+    const ouput = await dereferenceFilePaths(input, { storage });
+    expect(ouput).toMatchInlineSnapshot(`
 			{
 			  "changed": true,
 			  "result": {
@@ -27,15 +27,15 @@ describe('dereferenceFilePaths', () => {
 			  },
 			}
 		`);
-	});
+  });
 
-	test('inserts yaml files', async () => {
-		const storage = new InMemoryStorage();
-		await storage.writeFile('file:///a.yaml', 'c: 3\nd:\n  - 5\n  - 6\n');
+  test('inserts yaml files', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile('file:///a.yaml', 'c: 3\nd:\n  - 5\n  - 6\n');
 
-		const input = { a: 1, b: 'file:///a.yaml' };
-		const ouput = await dereferenceFilePaths(input, { storage });
-		expect(ouput).toMatchInlineSnapshot(`
+    const input = { a: 1, b: 'file:///a.yaml' };
+    const ouput = await dereferenceFilePaths(input, { storage });
+    expect(ouput).toMatchInlineSnapshot(`
 			{
 			  "changed": true,
 			  "result": {
@@ -50,15 +50,15 @@ describe('dereferenceFilePaths', () => {
 			  },
 			}
 		`);
-	});
+  });
 
-	test('inserts json files', async () => {
-		const storage = new InMemoryStorage();
-		await storage.writeFile('file:///a.json', '{"c": 3, "d": [5, 6]}');
+  test('inserts json files', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile('file:///a.json', '{"c": 3, "d": [5, 6]}');
 
-		const input = { a: 1, b: 'file:///a.json' };
-		const ouput = await dereferenceFilePaths(input, { storage });
-		expect(ouput).toMatchInlineSnapshot(`
+    const input = { a: 1, b: 'file:///a.json' };
+    const ouput = await dereferenceFilePaths(input, { storage });
+    expect(ouput).toMatchInlineSnapshot(`
 			{
 			  "changed": true,
 			  "result": {
@@ -73,16 +73,16 @@ describe('dereferenceFilePaths', () => {
 			  },
 			}
 		`);
-	});
+  });
 
-	test('allows referenced yaml to reference additional files', async () => {
-		const storage = new InMemoryStorage();
-		await storage.writeFile('file:///a.yaml', 'c: 3\nd: file:///b.txt');
-		await storage.writeFile('file:///b.txt', 'hello world!');
+  test('allows referenced yaml to reference additional files', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile('file:///a.yaml', 'c: 3\nd: file:///b.txt');
+    await storage.writeFile('file:///b.txt', 'hello world!');
 
-		const input = { a: 1, b: 'file:///a.yaml' };
-		const ouput = await dereferenceFilePaths(input, { storage });
-		expect(ouput).toMatchInlineSnapshot(`
+    const input = { a: 1, b: 'file:///a.yaml' };
+    const ouput = await dereferenceFilePaths(input, { storage });
+    expect(ouput).toMatchInlineSnapshot(`
 			{
 			  "changed": true,
 			  "result": {
@@ -94,25 +94,25 @@ describe('dereferenceFilePaths', () => {
 			  },
 			}
 		`);
-	});
+  });
 
-	test('throws an error on recursive cycles', async () => {
-		const storage = new InMemoryStorage();
-		await storage.writeFile('file:///a.yaml', 'b: file:///b.yaml');
-		await storage.writeFile('file:///b.yaml', 'a: file:///a.yaml');
+  test('throws an error on recursive cycles', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile('file:///a.yaml', 'b: file:///b.yaml');
+    await storage.writeFile('file:///b.yaml', 'a: file:///a.yaml');
 
-		const input = { a: 'file:///a.yaml' };
-		await expect(dereferenceFilePaths(input, { storage })).rejects.toThrowError();
-	});
+    const input = { a: 'file:///a.yaml' };
+    await expect(dereferenceFilePaths(input, { storage })).rejects.toThrowError();
+  });
 
-	test('supports glob references as arrays', async () => {
-		const storage = new InMemoryStorage();
-		await storage.writeFile('file:///a.txt', 'a');
-		await storage.writeFile('file:///b.txt', 'b');
+  test('supports glob references as arrays', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile('file:///a.txt', 'a');
+    await storage.writeFile('file:///b.txt', 'b');
 
-		const input = { values: 'file:///*.txt' };
-		const output = await dereferenceFilePaths(input, { storage });
-		expect(output).toMatchInlineSnapshot(`
+    const input = { values: 'file:///*.txt' };
+    const output = await dereferenceFilePaths(input, { storage });
+    expect(output).toMatchInlineSnapshot(`
 			{
 			  "changed": true,
 			  "result": {
@@ -123,16 +123,16 @@ describe('dereferenceFilePaths', () => {
 			  },
 			}
 		`);
-	});
+  });
 
-	test('flattens any glob references within an array', async () => {
-		const storage = new InMemoryStorage();
-		await storage.writeFile('file:///a.txt', 'a');
-		await storage.writeFile('file:///b.txt', 'b');
+  test('flattens any glob references within an array', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile('file:///a.txt', 'a');
+    await storage.writeFile('file:///b.txt', 'b');
 
-		const input = { values: ['file:///*.txt', 'c'] };
-		const output = await dereferenceFilePaths(input, { storage });
-		expect(output).toMatchInlineSnapshot(`
+    const input = { values: ['file:///*.txt', 'c'] };
+    const output = await dereferenceFilePaths(input, { storage });
+    expect(output).toMatchInlineSnapshot(`
 			{
 			  "changed": true,
 			  "result": {
@@ -144,38 +144,38 @@ describe('dereferenceFilePaths', () => {
 			  },
 			}
 		`);
-	});
+  });
 
-	test('embeds image files as FileReference', async () => {
-		const storage = new InMemoryStorage();
-		await storage.writeFile('file:///a.txt', 'a');
-		await storage.writeFile('file:///b.png', 'b');
+  test('embeds image files as FileReference', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile('file:///a.txt', 'a');
+    await storage.writeFile('file:///b.png', 'b');
 
-		const input = { txt: 'file:///a.txt', img: 'file:///b.png' };
-		const { result: output } = await dereferenceFilePaths(input, { storage });
+    const input = { txt: 'file:///a.txt', img: 'file:///b.png' };
+    const { result: output } = await dereferenceFilePaths(input, { storage });
 
-		// expect(output).toHaveProperty('txt');
-		// expect(output).toHaveProperty('img');
-		expect(output).property('txt').to.equal('a');
-		expect(output).property('img').to.be.instanceOf(FileReference);
-		expect(output).property('img').property('uri').to.equal('file:///b.png');
-		expect(output).property('img').property('file').to.be.instanceOf(File);
-		expect(output).property('img').property('file').property('name').to.equal('b.png');
-	});
+    // expect(output).toHaveProperty('txt');
+    // expect(output).toHaveProperty('img');
+    expect(output).property('txt').to.equal('a');
+    expect(output).property('img').to.be.instanceOf(FileReference);
+    expect(output).property('img').property('uri').to.equal('file:///b.png');
+    expect(output).property('img').property('file').to.be.instanceOf(File);
+    expect(output).property('img').property('file').property('name').to.equal('b.png');
+  });
 
-	test('supports relative paths', async () => {
-		const storage = new InMemoryStorage();
-		await storage.writeFile(
-			'file:///tests/a.yaml',
-			'vars: file://./b.yaml\nassert: file://../assert.js\nabs: file:///assert.js'
-		);
-		await storage.writeFile('file:///tests/b.yaml', 'foo: 1\nbar: 2\nbaz: file://./baz/c.png');
-		await storage.writeFile('file:///tests/baz/c.png', 'image');
-		await storage.writeFile('file:///assert.js', 'code');
+  test('supports relative paths', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile(
+      'file:///tests/a.yaml',
+      'vars: file://./b.yaml\nassert: file://../assert.js\nabs: file:///assert.js',
+    );
+    await storage.writeFile('file:///tests/b.yaml', 'foo: 1\nbar: 2\nbaz: file://./baz/c.png');
+    await storage.writeFile('file:///tests/baz/c.png', 'image');
+    await storage.writeFile('file:///assert.js', 'code');
 
-		const input = { tests: ['file:///tests/a.yaml'] };
-		const output = await dereferenceFilePaths(input, { storage });
-		expect(output).toMatchInlineSnapshot(`
+    const input = { tests: ['file:///tests/a.yaml'] };
+    const output = await dereferenceFilePaths(input, { storage });
+    expect(output).toMatchInlineSnapshot(`
 			{
 			  "changed": true,
 			  "result": {
@@ -205,5 +205,5 @@ describe('dereferenceFilePaths', () => {
 			  },
 			}
 		`);
-	});
+  });
 });
