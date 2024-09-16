@@ -1,4 +1,10 @@
-import type { ModelProvider, MultiPartPrompt, RunContext, TokenUsage } from '$lib/types';
+import type {
+	ModelProvider,
+	MultiPartPrompt,
+	NormalizedProviderConfig,
+	RunContext,
+	TokenUsage
+} from '$lib/types';
 import { iterateStream } from '$lib/utils/iterateStream';
 import { fileToBase64 } from '$lib/utils/media';
 import { z } from 'zod';
@@ -87,8 +93,13 @@ export class GeminiProvider implements ModelProvider {
 	constructor(
 		public model: string,
 		public apiKey: string,
-		public config: object = {}
-	) {}
+		public config: NormalizedProviderConfig = {}
+	) {
+		const { mimeTypes } = config;
+		if (mimeTypes) {
+			this.mimeTypes = mimeTypes;
+		}
+	}
 
 	mimeTypes = [
 		// Image

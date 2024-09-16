@@ -14,9 +14,13 @@ const assertionSchema = z.object({
 	description: z.string().optional(),
 	vars: z.record(z.string(), z.unknown()).optional()
 });
+export const normalizedProviderConfigSchema = z.object({
+	mimeTypes: z.array(z.string()).optional()
+});
+export type NormalizedProviderConfig = z.infer<typeof normalizedProviderConfigSchema>;
 const normalizedProviderSchema = z.object({
 	id: z.string(),
-	config: z.object({}).passthrough().optional(),
+	config: normalizedProviderConfigSchema.passthrough().optional(),
 	prompts: z.array(z.string()).optional()
 });
 export const providerSchema = z.union([z.string(), normalizedProviderSchema]);

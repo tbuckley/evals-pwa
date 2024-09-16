@@ -2,7 +2,11 @@ description: Test Gemini's file support
 
 providers:
   - gemini:gemini-1.5-flash-latest
-  - openai:gpt-4o-mini
+  - id: openai:gpt-4o-mini # Will skip running for unsupported audio/PDF files
+  - id: openai:gpt-4o-mini
+    config:
+      mimeTypes:
+        - '*/*' # Override model to allow all file types
 
 prompts:
   - "{{ file }} Summarize this file"
