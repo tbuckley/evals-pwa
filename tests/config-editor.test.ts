@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test.describe.only('Configuration editor', () => {
+test.describe('Configuration editor', () => {
 	test('does not error while in-progress', async ({ page }) => {
 		await page.goto('/configuration');
 
