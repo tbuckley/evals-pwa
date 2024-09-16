@@ -1,12 +1,7 @@
 <script lang="ts">
 	import Button from '$lib/components/ui/button/button.svelte';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
-	import {
-		loadStateFromStorage,
-		saveInMemoryConfigToFileSystem,
-		setInMemoryConfig,
-		setStorage
-	} from '$lib/state/actions';
+	import { loadStateFromStorage, setInMemoryConfig, setStorage } from '$lib/state/actions';
 	import { configStore, storageStore } from '$lib/state/stores';
 	import { FileSystemEvalsStorage } from '$lib/storage/FileSystemEvalsStorage';
 	import { InMemoryStorage } from '$lib/storage/InMemoryStorage';
@@ -30,6 +25,7 @@
 		}
 	}
 
+	let savedConfig = '';
 	let config = '';
 
 	onMount(async () => {
@@ -39,11 +35,13 @@
 		) {
 			const file = await $storageStore.fs.loadFile('file:///config.yaml');
 			config = await file.text();
+			savedConfig = config;
 		}
 	});
 
 	async function handleSaveToInMemoryStorage() {
 		setInMemoryConfig(config);
+		savedConfig = config;
 	}
 
 	function handleUseSample() {
@@ -53,6 +51,7 @@
 
 	function handleSwitchToInMemoryStorage() {
 		config = '';
+		savedConfig = '';
 		setStorage(null);
 	}
 
@@ -85,8 +84,12 @@
 			class="font-mono"
 			style="tab-size: 2;"
 			on:keydown={handleTabKey}
-			on:input={handleSaveToInMemoryStorage}
 		></Textarea>
-		<Button on:click={handleUseSample}>Use sample config</Button>
+		<div class="mt-2 flex gap-2">
+			<Button disabled={config === savedConfig} on:click={handleSaveToInMemoryStorage}
+				>Use config</Button
+			>
+			<Button on:click={handleUseSample} variant="secondary">Use sample config</Button>
+		</div>
 	{/if}
 </article>
