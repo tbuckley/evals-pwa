@@ -14,9 +14,9 @@
 <div>
 	<div>{providerId}</div>
 	<div>{env.prompt}</div>
-	<div>{passRate}% pass</div>
+	<div>{passRate.toFixed(2)}% pass</div>
 	{#if $summary.avgLatencyMillis}
-		<div>{$summary.avgLatencyMillis}ms avg latency</div>
+		<div>{Math.round($summary.avgLatencyMillis)}ms avg latency</div>
 	{/if}
 	{#if $summary.avgCostDollars}
 		<div>${$summary.avgCostDollars.toFixed(4)} avg cost</div>
