@@ -1,5 +1,3 @@
-import { CodeReference } from '$lib/storage/CodeReference';
-
 function stringToDataUrl(input: string): string {
   // Encode the string as UTF-8
   const utf8Encoder = new TextEncoder();
@@ -12,18 +10,34 @@ function stringToDataUrl(input: string): string {
   return `data:text/javascript;base64,${base64String}`;
 }
 
+interface ErrorResponse {
+  type: 'error';
+  error: string;
+  stack?: string;
+}
+
+interface OkResponse {
+  type: 'ok';
+}
+
+interface ResultResponse {
+  type: 'result';
+  result: unknown;
+}
+
+type Response = ErrorResponse | OkResponse | ResultResponse;
+
 export class CodeSandbox {
-  private static iframe: HTMLIFrameElement | null = null;
-  private static loaded: Promise<void> | null = null;
+  private static loaded: Promise<HTMLIFrameElement> | null = null;
   private static instance = 0;
 
   private static initIframe() {
-    if (this.iframe) return this.loaded;
+    if (this.loaded) return this.loaded;
 
     // Create and configure the iframe
-    this.iframe = document.createElement('iframe');
-    this.iframe.sandbox.add('allow-scripts'); // Allow scripts but restrict other capabilities
-    document.body.appendChild(this.iframe);
+    const iframe = document.createElement('iframe');
+    iframe.sandbox.add('allow-scripts'); // Allow scripts but restrict other capabilities
+    document.body.appendChild(iframe);
 
     // Set up the iframe content
     const iframeContent = `
@@ -69,10 +83,10 @@ export class CodeSandbox {
         `;
 
     // Use srcdoc to set the iframe's content
-    this.iframe.srcdoc = iframeContent;
-    this.loaded = new Promise<void>((resolve) => {
-      this.iframe!.addEventListener('load', () => {
-        resolve();
+    iframe.srcdoc = iframeContent;
+    this.loaded = new Promise<HTMLIFrameElement>((resolve) => {
+      iframe.addEventListener('load', () => {
+        resolve(iframe);
       });
     });
 
@@ -80,7 +94,7 @@ export class CodeSandbox {
   }
 
   static async bind(code: string): Promise<(...args: unknown[]) => Promise<unknown>> {
-    await this.initIframe();
+    const iframe = await this.initIframe();
 
     // Convert the code to a data URL
     const codeDataUrl = stringToDataUrl(code);
@@ -88,7 +102,7 @@ export class CodeSandbox {
     // Set up a message channel for communication with the iframe
     const codePortChannel = new MessageChannel();
     const codePort = codePortChannel.port1;
-    const iframeWindow = this.iframe!.contentWindow!;
+    const iframeWindow = iframe.contentWindow!;
     iframeWindow.postMessage(
       { type: 'bind', code: codeDataUrl, port: codePortChannel.port2 },
       '*',
@@ -98,7 +112,7 @@ export class CodeSandbox {
     const currentInstance = this.instance;
     return new Promise((resolve, reject) => {
       codePort.onmessage = (event) => {
-        const data = event.data;
+        const data = event.data as Response;
         if (data.type === 'ok') {
           // Return the bound function
           const boundFunction = (...args: unknown[]) => {
@@ -106,7 +120,7 @@ export class CodeSandbox {
               const callPortChannel = new MessageChannel();
               const callPort = callPortChannel.port1;
               callPort.onmessage = (event) => {
-                const data = event.data;
+                const data = event.data as Response;
                 if (data.type === 'result') {
                   resolve(data.result);
                 } else if (data.type === 'error') {
@@ -132,11 +146,11 @@ export class CodeSandbox {
     });
   }
 
-  static destroy() {
+  static async destroy() {
     this.instance++;
-    if (this.iframe) {
-      document.body.removeChild(this.iframe);
-      this.iframe = null;
+    if (this.loaded) {
+      const iframe = await this.loaded;
+      document.body.removeChild(iframe);
       this.loaded = null;
     }
   }

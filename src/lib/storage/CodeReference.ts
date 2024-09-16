@@ -7,12 +7,8 @@ import { blobToFileReference } from './dereferenceFilePaths';
 let esbuildReady: Promise<void> | undefined;
 function lazyInitEsbuild() {
   if (!esbuildReady) {
-    esbuildReady = new Promise<void>((resolve) => {
-      esbuild
-        .initialize({
-          wasmURL: new URL('../../../node_modules/esbuild-wasm/esbuild.wasm', import.meta.url).href,
-        })
-        .then(resolve);
+    esbuildReady = esbuild.initialize({
+      wasmURL: new URL('../../../node_modules/esbuild-wasm/esbuild.wasm', import.meta.url).href,
     });
   }
   return esbuildReady;
@@ -28,16 +24,18 @@ export default execute;`;
   return code;
 }
 
+export type Executable = (...args: unknown[]) => Promise<unknown>;
+
 export class CodeReference extends FileReference {
   readonly #storage?: ReadonlyFileStorage;
   #bundle?: string;
-  #execute?: (...args: unknown[]) => Promise<unknown>;
+  #execute?: Executable;
 
   constructor(uri: string, file: File, storage?: ReadonlyFileStorage) {
     super(uri, file, 'code');
     this.#storage = storage;
   }
-  async bind() {
+  async bind(): Promise<Executable> {
     if (!this.#execute) {
       this.#execute = await CodeSandbox.bind(await this.getCode());
     }

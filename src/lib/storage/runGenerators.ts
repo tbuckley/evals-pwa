@@ -22,20 +22,20 @@ function ensureArray<T>(value: T | T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [value];
 }
 
-export async function runGenerators(target: any) {
+export async function runGenerators(target: unknown) {
   const state = { changed: false };
   const result = await runGeneratorsImpl(target, state);
   return { result, changed: state.changed };
 }
 
-export async function runGeneratorsImpl(target: any, state: { changed: boolean }) {
+export async function runGeneratorsImpl(target: unknown, state: { changed: boolean }) {
   if (target == null) return target;
   if (typeof target !== 'object') {
     return target;
   }
   if (Array.isArray(target)) {
     for (let i = 0; i < target.length; i++) {
-      const value = target[i];
+      const value = target[i] as unknown;
       const result = await runGeneratorsImpl(value, state);
       if (isGenerator(value) || hasKey(value, '=gen-tests')) {
         // Flatten generated arrays into arrays.
@@ -46,7 +46,7 @@ export async function runGeneratorsImpl(target: any, state: { changed: boolean }
         target[i] = result;
       }
     }
-    return target;
+    return target as unknown;
   }
   if (isGenerator(target)) {
     state.changed = true;
@@ -69,6 +69,7 @@ export async function runGeneratorsImpl(target: any, state: { changed: boolean }
       for (const props of Array.isArray(target[key]) ? target[key] : [target[key]]) {
         Object.assign(target, props);
       }
+      // // eslint-disable-next-line no-dynamic-delete
       delete target[key];
     }
   }

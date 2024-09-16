@@ -31,7 +31,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
     }
 
     let text;
-    let raw;
+    let raw: unknown;
     try {
       text = await file.text();
       raw = yaml.parse(text);
@@ -75,7 +75,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
         }
       } while (changed);
     } finally {
-      CodeSandbox.destroy();
+      await CodeSandbox.destroy();
     }
 
     const parsed = fsConfigSchema.safeParse(result);

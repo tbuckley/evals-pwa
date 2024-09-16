@@ -1,4 +1,4 @@
-import { CodeReference, toCodeReference } from '$lib/storage/CodeReference';
+import { CodeReference, toCodeReference, type Executable } from '$lib/storage/CodeReference';
 import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 import {
   assertionResultSchema,
@@ -25,7 +25,7 @@ export function createJavascriptAssertion(
     throw new Error('Invalid javascript arguments');
   }
 
-  let execute: (...args: unknown[]) => Promise<unknown>;
+  let execute: Executable | undefined;
   return {
     async run(output: string): Promise<AssertionResult> {
       try {

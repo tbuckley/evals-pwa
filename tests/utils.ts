@@ -23,7 +23,7 @@ export class FileSystem {
   async clear() {
     return this.page.evaluate(async () => {
       const directory = await navigator.storage.getDirectory();
-      await (directory as unknown as { remove: (arg: unknown) => void }).remove({
+      (directory as unknown as { remove: (arg: unknown) => void }).remove({
         recursive: true,
       });
     });
