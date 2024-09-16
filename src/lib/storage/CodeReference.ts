@@ -79,10 +79,9 @@ export class CodeReference extends FileReference {
 			}
 			return (this.#bundle = result.outputFiles![0].text);
 		} else {
-			this.#bundle = `${await this.file.text()}
+			return (this.#bundle = `${await this.file.text()}
 
-export {execute};`;
+export {execute};`);
 		}
-		return await this.file.text();
 	}
 }

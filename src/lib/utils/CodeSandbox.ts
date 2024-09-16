@@ -124,7 +124,7 @@ export class CodeSandbox {
 					};
 					resolve(boundFunction);
 				} else if (data.type === 'error') {
-					const error = new Error(data.error);
+					const error = new Error(data.error + code);
 					error.stack = data.stack;
 					reject(error);
 				}
