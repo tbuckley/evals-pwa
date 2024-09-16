@@ -1,35 +1,35 @@
 <script lang="ts">
-	import Combobox from '$lib/components/Combobox.svelte';
-	import RunResultsTable from '$lib/components/run-results/run-results-table.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import { chooseFolder, runTests } from '$lib/state/actions';
-	import {
-		abortRunStore,
-		runTitleListStore,
-		selectedRunStore,
-		selectedRunTitle
-	} from '$lib/state/derived';
-	import { configStore, selectedRunIdStore } from '$lib/state/stores';
-	import { resultDialogStore } from '$lib/state/ui';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import CancelIcon from 'lucide-svelte/icons/ban';
+  import Combobox from '$lib/components/Combobox.svelte';
+  import RunResultsTable from '$lib/components/run-results/run-results-table.svelte';
+  import Button from '$lib/components/ui/button/button.svelte';
+  import { chooseFolder, runTests } from '$lib/state/actions';
+  import {
+    abortRunStore,
+    runTitleListStore,
+    selectedRunStore,
+    selectedRunTitle,
+  } from '$lib/state/derived';
+  import { configStore, selectedRunIdStore } from '$lib/state/stores';
+  import { resultDialogStore } from '$lib/state/ui';
+  import * as Dialog from '$lib/components/ui/dialog';
+  import CancelIcon from 'lucide-svelte/icons/ban';
 </script>
 
 <article class="prose">
-	{#if $configStore === null}
-		<h1>Welcome to Evals!</h1>
-		<p>
-			You can evaluate popular LLM models using your own prompts and test cases, all from within
-			your browser. Apart from requests directly to the LLM providers (like OpenAI or Google), no
-			data ever leaves your device. Your configuration is stored on your file system, and API keys
-			are saved to your browser's local storage.
-		</p>
-		<h2>Getting started</h2>
-		<p>
-			To get started, <a href="##" on:click|preventDefault={chooseFolder}>choose a folder</a>
-			containing a <code>config.yaml</code> file that looks like this:
-		</p>
-		<pre>
+  {#if $configStore === null}
+    <h1>Welcome to Evals!</h1>
+    <p>
+      You can evaluate popular LLM models using your own prompts and test cases, all from within
+      your browser. Apart from requests directly to the LLM providers (like OpenAI or Google), no
+      data ever leaves your device. Your configuration is stored on your file system, and API keys
+      are saved to your browser's local storage.
+    </p>
+    <h2>Getting started</h2>
+    <p>
+      To get started, <a href="##" on:click|preventDefault={chooseFolder}>choose a folder</a>
+      containing a <code>config.yaml</code> file that looks like this:
+    </p>
+    <pre>
 # An optional short description to help identify outputs
 description: My first eval
 
@@ -54,73 +54,73 @@ tests:
 				vars:
 					needle: washington
 </pre>
-		<p>
-			For more details, check out the <a href="/documentation">documentation</a>.
-		</p>
-	{:else}
-		<Button on:click={runTests}>Run tests</Button>
-		{#if $abortRunStore !== null}
-			<Button variant="secondary" on:click={$abortRunStore}>Cancel run</Button>
-		{/if}
-	{/if}
+    <p>
+      For more details, check out the <a href="/documentation">documentation</a>.
+    </p>
+  {:else}
+    <Button on:click={runTests}>Run tests</Button>
+    {#if $abortRunStore !== null}
+      <Button variant="secondary" on:click={$abortRunStore}>Cancel run</Button>
+    {/if}
+  {/if}
 </article>
 
 {#if $runTitleListStore.length > 0}
-	<div>
-		<Combobox
-			items={$runTitleListStore.map((run) => ({
-				value: run.id,
-				label: run.title
-			}))}
-			value={$selectedRunIdStore || ''}
-			on:select={(e) => selectedRunIdStore.set(e.detail)}
-		></Combobox>
+  <div>
+    <Combobox
+      items={$runTitleListStore.map((run) => ({
+        value: run.id,
+        label: run.title,
+      }))}
+      value={$selectedRunIdStore || ''}
+      on:select={(e) => selectedRunIdStore.set(e.detail)}
+    ></Combobox>
 
-		{#if $selectedRunStore !== null}
-			<h2 class="mb-4 mt-8 flex items-center gap-2 text-xl font-bold">
-				<div>{$selectedRunTitle}</div>
-				{#if $selectedRunStore.canceled}
-					<div
-						class="inline-flex items-center gap-1 rounded-md border border-red-500 bg-red-50 px-1 text-red-500"
-					>
-						<CancelIcon class="inline-block h-5 w-5"></CancelIcon>
-						Canceled
-					</div>
-				{/if}
-			</h2>
+    {#if $selectedRunStore !== null}
+      <h2 class="mb-4 mt-8 flex items-center gap-2 text-xl font-bold">
+        <div>{$selectedRunTitle}</div>
+        {#if $selectedRunStore.canceled}
+          <div
+            class="inline-flex items-center gap-1 rounded-md border border-red-500 bg-red-50 px-1 text-red-500"
+          >
+            <CancelIcon class="inline-block h-5 w-5"></CancelIcon>
+            Canceled
+          </div>
+        {/if}
+      </h2>
 
-			<!-- Use a keyed block so we don't try to reuse a table that was created with a different layout -->
-			{#key $selectedRunStore.id}
-				<RunResultsTable run={$selectedRunStore} />
-			{/key}
-		{/if}
-	</div>
+      <!-- Use a keyed block so we don't try to reuse a table that was created with a different layout -->
+      {#key $selectedRunStore.id}
+        <RunResultsTable run={$selectedRunStore} />
+      {/key}
+    {/if}
+  </div>
 {/if}
 
 <!-- Keep the global dialog component -->
 <Dialog.Root
-	open={$resultDialogStore.result !== null}
-	onOpenChange={(open) =>
-		resultDialogStore.update((state) => ({ ...state, result: open ? state.result : null }))}
+  open={$resultDialogStore.result !== null}
+  onOpenChange={(open) =>
+    resultDialogStore.update((state) => ({ ...state, result: open ? state.result : null }))}
 >
-	<Dialog.Content>
-		<Dialog.Header>
-			<Dialog.Title>{$resultDialogStore.title}</Dialog.Title>
-			<Dialog.Description>View the raw prompt and output for a test result.</Dialog.Description>
-		</Dialog.Header>
-		<div class="max-h-[50vh] overflow-y-scroll">
-			<h3 class="my-2 font-bold">Prompt</h3>
-			<pre class="whitespace-pre-wrap rounded-md bg-gray-100 p-2">{JSON.stringify(
-					$resultDialogStore.result?.rawPrompt,
-					null,
-					2
-				)}</pre>
-			<h3 class="my-2 font-bold">Output</h3>
-			<pre class="whitespace-pre-wrap rounded-md bg-gray-100 p-2">{JSON.stringify(
-					$resultDialogStore.result?.rawOutput,
-					null,
-					2
-				)}</pre>
-		</div>
-	</Dialog.Content>
+  <Dialog.Content>
+    <Dialog.Header>
+      <Dialog.Title>{$resultDialogStore.title}</Dialog.Title>
+      <Dialog.Description>View the raw prompt and output for a test result.</Dialog.Description>
+    </Dialog.Header>
+    <div class="max-h-[50vh] overflow-y-scroll">
+      <h3 class="my-2 font-bold">Prompt</h3>
+      <pre class="whitespace-pre-wrap rounded-md bg-gray-100 p-2">{JSON.stringify(
+          $resultDialogStore.result?.rawPrompt,
+          null,
+          2,
+        )}</pre>
+      <h3 class="my-2 font-bold">Output</h3>
+      <pre class="whitespace-pre-wrap rounded-md bg-gray-100 p-2">{JSON.stringify(
+          $resultDialogStore.result?.rawOutput,
+          null,
+          2,
+        )}</pre>
+    </div>
+  </Dialog.Content>
 </Dialog.Root>

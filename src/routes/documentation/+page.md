@@ -44,8 +44,8 @@ Format:
 
 ```typescript
 interface Config {
-	providers: Provider[];
-	// ...
+  providers: Provider[];
+  // ...
 }
 type Provider = string | { id: string; prompts?: Prompt[] };
 ```
@@ -96,8 +96,8 @@ Format:
 ```typescript
 type Prompt = string;
 interface Config {
-	prompts: Prompt[];
-	// ...
+  prompts: Prompt[];
+  // ...
 }
 ```
 
@@ -124,19 +124,19 @@ Format:
 
 ```typescript
 interface Config {
-	tests: Array<TestCase>[];
-	defaultTest?: Partial<TestCase>;
-	// ...
+  tests: Array<TestCase>[];
+  defaultTest?: Partial<TestCase>;
+  // ...
 }
 interface TestCase {
-	description?: string;
-	vars?: Record<string, unknown>;
-	asserts?: Assertion[];
+  description?: string;
+  vars?: Record<string, unknown>;
+  asserts?: Assertion[];
 }
 interface Assertion {
-	type: string;
-	description?: string;
-	vars?: Record<string, unknown>;
+  type: string;
+  description?: string;
+  vars?: Record<string, unknown>;
 }
 ```
 
@@ -180,9 +180,9 @@ For `javascript` assertions, your code must provide a function `execute(output: 
 
 ```typescript
 interface AssertionResult {
-	pass: boolean;
-	message?: string;
-	visuals?: (string | Blob)[];
+  pass: boolean;
+  message?: string;
+  visuals?: (string | Blob)[];
 }
 ```
 
@@ -212,40 +212,40 @@ The run tables offer features such as:
 
 ```typescript
 interface Run {
-	version: 1;
-	id: string;
-	timestamp: number;
-	description?: string;
-	envs: {
-		provider: Provider;
-		prompt: Prompt;
-	}[];
-	tests: TestCase[];
-	results: TestResult[][]; // tests x envs
+  version: 1;
+  id: string;
+  timestamp: number;
+  description?: string;
+  envs: {
+    provider: Provider;
+    prompt: Prompt;
+  }[];
+  tests: TestCase[];
+  results: TestResult[][]; // tests x envs
 }
 interface TestResult {
-	rawPrompt: unknown;
-	pass: boolean;
-	assertionResults: AssertionResult[];
+  rawPrompt: unknown;
+  pass: boolean;
+  assertionResults: AssertionResult[];
 
-	// On success
-	rawOutput?: unknown;
-	output?: string;
-	latencyMillis?: number;
-	tokenUsage?: {
-		inputTokens?: number;
-		outputTokens?: number;
-		totalTokens?: number;
-		costDollars?: number;
-	};
+  // On success
+  rawOutput?: unknown;
+  output?: string;
+  latencyMillis?: number;
+  tokenUsage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    costDollars?: number;
+  };
 
-	// On error
-	error?: string;
+  // On error
+  error?: string;
 }
 interface AssertionResult {
-	pass: boolean;
-	message?: string;
-	visuals?: string[];
+  pass: boolean;
+  message?: string;
+  visuals?: string[];
 }
 ```
 

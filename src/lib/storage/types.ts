@@ -7,38 +7,38 @@ export const fsVarSchema = z.any();
 export const fsVarSetSchema = z.record(z.string(), fsVarSchema);
 
 export const fsAssertionSchema = z.object({
-	// Required
-	type: z.string(),
+  // Required
+  type: z.string(),
 
-	// Optional
-	description: z.string().optional(),
-	vars: z.record(z.string(), z.unknown()).optional()
+  // Optional
+  description: z.string().optional(),
+  vars: z.record(z.string(), z.unknown()).optional(),
 });
 export type FsAssertion = z.infer<typeof fsAssertionSchema>;
 
 export const fsExpandedProviderSchema = z.object({
-	id: z.string(),
-	config: z.object({}).passthrough().optional(),
-	prompts: z.array(z.string()).optional()
+  id: z.string(),
+  config: z.object({}).passthrough().optional(),
+  prompts: z.array(z.string()).optional(),
 });
 export const fsProviderSchema = z.union([z.string(), fsExpandedProviderSchema]);
 
 export const fsPromptSchema = z.string();
 
 export const fsTestCaseSchema = z.object({
-	// Optional
-	vars: fsVarSetSchema.optional(),
-	description: z.string().optional(),
-	assert: z.array(fsAssertionSchema).optional()
+  // Optional
+  vars: fsVarSetSchema.optional(),
+  description: z.string().optional(),
+  assert: z.array(fsAssertionSchema).optional(),
 });
 export type FsTestCase = z.infer<typeof fsTestCaseSchema>;
 
 export const fsConfigSchema = z.object({
-	description: z.string().optional(),
+  description: z.string().optional(),
 
-	providers: z.array(fsProviderSchema).optional(),
-	prompts: z.array(fsPromptSchema).optional(),
-	tests: z.array(fsTestCaseSchema).optional(),
-	defaultTest: fsTestCaseSchema.optional()
+  providers: z.array(fsProviderSchema).optional(),
+  prompts: z.array(fsPromptSchema).optional(),
+  tests: z.array(fsTestCaseSchema).optional(),
+  defaultTest: fsTestCaseSchema.optional(),
 });
 export type FsConfig = z.infer<typeof fsConfigSchema>;
