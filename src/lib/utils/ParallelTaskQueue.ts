@@ -4,7 +4,7 @@ export type TaskFn = (opts: { abortSignal: AbortSignal }) => Promise<void>;
 
 export class ParallelTaskQueue implements TaskQueue {
   private maxParallel: number;
-  private queue: Array<TaskFn>;
+  private queue: TaskFn[];
   private running: number;
 
   private completedPromise: Promise<void>;

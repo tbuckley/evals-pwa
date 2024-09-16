@@ -41,7 +41,7 @@ export class SimpleEnvironment implements TestEnvironment {
     try {
       const generator = this.model.run(prompt, context);
       let next;
-      while (!next || !next.done) {
+      while (!next?.done) {
         next = await generator.next();
         if (!next.done) {
           yield next.value;

@@ -140,7 +140,7 @@ export interface FileStorage extends ReadonlyFileStorage {
 }
 
 export type PromptPart = { text: string } | { file: File };
-export type MultiPartPrompt = Array<PromptPart>;
+export type MultiPartPrompt = PromptPart[];
 
 export interface RunContext {
   abortSignal: AbortSignal;

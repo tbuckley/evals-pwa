@@ -15,7 +15,7 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
     const errorFiles: Record<string, FileReference> = {};
     const placeholderVars = await asyncObjectDfsMap(vars, async (val, path) => {
       if (val instanceof FileReference) {
-        if (mimeTypes && mimeTypes.some((pattern) => matchesMimeType(pattern, val.file.type))) {
+        if (mimeTypes?.some((pattern) => matchesMimeType(pattern, val.file.type))) {
           // Replace files with placeholders, which will be split out at the end
           files[path] = val;
           return `__FILE_PLACEHOLDER_${path}__`;

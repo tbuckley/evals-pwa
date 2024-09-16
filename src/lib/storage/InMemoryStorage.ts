@@ -3,7 +3,7 @@ import { fileUriToPath, getFilename, pathToFileUri } from '$lib/utils/path';
 import picomatch from 'picomatch';
 
 export class InMemoryStorage implements FileStorage {
-  private files: Map<string, File> = new Map();
+  private files = new Map<string, File>();
   constructor() {}
 
   getName(): string {

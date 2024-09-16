@@ -262,7 +262,7 @@ export async function runTests() {
   };
   liveRunStore.update((state) => ({
     ...state,
-    [run.id]: { run, abort: () => runner.abort() },
+    [run.id]: { run, abort: () => { runner.abort(); } },
   }));
   selectedRunIdStore.set(run.id);
 
@@ -296,7 +296,7 @@ export async function runTests() {
   }
 }
 
-type RunEnv = { provider: NormalizedProvider; prompt: Prompt };
+interface RunEnv { provider: NormalizedProvider; prompt: Prompt }
 function getRunEnvs(providers: NormalizedProvider[], prompts: Prompt[]): RunEnv[] {
   const envs: RunEnv[] = [];
   for (const provider of providers) {
@@ -342,7 +342,7 @@ async function runTest(
   // TODO should this be safeRun if it will catch all errors?
   const generator = env.run(test.vars, context);
   let next;
-  while (!next || !next.done) {
+  while (!next?.done) {
     next = await generator.next();
     if (!next.done) {
       const newText = next.value;
@@ -405,12 +405,12 @@ function deepEquals(a: unknown, b: unknown): boolean {
   if (typeof a !== 'object' || a === null) return false;
 
   const keysA = Object.keys(a);
-  const keysB = Object.keys(b as { [key: string]: unknown });
+  const keysB = Object.keys(b as Record<string, unknown>);
   if (keysA.length !== keysB.length) return false;
   for (const key of keysA) {
     if (!keysB.includes(key)) return false;
     if (
-      !deepEquals((a as { [key: string]: unknown })[key], (b as { [key: string]: unknown })[key])
+      !deepEquals((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
     ) {
       return false;
     }

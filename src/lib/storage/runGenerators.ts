@@ -52,7 +52,7 @@ export async function runGeneratorsImpl(target: any, state: { changed: boolean }
     state.changed = true;
     const code = await toCodeReference(target['=gen']);
     const execute = await code.bind();
-    const args = ensureArray(target['args']);
+    const args = ensureArray(target.args);
     return await execute(...args);
   }
 

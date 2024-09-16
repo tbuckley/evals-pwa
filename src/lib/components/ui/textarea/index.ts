@@ -4,9 +4,9 @@ type FormTextareaEvent<T extends Event = Event> = T & {
   currentTarget: EventTarget & HTMLTextAreaElement;
 };
 
-type TextareaEvents = {
+interface TextareaEvents {
   blur: FormTextareaEvent<FocusEvent>;
-  change: FormTextareaEvent<Event>;
+  change: FormTextareaEvent;
   click: FormTextareaEvent<MouseEvent>;
   focus: FormTextareaEvent<FocusEvent>;
   keydown: FormTextareaEvent<KeyboardEvent>;
@@ -17,7 +17,7 @@ type TextareaEvents = {
   mouseleave: FormTextareaEvent<MouseEvent>;
   paste: FormTextareaEvent<ClipboardEvent>;
   input: FormTextareaEvent<InputEvent>;
-};
+}
 
 export {
   Root,

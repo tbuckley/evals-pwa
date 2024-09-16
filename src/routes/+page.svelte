@@ -73,7 +73,7 @@ tests:
         label: run.title,
       }))}
       value={$selectedRunIdStore || ''}
-      on:select={(e) => selectedRunIdStore.set(e.detail)}
+      on:select={(e) => { selectedRunIdStore.set(e.detail); }}
     ></Combobox>
 
     {#if $selectedRunStore !== null}
@@ -101,7 +101,7 @@ tests:
 <Dialog.Root
   open={$resultDialogStore.result !== null}
   onOpenChange={(open) =>
-    resultDialogStore.update((state) => ({ ...state, result: open ? state.result : null }))}
+    { resultDialogStore.update((state) => ({ ...state, result: open ? state.result : null })); }}
 >
   <Dialog.Content>
     <Dialog.Header>
