@@ -39,10 +39,7 @@ export class CodeReference extends FileReference {
 						return { path, namespace: 'virtual' };
 					});
 					build.onLoad({ filter: /.*/, namespace: 'virtual' }, async (args) => {
-						const file = await storage.load(args.path);
-						if (Array.isArray(file)) {
-							throw new Error('cant load a glob');
-						}
+						const file = await storage.loadFile(args.path);
 						const contents = await file.text();
 						return {
 							contents,

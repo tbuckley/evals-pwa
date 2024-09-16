@@ -29,10 +29,10 @@ export function createJavascriptAssertion(
 	let execute: (...args: unknown[]) => Promise<unknown>;
 	return {
 		async run(output: string): Promise<AssertionResult> {
-			if (!execute) {
-				execute = await CodeSandbox.bind(parsedArgs.data.code);
-			}
 			try {
+				if (!execute) {
+					execute = await CodeSandbox.bind(parsedArgs.data.code);
+				}
 				const res = await execute(output, { vars: testVars });
 				const parsed = jsResultSchema.parse(res);
 				const visuals: AssertionResult['visuals'] = parsed.visuals

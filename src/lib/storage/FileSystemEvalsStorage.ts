@@ -65,9 +65,14 @@ export class FileSystemEvalsStorage implements StorageProvider {
 					}
 					throw err;
 				}
-				const genResult = await runGenerators(result);
-				result = genResult.result;
-				changed ||= genResult.changed;
+				try {
+					const genResult = await runGenerators(result);
+					result = genResult.result;
+					changed ||= genResult.changed;
+				} catch (err) {
+					const message = 'message' in (err as Error) ? (err as Error).message : String(err);
+					throw new UiError({ type: 'invalid-config', errors: [`Error in generator: ${message}`] });
+				}
 			} while (changed);
 		} finally {
 			CodeSandbox.destroy();
