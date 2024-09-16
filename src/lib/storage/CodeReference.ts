@@ -1,6 +1,8 @@
 import * as esbuild from 'esbuild-wasm';
-import type { FileStorage } from './dereferenceFilePaths';
 import { FileReference } from './FileReference';
+import type { ReadonlyFileStorage } from '$lib/types';
+import { CodeSandbox } from '$lib/utils/CodeSandbox';
+import { blobToFileReference } from './dereferenceFilePaths';
 
 let esbuildReady: Promise<void> | undefined;
 function lazyInitEsbuild() {
@@ -16,13 +18,33 @@ function lazyInitEsbuild() {
 	return esbuildReady;
 }
 
+export async function toCodeReference(code: string | CodeReference): Promise<CodeReference> {
+	if (typeof code === 'string') {
+		code = `${code}
+export default execute;`;
+		const file = await blobToFileReference(new Blob([code], { type: 'application/javascript' }));
+		return new CodeReference(file.uri, file.file);
+	}
+	return code;
+}
+
 export class CodeReference extends FileReference {
-	readonly #storage: FileStorage;
-	constructor(uri: string, file: File, storage: FileStorage) {
+	readonly #storage?: ReadonlyFileStorage;
+	#bundle?: string;
+	#execute?: (...args: unknown[]) => Promise<unknown>;
+
+	constructor(uri: string, file: File, storage?: ReadonlyFileStorage) {
 		super(uri, file, 'code');
 		this.#storage = storage;
 	}
+	async bind() {
+		if (!this.#execute) {
+			this.#execute = await CodeSandbox.bind(await this.getCode());
+		}
+		return this.#execute;
+	}
 	async getCode() {
+		if (this.#bundle) return this.#bundle;
 		if (this.file.name.endsWith('.ts')) {
 			await lazyInitEsbuild();
 			const storage = this.#storage;
@@ -36,10 +58,7 @@ export class CodeReference extends FileReference {
 						return { path, namespace: 'virtual' };
 					});
 					build.onLoad({ filter: /.*/, namespace: 'virtual' }, async (args) => {
-						const file = await storage.load(args.path);
-						if (Array.isArray(file)) {
-							throw new Error('cant load a glob');
-						}
+						const file = await storage!.loadFile(args.path);
 						const contents = await file.text();
 						return {
 							contents,
@@ -58,7 +77,11 @@ export class CodeReference extends FileReference {
 			if (result.errors.length) {
 				throw new Error(result.errors.map((value) => value.text).join('\n'));
 			}
-			return result.outputFiles![0].text;
+			return (this.#bundle = result.outputFiles![0].text);
+		} else {
+			this.#bundle = `${await this.file.text()}
+
+export {execute};`;
 		}
 		return await this.file.text();
 	}

@@ -13,11 +13,13 @@ import { MissingFileError, type ReadonlyFileStorage } from '$lib/types';
 
 export interface DereferenceOptions {
 	storage: ReadonlyFileStorage;
+	cache?: Cache;
 	absolutePath?: string;
 	visited?: Set<string>;
 	markGlobs?: boolean;
 	ignoreMissing?: boolean;
 }
+export type Cache = Map<string, WeakRef<FileReference>>;
 
 const GLOB_TYPE = Symbol('GLOB_TYPE');
 
@@ -155,9 +157,16 @@ async function handleFile(
 	} else if (file.name.endsWith('.txt')) {
 		return await file.text();
 	} else if (file.name.endsWith('.js') || file.name.endsWith('.ts')) {
-		return new CodeReference(absoluteFileUri, file, options.storage);
+		const ref =
+			options.cache?.get(absoluteFileUri)?.deref() ??
+			new CodeReference(absoluteFileUri, file, options.storage);
+		options.cache?.set(absoluteFileUri, new WeakRef(ref));
+		return ref;
 	} else {
-		return new FileReference(absoluteFileUri, file);
+		const ref =
+			options.cache?.get(absoluteFileUri)?.deref() ?? new FileReference(absoluteFileUri, file);
+		options.cache?.set(absoluteFileUri, new WeakRef(ref));
+		return ref;
 	}
 }
 
