@@ -9,7 +9,7 @@ export function fileToBase64(file: File): Promise<string> {
       }
     };
     reader.onerror = () => {
-      reject(reader.error);
+      reject(new Error(reader.error?.message ?? 'Unknown error'));
     };
     reader.readAsDataURL(file);
   });

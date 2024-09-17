@@ -17,7 +17,7 @@ test.describe('Configuration editor', () => {
       .locator('textarea')
       .fill('providers:\n  - reverser:whatever\n\nprompts:\n  - Write a poem about AI evals');
 
-    const useConfigBtn = await page.getByText('Use config');
+    const useConfigBtn = page.getByText('Use config');
     await expect(useConfigBtn).not.toBeDisabled();
     await useConfigBtn.click();
 
@@ -28,7 +28,7 @@ test.describe('Configuration editor', () => {
     await page.getByText('Dashboard').click();
     await page.waitForLoadState('networkidle');
 
-    const runTestsBtn = await page.getByText('Run tests');
+    const runTestsBtn = page.getByText('Run tests');
     await expect(runTestsBtn).toHaveCount(1);
   });
 });

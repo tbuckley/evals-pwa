@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { LiveResult, TestResult } from '$lib/types';
+  import type { LiveResult } from '$lib/types';
   import type { Readable } from 'svelte/store';
   import { resultDialogStore } from '$lib/state/ui';
   import Button from '../ui/button/button.svelte';
