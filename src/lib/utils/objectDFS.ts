@@ -4,7 +4,7 @@ export function objectDfsMap(
   path = '$',
 ): unknown {
   if (Array.isArray(val)) {
-    return val.map((v, i) => objectDfsMap(v, map, path + '[' + i + ']'));
+    return val.map((v, i) => objectDfsMap(v, map, `${path}[${i}]`));
   }
   if (typeof val === 'object' && val !== null && Object.getPrototypeOf(val) === Object.prototype) {
     const obj: Record<string, unknown> = {};
@@ -22,7 +22,7 @@ export async function asyncObjectDfsMap(
   path = '$',
 ): Promise<unknown> {
   if (Array.isArray(val)) {
-    return await Promise.all(val.map((v, i) => asyncObjectDfsMap(v, map, path + '[' + i + ']')));
+    return await Promise.all(val.map((v, i) => asyncObjectDfsMap(v, map, `${path}[${i}]`)));
   }
   if (typeof val === 'object' && val !== null && Object.getPrototypeOf(val) === Object.prototype) {
     const obj: Record<string, unknown> = {};

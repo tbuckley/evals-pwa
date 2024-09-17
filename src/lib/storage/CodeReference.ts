@@ -26,14 +26,30 @@ export default execute;`;
 
 export type Executable = (...args: unknown[]) => Promise<unknown>;
 
+type Bundle = { result?: string } & (
+  | { readonly mode: 'ts'; readonly storage: ReadonlyFileStorage }
+  | { readonly mode: 'js' }
+);
+
 export class CodeReference extends FileReference {
-  readonly #storage?: ReadonlyFileStorage;
-  #bundle?: string;
+  readonly #bundle: Bundle;
   #execute?: Executable;
 
   constructor(uri: string, file: File, storage?: ReadonlyFileStorage) {
     super(uri, file, 'code');
-    this.#storage = storage;
+    if (file.name.endsWith('.ts')) {
+      if (!storage) {
+        throw new Error('storage required for ts');
+      }
+      this.#bundle = {
+        mode: 'ts',
+        storage,
+      };
+    } else {
+      this.#bundle = {
+        mode: 'js',
+      };
+    }
   }
   async bind(): Promise<Executable> {
     if (!this.#execute) {
@@ -42,10 +58,10 @@ export class CodeReference extends FileReference {
     return this.#execute;
   }
   async getCode() {
-    if (this.#bundle) return this.#bundle;
-    if (this.file.name.endsWith('.ts')) {
+    if (this.#bundle.result) return this.#bundle.result;
+    if (this.#bundle.mode === 'ts') {
       await lazyInitEsbuild();
-      const storage = this.#storage;
+      const storage = this.#bundle.storage;
       const loader: esbuild.Plugin = {
         name: 'file loader',
         setup(build) {
@@ -56,7 +72,7 @@ export class CodeReference extends FileReference {
             return { path, namespace: 'virtual' };
           });
           build.onLoad({ filter: /.*/, namespace: 'virtual' }, async (args) => {
-            const file = await storage!.loadFile(args.path);
+            const file = await storage.loadFile(args.path);
             const contents = await file.text();
             return {
               contents,
@@ -75,9 +91,12 @@ export class CodeReference extends FileReference {
       if (result.errors.length) {
         throw new Error(result.errors.map((value) => value.text).join('\n'));
       }
-      return (this.#bundle = result.outputFiles![0].text);
+      if (!result.outputFiles) {
+        throw new Error("esbuild didn't produce output");
+      }
+      return (this.#bundle.result = result.outputFiles[0].text);
     } else {
-      return (this.#bundle = `${await this.file.text()}
+      return (this.#bundle.result = `${await this.file.text()}
 
 export {execute};`);
     }

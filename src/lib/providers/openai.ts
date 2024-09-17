@@ -80,7 +80,7 @@ export class OpenaiProvider implements ModelProvider {
       },
       body: JSON.stringify({
         model: this.model,
-        ...(this.request ?? {}),
+        ...this.request,
         stream: true,
         stream_options: {
           include_usage: true,
@@ -107,7 +107,7 @@ export class OpenaiProvider implements ModelProvider {
       // Buffer them so that we can pull them apart correctly.
       buffer += chunk;
       const parts = buffer.split('\n');
-      buffer = parts.pop()!;
+      buffer = parts.pop() ?? '';
       for (const part of parts) {
         if (part.startsWith('data: ')) {
           const value = part.substring(6);
