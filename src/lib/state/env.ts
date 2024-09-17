@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 
-const defaultEnv = localStorage.getItem('env') || '';
+const defaultEnv = localStorage.getItem('env') ?? '';
 export const envStore = writable<string>(defaultEnv);
 
 // Store in localStorage

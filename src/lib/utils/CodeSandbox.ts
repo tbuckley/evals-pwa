@@ -1,3 +1,5 @@
+import { cast } from './asserts';
+
 function stringToDataUrl(input: string): string {
   // Encode the string as UTF-8
   const utf8Encoder = new TextEncoder();
@@ -101,7 +103,7 @@ export async function bind(code: string): Promise<(...args: unknown[]) => Promis
   // Set up a message channel for communication with the iframe
   const codePortChannel = new MessageChannel();
   const codePort = codePortChannel.port1;
-  const iframeWindow = iframe.contentWindow!;
+  const iframeWindow = cast(iframe.contentWindow);
   iframeWindow.postMessage({ type: 'bind', code: codeDataUrl, port: codePortChannel.port2 }, '*', [
     codePortChannel.port2,
   ]);

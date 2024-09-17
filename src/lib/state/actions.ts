@@ -27,6 +27,7 @@ import { summarizeResults } from '$lib/utils/summarizeResults';
 import * as idb from 'idb-keyval';
 import { InMemoryStorage } from '$lib/storage/InMemoryStorage';
 import * as CodeSandbox from '$lib/utils/CodeSandbox';
+import { cast } from '$lib/utils/asserts';
 
 const folder = await idb.get<FileSystemDirectoryHandle>('folder');
 if (folder) {
@@ -161,10 +162,9 @@ export async function loadStateFromStorage(): Promise<void> {
 }
 
 export async function showPrompt(prompt: Omit<AlertState, 'callback'>): Promise<boolean> {
-  let resolve: (value: boolean) => void;
-  const result = new Promise<boolean>((r) => (resolve = r));
-  alertStore.set({ ...prompt, callback: resolve! });
-  return result;
+  return new Promise<boolean>((resolve) => {
+    alertStore.set({ ...prompt, callback: resolve });
+  });
 }
 
 export async function runTests() {
@@ -232,7 +232,7 @@ export async function runTests() {
       results.push(testResults);
     }
   } finally {
-    CodeSandbox.destroy();
+    await CodeSandbox.destroy();
   }
 
   // Create summaries derived from the testResults
