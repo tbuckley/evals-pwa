@@ -13,6 +13,13 @@
   import { resultDialogStore } from '$lib/state/ui';
   import * as Dialog from '$lib/components/ui/dialog';
   import CancelIcon from 'lucide-svelte/icons/ban';
+
+  function setSelectedRunId(id: unknown) {
+    if (id !== null || typeof id !== 'string') {
+      throw new Error('Invalid id for selectedRunIdStore');
+    }
+    selectedRunIdStore.set(id as string | null);
+  }
 </script>
 
 <article class="prose">
@@ -72,8 +79,10 @@ tests:
         value: run.id,
         label: run.title,
       }))}
-      value={$selectedRunIdStore || ''}
-      on:select={(e) => { selectedRunIdStore.set(e.detail); }}
+      value={$selectedRunIdStore ?? ''}
+      on:select={(e) => {
+        setSelectedRunId(e.detail);
+      }}
     ></Combobox>
 
     {#if $selectedRunStore !== null}
@@ -100,8 +109,9 @@ tests:
 <!-- Keep the global dialog component -->
 <Dialog.Root
   open={$resultDialogStore.result !== null}
-  onOpenChange={(open) =>
-    { resultDialogStore.update((state) => ({ ...state, result: open ? state.result : null })); }}
+  onOpenChange={(open) => {
+    resultDialogStore.update((state) => ({ ...state, result: open ? state.result : null }));
+  }}
 >
   <Dialog.Content>
     <Dialog.Header>

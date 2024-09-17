@@ -33,6 +33,10 @@
       alertStore.set(null);
     }
   }
+
+  function handleSettingsOpenChange(e: CustomEvent<boolean>) {
+    settingsOpen = e.detail;
+  }
 </script>
 
 <!-- <main>
@@ -50,7 +54,7 @@
       </div>
       <div class="flex-1">
         <nav class="grid items-start px-2 text-sm font-medium">
-          {#each links as { name, href, icon }, i}
+          {#each links as { name, href, icon }}
             <a
               {href}
               class={cn(
@@ -83,7 +87,7 @@
               <FlaskConical class="h-6 w-6" />
               <span class="sr-only">Evals</span>
             </a>
-            {#each links as { name, href, icon }, i}
+            {#each links as { name, href, icon }}
               <Sheet.Close asChild let:builder>
                 <a
                   use:builder.action
@@ -156,5 +160,5 @@
 <SettingsDialog
   open={settingsOpen || !$validEnvStore}
   canClose={$validEnvStore}
-  on:open-change={(e) => (settingsOpen = e.detail)}
+  on:open-change={handleSettingsOpenChange}
 ></SettingsDialog>
