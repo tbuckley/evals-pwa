@@ -63,14 +63,16 @@ export async function runGeneratorsImpl(target: unknown, state: { changed: boole
   }
 
   for (const [key, value] of Object.entries(target)) {
-    target[key] = await runGeneratorsImpl(value, state);
+    const result = await runGeneratorsImpl(value, state);
+    Object.assign(target, { [key]: result });
     // Spread operator spreads objects or arrays of objects into the target.
     if (key === '...') {
-      for (const props of Array.isArray(target[key]) ? target[key] : [target[key]]) {
+      for (const props of Array.isArray(result) ? result : [result]) {
         Object.assign(target, props);
       }
-      // // eslint-disable-next-line no-dynamic-delete
-      delete target[key];
+      if ('...' in target) {
+        delete target['...'];
+      }
     }
   }
   return target;

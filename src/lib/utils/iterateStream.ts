@@ -3,7 +3,7 @@ export function iterateStream<T>(stream: ReadableStream<T>) {
     [Symbol.asyncIterator]: async function* () {
       const reader = stream.getReader();
       try {
-        while (true) {
+        for (;;) {
           const { done, value } = await reader.read();
           if (done) return;
           yield value;

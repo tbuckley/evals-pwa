@@ -16,6 +16,6 @@ async function load(files: Record<string, string>, entry: string) {
 describe('CodeReference', () => {
   test('throws error when syntax is invalid', async () => {
     const ref = await load({ 'file:///test.ts': 'invalid(' }, 'file:///test.ts');
-    expect(ref.getCode()).rejects.toThrowError();
+    await expect(ref.getCode()).rejects.toThrowError();
   });
 });

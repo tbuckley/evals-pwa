@@ -1,7 +1,7 @@
 import * as esbuild from 'esbuild-wasm';
 import { FileReference } from './FileReference';
 import type { ReadonlyFileStorage } from '$lib/types';
-import { CodeSandbox } from '$lib/utils/CodeSandbox';
+import * as CodeSandbox from '$lib/utils/CodeSandbox';
 import { blobToFileReference } from './dereferenceFilePaths';
 
 let esbuildReady: Promise<void> | undefined;
