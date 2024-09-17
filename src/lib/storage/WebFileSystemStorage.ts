@@ -1,4 +1,5 @@
 import { MissingFileError, type FileStorage } from '$lib/types';
+import { cast } from '$lib/utils/asserts';
 import {
   fileUriToPath,
   getDirname,
@@ -52,7 +53,7 @@ export class WebFileSystemStorage implements FileStorage {
       throw new Error(`Cannot write to a directory: ${uri}`);
     }
     const dirname = getDirname(filepath);
-    const filename = getFilename(filepath)!;
+    const filename = cast(getFilename(filepath));
 
     const dir = await this.getSubdirHandle(dirname, true);
     const handle = await dir.getFileHandle(filename, { create: true });
@@ -68,7 +69,7 @@ export class WebFileSystemStorage implements FileStorage {
       throw new Error(`Cannot write to a directory: ${uri}`);
     }
     const dirname = getDirname(filepath);
-    const filename = getFilename(filepath)!;
+    const filename = cast(getFilename(filepath));
 
     const dir = await handleNotFoundError(this.getSubdirHandle(dirname), uri);
     const handle = await handleNotFoundError(dir.getFileHandle(filename, { create: false }), uri);
@@ -106,11 +107,11 @@ async function fileDfs(
 ): Promise<void> {
   const queue: { path: string; handle: FileSystemDirectoryHandle }[] = [{ handle: dir, path: '' }];
   while (queue.length > 0) {
-    const { handle, path } = queue.pop()!;
+    const { handle, path } = cast(queue.pop());
     for await (const entry of handle.values()) {
       if (entry.kind === 'file') {
         await fn(path + entry.name, entry);
-      } else if (entry.kind === 'directory') {
+      } else {
         queue.push({ path: path + entry.name + '/', handle: entry });
       }
     }
