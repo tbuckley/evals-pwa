@@ -18,6 +18,7 @@
   import { cn } from '$lib/utils/shadcn';
   import { page } from '$app/stores';
   import { alertStore } from '$lib/state/ui';
+  import type { Action as SvelteAction } from 'svelte/action';
 
   const links = [
     { name: 'Dashboard', href: '/', icon: Home },
@@ -36,6 +37,10 @@
 
   function handleSettingsOpenChange(e: CustomEvent<boolean>) {
     settingsOpen = e.detail;
+  }
+
+  function castSheetCloseBuilder(builder: unknown) {
+    return builder as { action: SvelteAction };
   }
 </script>
 
@@ -89,8 +94,9 @@
             </a>
             {#each links as { name, href, icon }}
               <Sheet.Close asChild let:builder>
+                {@const action = castSheetCloseBuilder(builder).action}
                 <a
-                  use:builder.action
+                  use:action
                   {href}
                   class="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
                 >
