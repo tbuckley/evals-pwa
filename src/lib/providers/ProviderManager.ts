@@ -30,7 +30,7 @@ export class ProviderManager {
       return new OpenaiProvider(modelName, this.env.OPENAI_API_KEY, config);
     } else if (providerId === 'reverser') {
       return new ReverserProvider();
-    } else if (providerId === 'chrome') {
+    } else if (providerId === 'chrome' && modelName === 'ai') {
       return new ChromeProvider();
     } else if (providerId === 'web-llm') {
       return new WebLlm(modelName);
