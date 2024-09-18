@@ -146,15 +146,23 @@ export interface RunContext {
   abortSignal: AbortSignal;
 }
 
+export interface ModelUpdate {
+  type: 'replace';
+  output: string;
+}
+
 export interface ModelProvider {
-  run(prompt: MultiPartPrompt, context: RunContext): AsyncGenerator<string, unknown, void>;
+  run(
+    prompt: MultiPartPrompt,
+    context: RunContext,
+  ): AsyncGenerator<string | ModelUpdate, unknown, void>;
   extractOutput(response: unknown): string;
   extractTokenUsage(response: unknown): TokenUsage;
   mimeTypes?: string[];
 }
 
 export interface TestEnvironment {
-  run(test: TestCase, context: RunContext): AsyncGenerator<string, TestOutput, void>;
+  run(test: TestCase, context: RunContext): AsyncGenerator<string | ModelUpdate, TestOutput, void>;
 }
 
 export interface TaskQueue {

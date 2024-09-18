@@ -354,12 +354,21 @@ async function runTest(
   while (!next?.done) {
     next = await generator.next();
     if (!next.done) {
-      const newText = next.value;
-      result.update((state) => ({
-        ...state,
-        state: 'in-progress',
-        output: (state.output ?? '') + newText,
-      }));
+      if (typeof next.value === 'string') {
+        const delta = next.value;
+        result.update((state) => ({
+          ...state,
+          state: 'in-progress',
+          output: (state.output ?? '') + delta,
+        }));
+      } else {
+        const output = next.value.output;
+        result.update((state) => ({
+          ...state,
+          state: 'in-progress',
+          output,
+        }));
+      }
     }
   }
   const output = next.value;
