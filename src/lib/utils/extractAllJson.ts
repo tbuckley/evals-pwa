@@ -16,7 +16,7 @@ export function extractAllJsonObjects(input: string): unknown[] {
 
     // Try extracting an object
     try {
-      const object = JSON.parse(input.slice(openBraceIndex, closeBraceIndex + 1));
+      const object: unknown = JSON.parse(input.slice(openBraceIndex, closeBraceIndex + 1));
       validObjects.push(object);
 
       // Move to after the closing brace

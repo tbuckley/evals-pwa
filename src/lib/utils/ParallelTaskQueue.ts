@@ -45,20 +45,24 @@ export class ParallelTaskQueue implements TaskQueue {
     this.running++;
     // TODO should we catch any errors?
     // TODO pass abort signal to functions?
-    fn({ abortSignal: this.abortController.signal }).finally(() => {
-      if (this.abortController.signal.aborted) {
-        // If already aborted, ignore any results
-        return;
-      }
-      this.running--;
-      if (this.queue.length === 0 && this.running === 0) {
-        // If we're the last task, signal that we're done
-        this.markCompleted?.();
-        this.markCompleted = null;
-      } else {
-        this.run();
-      }
-    });
+    fn({ abortSignal: this.abortController.signal })
+      .catch((err: unknown) => {
+        throw new Error('ParallelTaskQueue task failed', { cause: err });
+      })
+      .finally(() => {
+        if (this.abortController.signal.aborted) {
+          // If already aborted, ignore any results
+          return;
+        }
+        this.running--;
+        if (this.queue.length === 0 && this.running === 0) {
+          // If we're the last task, signal that we're done
+          this.markCompleted?.();
+          this.markCompleted = null;
+        } else {
+          this.run();
+        }
+      });
   }
   completed(): Promise<void> {
     return this.completedPromise;

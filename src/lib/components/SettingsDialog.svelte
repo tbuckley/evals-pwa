@@ -11,10 +11,9 @@
 
   const dispatch = createEventDispatcher();
 
-  let envEditorEntries: [string, string][];
-  $: {
-    open; // Reset when settings visible closes without a change
-    envEditorEntries = $requiredEnvStore.map((req) => [req, $parsedEnvStore[req]]);
+  $: envEditorEntries = getEnvEditorEntries($requiredEnvStore, open);
+  function getEnvEditorEntries(requiredEnv: string[], _open: boolean): [string, string][] {
+    return requiredEnv.map((req) => [req, $parsedEnvStore[req]]);
   }
 
   function saveEnv() {

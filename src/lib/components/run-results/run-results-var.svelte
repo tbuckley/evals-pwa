@@ -3,7 +3,7 @@
   import Button from '../ui/button/button.svelte';
   import Copy from 'lucide-svelte/icons/copy';
 
-  export let value: any;
+  export let value: unknown;
 
   function isImageFile(val: unknown): boolean {
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
@@ -15,7 +15,7 @@
 
   async function copy() {
     if (typeof value === 'string') {
-      navigator.clipboard.writeText(value);
+      await navigator.clipboard.writeText(value);
     }
   }
 </script>

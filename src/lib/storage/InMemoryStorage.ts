@@ -1,19 +1,19 @@
 import { MissingFileError, type FileStorage } from '$lib/types';
+import { cast } from '$lib/utils/asserts';
 import { fileUriToPath, getFilename, pathToFileUri } from '$lib/utils/path';
 import picomatch from 'picomatch';
 
 export class InMemoryStorage implements FileStorage {
   private files = new Map<string, File>();
-  constructor() {}
 
   getName(): string {
     return 'Temporary';
   }
 
-  async loadFile(uri: string): Promise<File> {
+  loadFile(uri: string): Promise<File> {
     const path = fileUriToPath(uri);
     if (this.files.has(path)) {
-      return this.files.get(path)!;
+      return Promise.resolve(cast(this.files.get(path)));
     }
     throw new MissingFileError(uri);
   }
@@ -38,7 +38,7 @@ export class InMemoryStorage implements FileStorage {
     return this.loadFile(uri);
   }
 
-  async writeFile(uri: string, data: string | Blob): Promise<void> {
+  writeFile(uri: string, data: string | Blob): Promise<void> {
     const path = fileUriToPath(uri);
     const filename = getFilename(path);
     if (!filename) {
@@ -46,5 +46,6 @@ export class InMemoryStorage implements FileStorage {
     }
     const file = new File([data], filename);
     this.files.set(path, file);
+    return Promise.resolve();
   }
 }
