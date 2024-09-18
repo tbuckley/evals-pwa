@@ -5,7 +5,13 @@ import {
   type CompletionUsage,
   MLCEngine,
 } from '@mlc-ai/web-llm';
-import type { ModelProvider, ModelUpdate, MultiPartPrompt, TokenUsage } from '$lib/types';
+import type {
+  ModelProvider,
+  ModelUpdate,
+  MultiPartPrompt,
+  RunContext,
+  TokenUsage,
+} from '$lib/types';
 import { cast } from '$lib/utils/asserts';
 
 interface Response {
@@ -24,7 +30,7 @@ const cache = new Map<
 export class WebLlm implements ModelProvider {
   constructor(public model: string) {}
 
-  async *run(prompt: MultiPartPrompt) {
+  async *run(prompt: MultiPartPrompt, context: RunContext) {
     const progress = generator<InitProgressReport>();
     let cacheEntry;
     let engine;
@@ -63,6 +69,11 @@ export class WebLlm implements ModelProvider {
       let reply = '';
       let usage: CompletionUsage | undefined;
       for await (const chunk of chunks) {
+        if (context.abortSignal.aborted) {
+          return {
+            reply,
+          };
+        }
         const delta = chunk.choices[0]?.delta.content ?? '';
         yield delta;
         reply += delta;
