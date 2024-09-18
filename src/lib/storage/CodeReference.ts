@@ -53,7 +53,7 @@ export class CodeReference extends FileReference {
   }
   async bind(): Promise<Executable> {
     if (!this.#execute) {
-      this.#execute = await CodeSandbox.bind(await this.getCode());
+      this.#execute = CodeSandbox.bind(await this.getCode());
     }
     return this.#execute;
   }
