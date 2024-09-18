@@ -27,7 +27,6 @@ import { summarizeResults } from '$lib/utils/summarizeResults';
 import * as idb from 'idb-keyval';
 import { InMemoryStorage } from '$lib/storage/InMemoryStorage';
 import * as CodeSandbox from '$lib/utils/CodeSandbox';
-import { cast } from '$lib/utils/asserts';
 
 const folder = await idb.get<FileSystemDirectoryHandle>('folder');
 if (folder) {
@@ -57,14 +56,14 @@ export async function chooseFolder() {
 export async function setStorageDirectory(dir: FileSystemDirectoryHandle) {
   const storage = new WebFileSystemStorage(dir);
   await idb.set('folder', dir);
-  setStorage(storage);
+  await setStorage(storage);
 }
 
 export async function setInMemoryConfig(config: string) {
   const storage = new InMemoryStorage();
-  storage.writeFile('file:///config.yaml', config);
+  await storage.writeFile('file:///config.yaml', config);
   await idb.del('folder');
-  setStorage(storage);
+  await setStorage(storage);
 }
 
 export async function saveInMemoryConfigToFileSystem(config?: string) {
@@ -98,7 +97,7 @@ export async function saveInMemoryConfigToFileSystem(config?: string) {
   }
 
   await idb.set('folder', dir);
-  setStorage(storage);
+  await setStorage(storage);
 }
 
 export async function setStorage(fileStorage: FileStorage | null) {
@@ -123,14 +122,14 @@ export async function loadStateFromStorage(): Promise<void> {
     if (err instanceof UiError) {
       switch (err.detail.type) {
         case 'missing-config':
-          showPrompt({
+          await showPrompt({
             title: 'Missing config.yaml',
             description: [`Please create ${err.detail.path} in your selected directory.`],
             cancelText: null,
           });
           break;
         case 'missing-config-reference':
-          showPrompt({
+          await showPrompt({
             title: 'Missing file',
             description: [
               `The file ${err.detail.path} referenced from your configuration does not exist.`,
@@ -139,7 +138,7 @@ export async function loadStateFromStorage(): Promise<void> {
           });
           break;
         case 'invalid-config':
-          showPrompt({
+          await showPrompt({
             title: 'Invalid configuration',
             description: [`The config.yaml file contains errors:`, ...err.detail.errors],
             cancelText: null,
@@ -199,7 +198,9 @@ export async function runTests() {
   // Request permission to show notifications
   if (Notification.permission !== 'granted') {
     // Note: not awaited so it does not delay results
-    Notification.requestPermission();
+    Notification.requestPermission().catch((err: unknown) => {
+      console.error('Failed to request notification permission', err);
+    });
   }
 
   // Get global prompts + tests
@@ -294,7 +295,7 @@ export async function runTests() {
   }));
 
   // Save the run to storage
-  storage.addRun(liveRunToRun(run));
+  await storage.addRun(liveRunToRun(run));
 
   if (document.visibilityState !== 'visible' && Notification.permission === 'granted') {
     new Notification('Eval complete', { body: 'See your results in Evals.' });
@@ -372,12 +373,21 @@ async function runTest(
     }));
     return;
   }
+  if (!output.output) {
+    result.update((state) => ({
+      ...state,
+      state: 'error',
+      error: 'No output',
+      pass: false,
+    }));
+    return;
+  }
 
   // Test assertions
   const assertions = test.assert.map((a) => assertionManager.getAssertion(a, test.vars));
   const assertionResults: AssertionResult[] = [];
   for (const assertion of assertions) {
-    const result = await assertion.run(output.output!);
+    const result = await assertion.run(output.output);
     assertionResults.push(result);
   }
   result.update((state) => ({

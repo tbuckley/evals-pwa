@@ -1,3 +1,5 @@
+import { cast } from './asserts';
+
 export function fileUriToPath(uri: string): string {
   const url = new URL(uri);
   if (url.protocol !== 'file:' || (url.host !== '' && url.host !== '.' && url.host !== '..')) {
@@ -50,7 +52,7 @@ export function getFilename(path: string): string | null {
   if (!pathIsFile(path)) {
     return null;
   }
-  return path.split('/').pop()!;
+  return cast(path.split('/').pop());
 }
 
 export function getFileExtension(path: string): string | null {
@@ -98,17 +100,17 @@ export function normalizePath(path: string): string {
 export function joinPath(...paths: string[]): string {
   // Ensure all but last path are directories
   if (paths.slice(0, -1).some((path) => pathIsFile(path))) {
-    throw new Error(`All but the last path must be directories: ${paths}`);
+    throw new Error(`All but the last path must be directories: ${paths.join(', ')}`);
   }
 
   // Ensure first part is absolute
   if (!pathIsAbsolute(paths[0])) {
-    throw new Error(`First path must be absolute: ${paths}`);
+    throw new Error(`First path must be absolute: ${paths.join(', ')}`);
   }
 
   // Ensure all following parts are relative
   if (paths.slice(1).some((path) => pathIsAbsolute(path))) {
-    throw new Error(`All but the first path must be relative: ${paths}`);
+    throw new Error(`All but the first path must be relative: ${paths.join(', ')}`);
   }
 
   return normalizePath(paths.join(''));
