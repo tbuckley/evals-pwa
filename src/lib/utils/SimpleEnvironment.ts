@@ -7,6 +7,7 @@ import type {
   VarSet,
   RunContext,
   MultiPartPrompt,
+  ModelUpdate,
 } from '$lib/types';
 
 export interface Config {
@@ -23,7 +24,10 @@ export class SimpleEnvironment implements TestEnvironment {
     this.prompt = options.prompt;
   }
 
-  async *run(vars: VarSet, context: RunContext): AsyncGenerator<string, TestOutput, void> {
+  async *run(
+    vars: VarSet,
+    context: RunContext,
+  ): AsyncGenerator<string | ModelUpdate, TestOutput, void> {
     let prompt: MultiPartPrompt;
     try {
       prompt = await this.prompt.format(vars, this.model.mimeTypes);

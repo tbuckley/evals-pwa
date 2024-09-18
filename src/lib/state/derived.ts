@@ -45,9 +45,9 @@ export const requiredEnvStore = derived(configStore, ($config) => {
 
   const tests = $config?.tests ?? [];
   for (const test of tests) {
-    const asserts = test.assert ?? [];
+    const asserts = test.assert;
     for (const assertion of asserts) {
-      const vars = assertion.vars ?? {};
+      const vars = assertion.vars;
       if ('provider' in vars && typeof vars.provider === 'string') {
         // TODO support other types of provider
         const providerId = vars.provider;

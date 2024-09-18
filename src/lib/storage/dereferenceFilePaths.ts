@@ -206,7 +206,11 @@ async function hashBlob(blob: Blob): Promise<string> {
         const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
         resolve(hashHex);
       } catch (err) {
-        reject(err);
+        if (err instanceof Error) {
+          reject(err);
+        } else {
+          reject(new Error('Unknown error', { cause: err }));
+        }
       }
     };
   });

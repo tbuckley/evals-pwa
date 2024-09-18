@@ -1,8 +1,23 @@
 import { writable, type Writable } from 'svelte/store';
+import { z } from 'zod';
 
-function createLocalStorageStore<T>(key: string, defaultValue: T): Writable<T> {
+function createLocalStorageStore<T>(
+  key: string,
+  schema: z.ZodType<T>,
+  defaultValue: T,
+): Writable<T> {
+  let value = defaultValue;
+
+  // Try loading from local storage
   const storedValue = localStorage.getItem(key);
-  const store = writable<T>(storedValue ? JSON.parse(storedValue) : defaultValue);
+  if (storedValue) {
+    const parsed = schema.safeParse(JSON.parse(storedValue));
+    if (parsed.success) {
+      value = parsed.data;
+    }
+  }
+
+  const store = writable<T>(value);
 
   store.subscribe((value) => {
     localStorage.setItem(key, JSON.stringify(value));
@@ -10,4 +25,10 @@ function createLocalStorageStore<T>(key: string, defaultValue: T): Writable<T> {
   return store;
 }
 
-export const showVarsColumnsStore = createLocalStorageStore<boolean>('showVarsColumns', true);
+const boolSchema = z.boolean();
+
+export const showVarsColumnsStore = createLocalStorageStore<boolean>(
+  'showVarsColumns',
+  boolSchema,
+  true,
+);

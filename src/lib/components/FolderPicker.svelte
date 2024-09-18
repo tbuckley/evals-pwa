@@ -9,7 +9,6 @@
 
   import Folder from 'lucide-svelte/icons/folder';
   import RefreshCcw from 'lucide-svelte/icons/refresh-ccw';
-  import FileWarning from 'lucide-svelte/icons/file-warning';
   import Save from 'lucide-svelte/icons/save';
   import { FileSystemEvalsStorage } from '$lib/storage/FileSystemEvalsStorage';
   import { InMemoryStorage } from '$lib/storage/InMemoryStorage';

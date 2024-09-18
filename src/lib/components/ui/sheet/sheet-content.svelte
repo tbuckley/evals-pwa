@@ -16,14 +16,12 @@
   };
 
   let className: $$Props['class'] = undefined;
-  export let side: $$Props['side'] = 'right';
+  export let side: NonNullable<$$Props['side']> = 'right';
   export { className as class };
   export let inTransition: $$Props['inTransition'] = fly;
-  export let inTransitionConfig: $$Props['inTransitionConfig'] =
-    sheetTransitions[side ?? 'right'].in;
+  export let inTransitionConfig: $$Props['inTransitionConfig'] = sheetTransitions[side].in;
   export let outTransition: $$Props['outTransition'] = fly;
-  export let outTransitionConfig: $$Props['outTransitionConfig'] =
-    sheetTransitions[side ?? 'right'].out;
+  export let outTransitionConfig: $$Props['outTransitionConfig'] = sheetTransitions[side].out;
 </script>
 
 <SheetPortal>
