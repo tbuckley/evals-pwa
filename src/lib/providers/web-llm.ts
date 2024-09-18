@@ -1,9 +1,9 @@
 import {
-  CreateMLCEngine,
   type InitProgressReport,
   type ChatCompletionMessageParam,
   type CompletionUsage,
-  MLCEngine,
+  CreateWebWorkerMLCEngine,
+  WebWorkerMLCEngine,
 } from '@mlc-ai/web-llm';
 import type {
   ModelProvider,
@@ -23,7 +23,7 @@ const cache = new Map<
   string,
   {
     refCount: number;
-    load: Promise<MLCEngine>;
+    load: Promise<WebWorkerMLCEngine>;
   }
 >();
 
@@ -36,7 +36,10 @@ export class WebLlm implements ModelProvider {
     let engine;
     try {
       if (!cache.has(this.model)) {
-        const load = CreateMLCEngine(this.model, {
+        const worker = new Worker(new URL('./web-llm.worker.ts', import.meta.url), {
+          type: 'module',
+        });
+        const load = CreateWebWorkerMLCEngine(worker, this.model, {
           initProgressCallback: (report) => {
             progress.yield(report);
           },
@@ -49,7 +52,6 @@ export class WebLlm implements ModelProvider {
         for await (const report of progress.generator) {
           yield { type: 'replace', output: report.text } as ModelUpdate;
         }
-        yield { type: 'replace', output: '' } as ModelUpdate;
       } else {
         cacheEntry = cast(cache.get(this.model));
         cacheEntry.refCount++;
@@ -66,6 +68,7 @@ export class WebLlm implements ModelProvider {
         stream: true,
         stream_options: { include_usage: true },
       });
+      yield { type: 'replace', output: '' } as ModelUpdate;
       let reply = '';
       let usage: CompletionUsage | undefined;
       for await (const chunk of chunks) {
