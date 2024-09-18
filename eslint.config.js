@@ -24,8 +24,7 @@ export default ts.config(
         {
           allowBoolean: true,
           allowNumber: true,
-        }
-        
+        },
       ],
     },
   },
