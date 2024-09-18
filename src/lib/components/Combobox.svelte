@@ -23,9 +23,17 @@
   // rest of the form with the keyboard.
   function closeAndFocusTrigger(triggerId: string) {
     open = false;
-    tick().then(() => {
-      document.getElementById(triggerId)?.focus();
-    });
+    tick()
+      .then(() => {
+        document.getElementById(triggerId)?.focus();
+      })
+      .catch((reason: unknown) => {
+        console.error('Tick failed', reason);
+      });
+  }
+
+  function castPopoverIds(popoverIds: unknown): { content: string; trigger: string } {
+    return popoverIds as { content: string; trigger: string };
   }
 </script>
 
@@ -51,7 +59,7 @@
           <Command.Item
             onSelect={() => {
               dispatch('select', item.value);
-              closeAndFocusTrigger(ids.trigger);
+              closeAndFocusTrigger(castPopoverIds(ids).trigger);
             }}
           >
             <Check class={cn('mr-2 h-4 w-4', value !== item.value && 'text-transparent')} />
