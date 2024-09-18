@@ -4,6 +4,7 @@ import { OpenaiProvider, type OpenaiConfig } from './openai';
 import { ReverserProvider } from './reverser';
 import { ChromeProvider } from './chrome';
 import { OllamaProvider } from './ollama';
+import { WebLlm } from './web-llm';
 
 export class ProviderManager {
   constructor(public env: Record<string, string>) {}
@@ -31,6 +32,8 @@ export class ProviderManager {
       return new ReverserProvider();
     } else if (providerId === 'chrome') {
       return new ChromeProvider();
+    } else if (providerId === 'web-llm') {
+      return new WebLlm(modelName);
     } else if (providerId === 'ollama') {
       if ((config as OpenaiConfig).apiBaseUrl === undefined) {
         if (typeof this.env.OLLAMA_ENDPOINT !== 'string') {
@@ -60,6 +63,8 @@ export class ProviderManager {
       return [];
     } else if (providerId === 'ollama') {
       return ['OLLAMA_ENDPOINT'];
+    } else if (providerId === 'web-llm') {
+      return [];
     }
     throw new Error(`Unknown provider: ${providerId}`);
   }
