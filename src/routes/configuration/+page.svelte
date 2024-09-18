@@ -40,19 +40,19 @@
   });
 
   async function handleSaveToInMemoryStorage() {
-    setInMemoryConfig(config);
+    await setInMemoryConfig(config);
     savedConfig = config;
   }
 
-  function handleUseSample() {
+  async function handleUseSample() {
     config = SAMPLE_CONFIG;
-    handleSaveToInMemoryStorage();
+    await handleSaveToInMemoryStorage();
   }
 
-  function handleSwitchToInMemoryStorage() {
+  async function handleSwitchToInMemoryStorage() {
     config = '';
     savedConfig = '';
-    setStorage(null);
+    await setStorage(null);
   }
 
   const SAMPLE_CONFIG = dedent`
