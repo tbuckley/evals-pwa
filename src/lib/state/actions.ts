@@ -217,9 +217,10 @@ export async function runTests() {
   const envs: TestEnvironment[] = createEnvironments(runEnvs, providerManager);
 
   // Run tests
+  const abortController = new AbortController();
   const results: LiveRun['results'] = [];
   const runner = new ParallelTaskQueue(5);
-  const mgr = new AssertionManager(providerManager);
+  const mgr = new AssertionManager(providerManager, abortController.signal);
   try {
     for (const test of globalTests) {
       const testResults: Writable<LiveResult>[] = [];
@@ -267,6 +268,7 @@ export async function runTests() {
       run,
       abort: () => {
         runner.abort();
+        abortController.abort();
       },
     },
   }));
@@ -284,6 +286,7 @@ export async function runTests() {
     mgr.destroy();
     liveRunStore.update((state) => {
       const newState = { ...state };
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
       delete newState[run.id];
       return newState;
     });

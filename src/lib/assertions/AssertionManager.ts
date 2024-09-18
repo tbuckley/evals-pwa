@@ -11,7 +11,10 @@ import { objectDfsMap } from '$lib/utils/objectDFS';
 export class AssertionManager {
   assertions: AssertionProvider[] = [];
 
-  constructor(public providerManager: ProviderManager) {}
+  constructor(
+    public providerManager: ProviderManager,
+    private abortSignal: AbortSignal,
+  ) {}
 
   getAssertion(assertion: Assertion, testVars: NormalizedTestCase['vars']): AssertionProvider {
     const provider = this.createAssertion(assertion.type, assertion.vars, testVars);
@@ -41,7 +44,7 @@ export class AssertionManager {
     } else if (type === 'javascript') {
       return createJavascriptAssertion(vars, testVars);
     } else if (type === 'llm-rubric') {
-      return createLlmRubricAssertion(vars, testVars, this.providerManager);
+      return createLlmRubricAssertion(vars, testVars, this.providerManager, this.abortSignal);
     } else {
       throw new Error(`Unknown assertion type: ${type}`);
     }
@@ -50,7 +53,7 @@ export class AssertionManager {
 
 function prePopulateVars(vars: Assertion['vars'], testVars: NormalizedTestCase['vars']) {
   const populatedVars = { ...vars };
-  const safeVars = objectDfsMap(testVars ?? {}, (val) => {
+  const safeVars = objectDfsMap(testVars, (val) => {
     if (typeof val === 'string') {
       return new Handlebars.SafeString(val);
     }

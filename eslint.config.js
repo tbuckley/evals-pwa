@@ -11,7 +11,7 @@ export default ts.config(
   prettier,
   {
     // TODO: Maybe don't ignore top level ts/js files?
-    ignores: ['build/', '.svelte-kit/', 'dist/', '*.ts', '*.js', '*.mjs'],
+    ignores: ['build/', '.svelte-kit/', 'dist/', '*.ts', '*.js', '*.mjs', 'examples/'],
   },
   {
     rules: {

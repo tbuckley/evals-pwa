@@ -17,13 +17,14 @@ export const DEFAULT_LLM_RUBRIC_PROVIDER = 'gemini:gemini-1.5-pro-latest';
 const argsSchema = z.object({
   rubric: z.string(),
   prompt: z.string().optional(),
-  provider: providerSchema,
+  provider: providerSchema.optional(),
 });
 
 export function createLlmRubricAssertion(
   args: unknown,
   testVars: NormalizedTestCase['vars'],
   providerManager: ProviderManager,
+  abortSignal: AbortSignal,
 ): AssertionProvider {
   const parsedArgs = argsSchema.safeParse(args);
   if (!parsedArgs.success) {
@@ -45,7 +46,7 @@ export function createLlmRubricAssertion(
 
   return {
     run: async function (output: string): Promise<AssertionResult> {
-      const generator = env.run({ output, rubric, ...testVars });
+      const generator = env.run({ output, rubric, ...testVars }, { abortSignal });
       let next;
       while (!next?.done) {
         // Skip over the streaming responses.
