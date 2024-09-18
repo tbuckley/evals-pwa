@@ -41,7 +41,7 @@
       table.column({
         id: varName,
         header: varName,
-        accessor: (row) => {
+        accessor: (row): unknown => {
           return row.test.vars?.[varName];
         },
         cell: ({ value }) => {
@@ -77,6 +77,20 @@
   columnWidths.subscribe(($widths) => {
     forceResizeUpdateValue = Object.values($widths).reduce((acc, val) => acc + val, 0);
   });
+
+  interface ResizeExtension {
+    (node: Element): void;
+    drag: (node: Element) => void;
+    reset: (node: Element) => void;
+    disabled: boolean;
+  }
+  function castResizeExtension(builder: unknown): ResizeExtension {
+    return (
+      builder as {
+        resize: ResizeExtension;
+      }
+    ).resize;
+  }
 </script>
 
 <div class="mb-2 flex items-center gap-1.5">
@@ -94,19 +108,17 @@
               {@const headerCellAttrs = cell.attrs()}
               {@const headerCellProps = cell.props()}
               <Subscribe attrs={headerCellAttrs} let:attrs props={headerCellProps} let:props>
+                {@const resize = castResizeExtension(props)}
                 <!-- Classes copied from Table.Head -->
                 <th
                   class="relative h-10 px-2 pr-[16px] text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]"
                   {...attrs}
-                  use:props.resize
+                  use:resize
                 >
                   <Render of={cell.render()} />
 
-                  {#if !props.resize.disabled}
-                    <div
-                      class="absolute right-0 top-1 z-10 w-4 cursor-col-resize"
-                      use:props.resize.drag
-                    >
+                  {#if !resize.disabled}
+                    <div class="absolute right-0 top-1 z-10 w-4 cursor-col-resize" use:resize.drag>
                       <GripVertical class="h-4 w-4"></GripVertical>
                     </div>
                   {/if}
