@@ -3,7 +3,7 @@ import {
   type ChatCompletionMessageParam,
   type CompletionUsage,
   CreateWebWorkerMLCEngine,
-  WebWorkerMLCEngine,
+  type WebWorkerMLCEngine,
 } from '@mlc-ai/web-llm';
 import type {
   ModelProvider,

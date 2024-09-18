@@ -94,5 +94,5 @@ describe('AssertionManager', () => {
 
 function createAssertionManager(): AssertionManager {
   const provider = new ProviderManager({});
-  return new AssertionManager(provider);
+  return new AssertionManager(provider, new AbortController().signal);
 }
