@@ -11,13 +11,14 @@ export default ts.config(
   prettier,
   {
     // TODO: Maybe don't ignore top level ts/js files?
-    ignores: ['build/', '.svelte-kit/', 'dist/', '*.ts', '*.js'],
+    ignores: ['build/', '.svelte-kit/', 'dist/', '*.ts', '*.js', '*.mjs'],
   },
   {
     rules: {
       '@typescript-eslint/no-unused-vars': [
         'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+        // Ignore variables that start with _ or $$ (used by shadcn-svelte)
+        { argsIgnorePattern: '^(_|\\$\\$)', varsIgnorePattern: '^(_|\\$\\$)' },
       ],
       '@typescript-eslint/restrict-template-expressions': [
         'error',
