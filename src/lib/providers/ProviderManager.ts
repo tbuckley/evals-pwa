@@ -5,6 +5,7 @@ import { ReverserProvider } from './reverser';
 import { ChromeProvider } from './chrome';
 import { OllamaProvider } from './ollama';
 import { WebLlm } from './web-llm';
+import { AnthropicProvider } from './anthropic';
 
 export class ProviderManager {
   constructor(public env: Record<string, string>) {}
@@ -28,6 +29,11 @@ export class ProviderManager {
         throw new Error('OPENAI_API_KEY not found');
       }
       return new OpenaiProvider(modelName, this.env.OPENAI_API_KEY, config);
+    } else if (providerId === 'anthropic') {
+      if (typeof this.env.ANTHROPIC_API_KEY !== 'string') {
+        throw new Error('ANTHROPIC_API_KEY not found');
+      }
+      return new AnthropicProvider(modelName, this.env.ANTHROPIC_API_KEY, config);
     } else if (providerId === 'reverser') {
       return new ReverserProvider();
     } else if (providerId === 'chrome' && modelName === 'ai') {
@@ -57,6 +63,8 @@ export class ProviderManager {
       return ['GEMINI_API_KEY'];
     } else if (providerId === 'openai') {
       return ['OPENAI_API_KEY'];
+    } else if (providerId === 'anthropic') {
+      return ['ANTHROPIC_API_KEY'];
     } else if (providerId === 'reverser') {
       return [];
     } else if (providerId === 'chrome') {
