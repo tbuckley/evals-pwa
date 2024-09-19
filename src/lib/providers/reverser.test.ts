@@ -16,7 +16,7 @@ describe('ReverserProvider', () => {
     const provider = new ReverserProvider();
     const resp = provider.run([
       { text: 'hello' },
-      { image: new File([], 'foo.png') },
+      { file: new File([], 'foo.png') },
       { text: 'world' },
     ]);
     let next;
