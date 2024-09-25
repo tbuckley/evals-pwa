@@ -13,6 +13,7 @@ import type {
   TokenUsage,
 } from '$lib/types';
 import { cast } from '$lib/utils/asserts';
+import { multiPartPromptToOpenAI } from './openai';
 
 interface Response {
   reply: string;
@@ -29,6 +30,14 @@ const cache = new Map<
 
 export class WebLlm implements ModelProvider {
   constructor(public model: string) {}
+
+  mimeTypes = [
+    // Image
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+    'image/gif',
+  ];
 
   async *run(prompt: MultiPartPrompt, context: RunContext) {
     const progress = generator<InitProgressReport>();
@@ -57,10 +66,9 @@ export class WebLlm implements ModelProvider {
         cacheEntry.refCount++;
       }
       engine = await cacheEntry.load;
-      const input = prompt.map((part) => ('text' in part ? part.text : '')).join('\n');
       const messages: ChatCompletionMessageParam[] = [
         // { role: 'system', content: 'You are a helpful AI assistant.' },
-        { role: 'user', content: input },
+        { role: 'user', content: await Promise.all(prompt.map(multiPartPromptToOpenAI)) },
       ];
 
       const chunks = await engine.chat.completions.create({
