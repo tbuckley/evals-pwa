@@ -234,7 +234,7 @@ export async function runTests() {
       results.push(testResults);
     }
   } finally {
-    await CodeSandbox.destroy();
+    await CodeSandbox.clear();
   }
 
   // Create summaries derived from the testResults

@@ -94,7 +94,37 @@ function initIframe() {
   return loaded;
 }
 
-export async function bind(code: string): Promise<(...args: unknown[]) => Promise<unknown>> {
+export function bind(code: string): (...args: unknown[]) => Promise<unknown> {
+  let codePort: MessagePort;
+  let currentInstance: number;
+
+  return async (...args: unknown[]) => {
+    while (currentInstance !== instance) {
+      currentInstance = instance;
+      codePort = await bindPort(code);
+    }
+    return new Promise<unknown>((resolve, reject) => {
+      const callPortChannel = new MessageChannel();
+      const callPort = callPortChannel.port1;
+      callPort.onmessage = (event) => {
+        const data = event.data as Response;
+        if (data.type === 'result') {
+          resolve(data.result);
+        } else if (data.type === 'error') {
+          const error = new Error(data.error);
+          error.stack = data.stack;
+          reject(error);
+        }
+      };
+      if (instance !== currentInstance) {
+        throw new Error('Attempt to call bound function after destroy');
+      }
+      codePort.postMessage({ args, port: callPortChannel.port2 }, [callPortChannel.port2]);
+    });
+  };
+}
+
+async function bindPort(code: string): Promise<MessagePort> {
   const iframe = await initIframe();
 
   // Convert the code to a data URL
@@ -108,34 +138,11 @@ export async function bind(code: string): Promise<(...args: unknown[]) => Promis
     codePortChannel.port2,
   ]);
 
-  const currentInstance = instance;
   return new Promise((resolve, reject) => {
     codePort.onmessage = (event) => {
       const data = event.data as Response;
       if (data.type === 'ok') {
-        // Return the bound function
-        const boundFunction = (...args: unknown[]) => {
-          return new Promise<unknown>((resolve, reject) => {
-            const callPortChannel = new MessageChannel();
-            const callPort = callPortChannel.port1;
-            callPort.onmessage = (event) => {
-              const data = event.data as Response;
-              if (data.type === 'result') {
-                resolve(data.result);
-              } else if (data.type === 'error') {
-                const error = new Error(data.error);
-                error.stack = data.stack;
-                reject(error);
-              }
-            };
-            if (instance !== currentInstance) {
-              throw new Error('Attempt to call bound function after destroy');
-            }
-            // Send the function call along with arguments
-            codePort.postMessage({ args, port: callPortChannel.port2 }, [callPortChannel.port2]);
-          });
-        };
-        resolve(boundFunction);
+        resolve(codePort);
       } else if (data.type === 'error') {
         const error = new Error(data.error + code);
         error.stack = data.stack;
@@ -144,8 +151,7 @@ export async function bind(code: string): Promise<(...args: unknown[]) => Promis
     };
   });
 }
-
-export async function destroy() {
+export async function clear() {
   instance++;
   if (loaded) {
     const iframe = await loaded;

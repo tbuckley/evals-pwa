@@ -3,17 +3,17 @@ import * as CodeSandbox from './CodeSandbox';
 
 describe('CodeSandbox', () => {
   afterEach(async () => {
-    await CodeSandbox.destroy();
+    await CodeSandbox.clear();
   });
   test('can run code', async () => {
-    const execute = await CodeSandbox.bind('export function execute(a, b) { return a + b; }');
+    const execute = CodeSandbox.bind('export function execute(a, b) { return a + b; }');
 
     const res = await execute(1, 2);
     expect(res).toBe(3);
   });
 
   test('supports module imports', async () => {
-    const execute = await CodeSandbox.bind(`
+    const execute = CodeSandbox.bind(`
 				import _ from 'https://cdn.jsdelivr.net/npm/lodash@4.17.21/+esm';
 
 				export function execute(arr) { return _.uniq(arr); }
@@ -24,7 +24,7 @@ describe('CodeSandbox', () => {
   });
 
   test('forwards any errors from the sandbox', async () => {
-    const execute = await CodeSandbox.bind(`
+    const execute = CodeSandbox.bind(`
 				export function execute(arr) { throw new Error('This is a test error'); }
 			`);
 
@@ -37,10 +37,10 @@ describe('CodeSandbox', () => {
   });
 
   test('errors if a function is reused after destroy', async () => {
-    const execute = await CodeSandbox.bind(`
+    const execute = CodeSandbox.bind(`
 				export function execute() { }
 			`);
-    await CodeSandbox.destroy();
+    await CodeSandbox.clear();
 
     try {
       await execute('test');

@@ -75,7 +75,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
         }
       } while (changed);
     } finally {
-      await CodeSandbox.destroy();
+      await CodeSandbox.clear();
     }
 
     const parsed = fsConfigSchema.safeParse(result);
