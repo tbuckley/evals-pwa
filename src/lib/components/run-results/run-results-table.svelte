@@ -111,7 +111,7 @@
                 {@const resize = castResizeExtension(props)}
                 <!-- Classes copied from Table.Head -->
                 <th
-                  class="relative h-10 px-2 pr-[16px] text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]"
+                  class="relative h-10 px-2 pr-[16px] text-left align-top font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]"
                   {...attrs}
                   use:resize
                 >

@@ -403,10 +403,14 @@ async function runTest(
   }
 
   // Test assertions
-  const assertions = test.assert.map((a) => assertionManager.getAssertion(a, test.vars));
+  const assertions = test.assert.map((a) => ({
+    id: a.id,
+    assert: assertionManager.getAssertion(a, test.vars),
+  }));
   const assertionResults: AssertionResult[] = [];
   for (const assertion of assertions) {
-    const result = await assertion.run(output.output);
+    const result = await assertion.assert.run(output.output);
+    result.id = assertion.id;
     assertionResults.push(result);
   }
   result.update((state) => ({

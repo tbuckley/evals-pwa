@@ -13,6 +13,7 @@ const assertionSchema = z.object({
   // Optional
   description: z.string().optional(),
   vars: z.record(z.string(), z.unknown()).optional(),
+  id: z.string().optional(),
 });
 export const normalizedProviderConfigSchema = z.object({
   mimeTypes: z.array(z.string()).optional(),
@@ -57,6 +58,8 @@ export const assertionResultSchema = z.object({
   // Optional
   message: z.string().optional(),
   visuals: z.array(z.union([z.string(), z.instanceof(FileReference)])).optional(),
+  outputs: z.record(z.string(), z.union([z.boolean(), z.number()])).optional(),
+  id: z.string().optional(),
 });
 export type AssertionResult = z.infer<typeof assertionResultSchema>;
 
@@ -239,10 +242,20 @@ export interface LiveRun {
   results: Readable<LiveResult>[][];
 }
 
+export interface AssertionStats {
+  description: string;
+  avgPass: number;
+  outputStats: Record<
+    string,
+    { type: 'boolean'; avgTrue: number } | { type: 'number'; avgNumber: number }
+  >;
+}
+
 export interface SummaryStats {
   total: number;
   passed: number;
   failed: number;
   avgLatencyMillis?: number;
   avgCostDollars?: number;
+  assertions: AssertionStats[];
 }

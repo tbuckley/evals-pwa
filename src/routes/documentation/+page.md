@@ -139,6 +139,7 @@ interface Assertion {
   type: string;
   description?: string;
   vars?: Record<string, unknown>;
+  id?: string;
 }
 ```
 
@@ -178,6 +179,19 @@ tests:
 
 You may also limit which tests will be run by marking some as `only: true`. If any tests are marked this way, only the marked tests will be run.
 
+## Assertion IDs
+
+You can give an assertion an `id` to track its pass/fail rate across all tests. This is useful for tracking the success rate of a particular assertion across different prompts and providers.
+
+```yaml
+tests:
+  - asserts:
+      - type: contains
+        id: has-washington
+        vars:
+          needle: washington
+```
+
 ## Javascript Assertions
 
 For `javascript` assertions, your code must provide a function `execute(output: string, context: { vars: Record<string, unknown> }): Promise<AssertionResult>`. It returns whether the assertion passed, an optional message explaining the result, and an optional array of visuals to show in the UI. Visuals may be a string or an image (PNG/JPEG) as a Blob.
@@ -187,6 +201,7 @@ interface AssertionResult {
   pass: boolean;
   message?: string;
   visuals?: (string | Blob)[];
+  outputs?: Record<string, number | boolean>;
 }
 ```
 
@@ -201,6 +216,29 @@ function execute(output, context) {
 The code is run inside a sandboxed iframe with `<script type="module">`. You can import libraries from a CDN, but you cannot reference other files in your directory. Errors will be shown in the UI.
 
 Note: Currently, every javascript assertion will be instantiated once per test case using it. In future we plan to only instantiate each unique script a single time and reuse it across test cases. Please avoid creating any global state that would affect following test cases.
+
+### Outputs
+
+You can use the `outputs` property in your JavaScript assertions to track additional data points.
+
+```javascript
+function execute(output, context) {
+  const wordCount = output.split(/\s+/).length; // Count words in the output
+
+  return {
+    pass: true, // Assuming the test passes
+    outputs: {
+      wordCount: wordCount, // Store the word count
+      hasKeywords: output.includes('AI') && output.includes('machine learning'), // Check for keywords
+    },
+  };
+}
+```
+
+The UI will display the following:
+
+- **Numbers:** The average value of all outputs with the same key.
+- **Booleans:** The percentage of outputs with the same key that are `true`.
 
 ## Runs
 
@@ -247,9 +285,11 @@ interface TestResult {
   error?: string;
 }
 interface AssertionResult {
+  id?: string;
   pass: boolean;
   message?: string;
   visuals?: string[];
+  outputs?: Record<string, number | boolean>;
 }
 ```
 

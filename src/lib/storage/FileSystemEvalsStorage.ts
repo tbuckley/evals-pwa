@@ -103,7 +103,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
       }
       return 1;
     });
-    return Promise.all(
+    const results = await Promise.allSettled(
       files.map(async ({ file }) => {
         const text = await file.text();
         const json = JSON.parse(text) as unknown;
@@ -115,6 +115,13 @@ export class FileSystemEvalsStorage implements StorageProvider {
         return runSchema.parse(dereferenced.result);
       }),
     );
+    results
+      .filter((result) => result.status === 'rejected')
+      .forEach((result) => {
+        // TODO How to display run errors?
+        console.error(result.reason);
+      });
+    return results.filter((result) => result.status === 'fulfilled').map((result) => result.value);
   }
 
   async addRun(run: Run): Promise<void> {
