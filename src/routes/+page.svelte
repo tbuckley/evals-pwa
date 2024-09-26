@@ -15,10 +15,10 @@
   import CancelIcon from 'lucide-svelte/icons/ban';
 
   function setSelectedRunId(id: unknown) {
-    if (id !== null || typeof id !== 'string') {
+    if (id !== null && typeof id !== 'string') {
       throw new Error('Invalid id for selectedRunIdStore');
     }
-    selectedRunIdStore.set(id as string | null);
+    selectedRunIdStore.set(id);
   }
 </script>
 

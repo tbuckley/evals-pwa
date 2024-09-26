@@ -155,6 +155,8 @@ export async function loadStateFromStorage(): Promise<void> {
 
   configStore.set(config);
   runStore.set(Object.fromEntries(runs.map((run) => [run.id, run])));
+
+  // Assumes that runs are sorted alphabetically
   selectedRunIdStore.set(runs.length > 0 ? runs[runs.length - 1].id : null);
 
   // TODO check that necessary environment variables are set
