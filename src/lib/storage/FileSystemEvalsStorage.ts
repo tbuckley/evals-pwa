@@ -96,6 +96,13 @@ export class FileSystemEvalsStorage implements StorageProvider {
     } catch {
       return [];
     }
+    // TODO have file layers always return files in order
+    files.sort((a, b) => {
+      if (a.file.name < b.file.name) {
+        return -1;
+      }
+      return 1;
+    });
     return Promise.all(
       files.map(async ({ file }) => {
         const text = await file.text();
