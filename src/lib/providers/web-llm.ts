@@ -4,6 +4,8 @@ import {
   type CompletionUsage,
   CreateWebWorkerMLCEngine,
   type WebWorkerMLCEngine,
+  prebuiltAppConfig,
+  type ModelRecord,
 } from '@mlc-ai/web-llm';
 import type {
   ModelProvider,
@@ -29,7 +31,14 @@ const cache = new Map<
 >();
 
 export class WebLlm implements ModelProvider {
-  constructor(public model: string) {}
+  #modelRecord: ModelRecord;
+  constructor(public model: string) {
+    const record = prebuiltAppConfig.model_list.find((entry) => entry.model_id === model);
+    if (!record) {
+      throw new Error(`Unknown model: ${model}`);
+    }
+    this.#modelRecord = record;
+  }
 
   mimeTypes = [
     // Image
@@ -66,9 +75,14 @@ export class WebLlm implements ModelProvider {
         cacheEntry.refCount++;
       }
       engine = await cacheEntry.load;
+      const content =
+        // eslint-disable-next-line -- ModelType can't be imported...
+        this.#modelRecord.model_type === 2 /* VLM */
+          ? await Promise.all(prompt.map(multiPartPromptToOpenAI))
+          : prompt.map((part) => ('text' in part ? part.text : '')).join('\n');
       const messages: ChatCompletionMessageParam[] = [
         // { role: 'system', content: 'You are a helpful AI assistant.' },
-        { role: 'user', content: await Promise.all(prompt.map(multiPartPromptToOpenAI)) },
+        { role: 'user', content },
       ];
 
       const chunks = await engine.chat.completions.create({
