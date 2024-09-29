@@ -208,7 +208,12 @@ export async function runTests() {
   // Get global prompts + tests
   const globalPrompts: Prompt[] = config.prompts;
   const globalProviders: NormalizedProvider[] = config.providers;
-  const globalTests: NormalizedTestCase[] = config.tests;
+  let globalTests: NormalizedTestCase[] = config.tests;
+
+  // If any tests are marked as "only", filter them
+  if (globalTests.some((test) => test.only)) {
+    globalTests = globalTests.filter((test) => test.only);
+  }
 
   // Create the provider manager
   const env = get(parsedEnvStore); // TODO validate that env variables for each provider is set

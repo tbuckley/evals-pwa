@@ -52,9 +52,16 @@ function normalizeTestCase(test: FsTestCase, defaultTest: Partial<FsTestCase>): 
     ...(defaultTest.assert ?? []),
     ...(test.assert ?? []),
   ].map((assert) => ({ ...assert, vars: assert.vars ?? {} }));
-  return {
+
+  const result: NormalizedTestCase = {
     description: test.description ?? defaultTest.description,
     vars,
     assert,
   };
+
+  if (test.only !== undefined) {
+    result.only = test.only;
+  }
+
+  return result;
 }
