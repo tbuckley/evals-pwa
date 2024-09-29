@@ -5,6 +5,7 @@
   import { chooseFolder, runTests } from '$lib/state/actions';
   import {
     abortRunStore,
+    hasTestsMarkedOnlyStore,
     runTitleListStore,
     selectedRunStore,
     selectedRunTitle,
@@ -13,6 +14,8 @@
   import { resultDialogStore } from '$lib/state/ui';
   import * as Dialog from '$lib/components/ui/dialog';
   import CancelIcon from 'lucide-svelte/icons/ban';
+  import * as Alert from '$lib/components/ui/alert';
+  import Filter from 'lucide-svelte/icons/filter';
 
   function setSelectedRunId(id: unknown) {
     if (id !== null && typeof id !== 'string') {
@@ -68,6 +71,18 @@ tests:
     <Button on:click={runTests}>Run tests</Button>
     {#if $abortRunStore !== null}
       <Button variant="secondary" on:click={$abortRunStore}>Cancel run</Button>
+    {/if}
+
+    {#if $hasTestsMarkedOnlyStore}
+      <Alert.Root class="mt-2">
+        <Filter class="h-4 w-4"></Filter>
+        <Alert.Title>Limiting to specific tests</Alert.Title>
+        <Alert.Description>
+          Some tests are marked as <span class="rounded-sm bg-gray-100 p-1 font-mono text-[0.9em]"
+            >only: true</span
+          >, so only those will be run.
+        </Alert.Description>
+      </Alert.Root>
     {/if}
   {/if}
 </article>

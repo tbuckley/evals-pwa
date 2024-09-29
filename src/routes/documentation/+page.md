@@ -133,6 +133,7 @@ interface TestCase {
   description?: string;
   vars?: Record<string, unknown>;
   asserts?: Assertion[];
+  only?: boolean;
 }
 interface Assertion {
   type: string;
@@ -174,6 +175,8 @@ tests:
       language: Spanish
     translation: hola
 ```
+
+You may also limit which tests will be run by marking some as `only: true`. If any tests are marked this way, only the marked tests will be run.
 
 ## Javascript Assertions
 

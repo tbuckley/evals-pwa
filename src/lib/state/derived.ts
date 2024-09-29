@@ -71,6 +71,13 @@ export const validEnvStore = derived([requiredEnvStore, parsedEnvStore], ([$requ
   return true;
 });
 
+export const hasTestsMarkedOnlyStore = derived(configStore, ($config) => {
+  if (!$config) {
+    return false;
+  }
+  return $config.tests.some((test) => test.only);
+});
+
 export const selectedRunStore = derived(
   [liveRunStore, runStore, selectedRunIdStore],
   ([$liveRuns, $runs, $selectedId]) => {

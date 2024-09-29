@@ -38,6 +38,7 @@ export interface NormalizedTestCase {
   description?: string;
   vars: VarSet;
   assert: NormalizedAssertion[];
+  only?: boolean;
 }
 
 export interface NormalizedConfig {
@@ -95,6 +96,7 @@ const testCaseSchema = z.object({
   vars: varSetSchema.optional(),
   description: z.string().optional(),
   assert: z.array(assertionSchema).optional(),
+  only: z.boolean().optional(),
 });
 export type TestCase = z.infer<typeof testCaseSchema>;
 
