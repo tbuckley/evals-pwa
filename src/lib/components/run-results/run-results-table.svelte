@@ -1,96 +1,99 @@
 <script lang="ts">
-  import type { LiveResult, LiveRun, TestCase } from '$lib/types';
-  import { createRender, createTable, Render, Subscribe } from 'svelte-headless-table';
-  import { writable, type Readable } from 'svelte/store';
-  import * as Table from '../ui/table/';
+  import type { Env, LiveRun } from '$lib/types';
   import RunResultsCell from './run-results-cell.svelte';
-  import { addHiddenColumns, addResizedColumns } from 'svelte-headless-table/plugins';
-  import Label from '../ui/label/label.svelte';
-  import Checkbox from '../ui/checkbox/checkbox.svelte';
-  import { showVarsColumnsStore } from '$lib/state/settings';
-  import GripVertical from 'lucide-svelte/icons/grip-vertical';
   import RunResultsHeader from './run-results-header.svelte';
   import RunResultsVar from './run-results-var.svelte';
+  import { showVarsColumnsStore } from '$lib/state/settings';
+  import Label from '../ui/label/label.svelte';
+  import Checkbox from '../ui/checkbox/checkbox.svelte';
 
   export let run: LiveRun;
 
-  interface RunRow {
-    test: TestCase;
-    results: Readable<LiveResult>[];
+  type HeaderCell = VarHeaderCell | EnvHeaderCell | LabelCell;
+  type BodyCell = VarCell | ResultCell | LabelCell;
+
+  interface VarHeaderCell {
+    type: 'var';
+    varName: string;
   }
 
-  const data = writable<RunRow[]>([]);
-  $: data.set(run.tests.map((test, index) => ({ test, results: run.results[index] })));
-
-  const table = createTable(data, {
-    resize: addResizedColumns(),
-    hideColumns: addHiddenColumns(),
-  });
-  const columns = table.createColumns([
-    table.column({
-      id: 'testCase',
-      header: 'Test',
-      accessor: (row) => {
-        return row.test;
-      },
-      cell: ({ value }) => {
-        return value.description ?? 'Test';
-      },
-    }),
-    ...run.varNames.map((varName) =>
-      table.column({
-        id: varName,
-        header: varName,
-        accessor: (row): unknown => {
-          return row.test.vars?.[varName];
-        },
-        cell: ({ value }) => {
-          return createRender(RunResultsVar, { value });
-        },
-      }),
-    ),
-    ...run.envs.map((env, index) =>
-      table.column({
-        id: `env-${index}`,
-        header: createRender(RunResultsHeader, { env, summary: run.summaries[index] }),
-        accessor: (row) => row.results[index],
-        cell: ({ value }) => {
-          return createRender(RunResultsCell, { testResult: value });
-        },
-        plugins: {
-          resize: {
-            initialWidth: 300,
-          },
-        },
-      }),
-    ),
-  ]);
-
-  const { headerRows, pageRows, tableAttrs, tableBodyAttrs, pluginStates } =
-    table.createViewModel(columns);
-  const { hiddenColumnIds } = pluginStates.hideColumns;
-
-  $: $hiddenColumnIds = $showVarsColumnsStore ? [] : run.varNames;
-  const { columnWidths } = pluginStates.resize;
-
-  let forceResizeUpdateValue = 0;
-  columnWidths.subscribe(($widths) => {
-    forceResizeUpdateValue = Object.values($widths).reduce((acc, val) => acc + val, 0);
-  });
-
-  interface ResizeExtension {
-    (node: Element): void;
-    drag: (node: Element) => void;
-    reset: (node: Element) => void;
-    disabled: boolean;
+  interface EnvHeaderCell {
+    type: 'env'
+    env: Env;
+    summary: LiveRun['summaries'][number];
   }
-  function castResizeExtension(builder: unknown): ResizeExtension {
-    return (
-      builder as {
-        resize: ResizeExtension;
-      }
-    ).resize;
+
+  interface BodyRow {
+    cells: Iterable<BodyCell>;
   }
+
+  interface VarCell {
+    type: 'var';
+    var: string;
+  }
+
+  interface ResultCell {
+    type: 'result';
+    env: LiveRun['envs'][number];
+    result: LiveRun['results'][number][number];
+  }
+
+  interface LabelCell {
+    type: 'label';
+    text: string;
+  }
+
+  function* headerCells(run: LiveRun): Generator<HeaderCell, void, void> {
+    yield {
+      type: 'label',
+      text: 'Test',
+    };
+    for (const varName of run.varNames) {
+      yield {
+        type: 'var',
+        varName,
+      };
+    }
+    for (let i = 0; i < run.envs.length; i++) {
+      yield {
+        type: 'env',
+        env: run.envs[i],
+        summary: run.summaries[i],
+      };
+    }
+  }
+
+  function* bodyCells(run: LiveRun, i: number): Generator<BodyCell, void, void> {
+    yield {
+      type: 'label',
+      text: run.tests[i].description ?? 'Test',
+    }
+    for (const varName of run.varNames) {
+      yield {
+        type: 'var',
+        var: run.tests[i].vars?.[varName]
+      };
+    }
+    let e = 0;
+    for (const env of run.envs) {
+      yield {
+        type: 'result',
+        result: run.results[i][e++],
+        env,
+      };
+    }
+  }
+
+  function* bodyRows(run: LiveRun): Generator<BodyRow, void, void> {
+    for (let i = 0; i < run.tests.length; i++) {
+      yield {
+        cells: {[Symbol.iterator]: () => bodyCells(run, i)},
+      };
+    }
+  }
+
+  $: header = {[Symbol.iterator]: () => headerCells(run)};
+  $: body = {[Symbol.iterator]: () => bodyRows(run)};
 </script>
 
 <div class="mb-2 flex items-center gap-1.5">
@@ -98,54 +101,42 @@
   <Label for="run-{run.id}-{run.timestamp}">Show vars columns</Label>
 </div>
 <div class="rounded-md border">
-  <Table.Root {...$tableAttrs} class="mr-[150px] w-auto">
-    <Table.Header>
-      {#each $headerRows as headerRow (headerRow.id)}
-        <Subscribe rowAttrs={headerRow.attrs()} let:rowAttrs>
-          <Table.Row {...rowAttrs}>
-            {#each headerRow.cells as cell (cell.id)}
-              <!-- See https://github.com/bryanmylee/svelte-headless-table/issues/139 -->
-              {@const headerCellAttrs = cell.attrs()}
-              {@const headerCellProps = cell.props()}
-              <Subscribe attrs={headerCellAttrs} let:attrs props={headerCellProps} let:props>
-                {@const resize = castResizeExtension(props)}
-                <!-- Classes copied from Table.Head -->
-                <th
-                  class="relative h-10 px-2 pr-[16px] text-left align-top font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]"
-                  {...attrs}
-                  use:resize
-                >
-                  <Render of={cell.render()} />
-
-                  {#if !resize.disabled}
-                    <div class="absolute right-0 top-1 z-10 w-4 cursor-col-resize" use:resize.drag>
-                      <GripVertical class="h-4 w-4"></GripVertical>
-                    </div>
-                  {/if}
-                </th>
-              </Subscribe>
-            {/each}
-          </Table.Row>
-        </Subscribe>
+  <table>
+    <thead>
+      {#each header as cell}
+        {#if cell.type !== 'var' || $showVarsColumnsStore}
+          <th
+            class="text-left align-top font-medium text-muted-foreground"
+          >
+            {#if cell.type === 'label'}
+              {cell.text}
+            {:else if cell.type === 'var'}
+              {cell.varName}
+            {:else if cell.type === 'env'}
+              <RunResultsHeader env={cell.env} summary={cell.summary}></RunResultsHeader>
+            {/if}
+          </th>
+        {/if}
       {/each}
-    </Table.Header>
-    <Table.Body {...$tableBodyAttrs}>
-      {#each $pageRows as row (row.id)}
-        <Subscribe rowAttrs={row.attrs()} let:rowAttrs>
-          <Table.Row {...rowAttrs}>
-            {#each row.cells as cell (cell.id)}
-              <Subscribe attrs={cell.attrs()} let:attrs>
-                <Table.Cell {...attrs} class="align-top">
-                  <Render of={cell.render()} />
-                </Table.Cell>
-              </Subscribe>
-            {/each}
-          </Table.Row>
-        </Subscribe>
+    </thead>
+    <tbody>
+      {#each body as row}
+        <tr>
+          {#each row.cells as cell}
+            {#if cell.type !== 'var' || $showVarsColumnsStore}
+              <td class="align-top">
+                {#if cell.type === 'label'}
+                  {cell.text}
+                {:else if cell.type === 'var'}
+                  <RunResultsVar value={cell.var}></RunResultsVar>
+                {:else if cell.type === 'result'}
+                  <RunResultsCell testResult={cell.result}></RunResultsCell>
+                {/if}
+              </td>
+            {/if}
+          {/each}
+        </tr>
       {/each}
-    </Table.Body>
-  </Table.Root>
+    </tbody>
+  </table>
 </div>
-
-<!-- Necessary to force the column resizing to take effect -->
-<div id="force-{forceResizeUpdateValue}"></div>
