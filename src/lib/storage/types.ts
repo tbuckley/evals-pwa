@@ -13,6 +13,7 @@ export const fsAssertionSchema = z.object({
   // Optional
   description: z.string().optional(),
   vars: z.record(z.string(), z.unknown()).optional(),
+  id: z.string().optional(),
 });
 export type FsAssertion = z.infer<typeof fsAssertionSchema>;
 

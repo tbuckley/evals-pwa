@@ -14,6 +14,7 @@ const argsSchema = z.object({
 
 const jsResultSchema = assertionResultSchema.extend({
   visuals: z.array(z.union([z.string(), z.instanceof(Blob)])).optional(),
+  outputs: z.record(z.string(), z.union([z.boolean(), z.number()])).optional(),
 });
 
 export function createJavascriptAssertion(
@@ -52,6 +53,7 @@ export function createJavascriptAssertion(
         return {
           pass: parsed.pass,
           message: parsed.message,
+          outputs: parsed.outputs,
           visuals,
         };
       } catch (e) {
