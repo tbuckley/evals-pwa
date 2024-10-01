@@ -1,9 +1,11 @@
 <script lang="ts">
   import { FileReference } from '$lib/storage/FileReference';
+  import type { Readable } from 'svelte/store';
   import Button from '../ui/button/button.svelte';
   import Copy from 'lucide-svelte/icons/copy';
 
   export let value: unknown;
+  export let height: Readable<'minimal' | 'collapsed' | 'expanded'>;
 
   function isImageFile(val: unknown): boolean {
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
@@ -21,7 +23,15 @@
 </script>
 
 {#if typeof value === 'string'}
-  <div class="relative whitespace-pre-wrap">
+  <div
+    class="relative overflow-hidden"
+    class:whitespace-nowrap={$height === 'minimal'}
+    class:whitespace-pre-wrap={$height !== 'minimal'}
+    class:w-64={$height === 'minimal'}
+    class:truncate={$height === 'minimal'}
+    class:max-h-48={$height === 'collapsed'}
+    class:overflow-y-auto={$height === 'collapsed'}
+  >
     {value}
     <Button
       on:click={copy}

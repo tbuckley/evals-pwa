@@ -3,14 +3,17 @@
   import RunResultsCell from './run-results-cell.svelte';
   import RunResultsHeader from './run-results-header.svelte';
   import RunResultsVar from './run-results-var.svelte';
+  import RowToggle from './RowToggle.svelte';
   import { showVarsColumnsStore } from '$lib/state/settings';
   import Label from '../ui/label/label.svelte';
   import Checkbox from '../ui/checkbox/checkbox.svelte';
+  import { get, writable, type Writable } from 'svelte/store';
 
   export let run: LiveRun;
 
-  type HeaderCell = VarHeaderCell | EnvHeaderCell | LabelCell;
-  type BodyCell = VarCell | ResultCell | LabelCell;
+  type HeaderCell = VarHeaderCell | EnvHeaderCell | LabelCell | ToggleHeightCell;
+  type BodyCell = VarCell | ResultCell | LabelCell | ToggleHeightCell;
+  type RowHeight = 'minimal' | 'collapsed' | 'expanded';
 
   interface VarHeaderCell {
     type: 'var';
@@ -18,13 +21,14 @@
   }
 
   interface EnvHeaderCell {
-    type: 'env'
+    type: 'env';
     env: Env;
     summary: LiveRun['summaries'][number];
   }
 
   interface BodyRow {
     cells: Iterable<BodyCell>;
+    rowHeight: Writable<RowHeight>;
   }
 
   interface VarCell {
@@ -43,7 +47,14 @@
     text: string;
   }
 
+  interface ToggleHeightCell {
+    type: 'height';
+  }
+
   function* headerCells(run: LiveRun): Generator<HeaderCell, void, void> {
+    yield {
+      type: 'height',
+    };
     yield {
       type: 'label',
       text: 'Test',
@@ -65,13 +76,16 @@
 
   function* bodyCells(run: LiveRun, i: number): Generator<BodyCell, void, void> {
     yield {
+      type: 'height',
+    };
+    yield {
       type: 'label',
       text: run.tests[i].description ?? 'Test',
-    }
+    };
     for (const varName of run.varNames) {
       yield {
         type: 'var',
-        var: run.tests[i].vars?.[varName]
+        var: run.tests[i].vars?.[varName],
       };
     }
     let e = 0;
@@ -87,27 +101,53 @@
   function* bodyRows(run: LiveRun): Generator<BodyRow, void, void> {
     for (let i = 0; i < run.tests.length; i++) {
       yield {
-        cells: {[Symbol.iterator]: () => bodyCells(run, i)},
+        cells: [...bodyCells(run, i)],
+        rowHeight: writable(get(globalRowHeight)),
       };
     }
   }
 
-  $: header = {[Symbol.iterator]: () => headerCells(run)};
-  $: body = {[Symbol.iterator]: () => bodyRows(run)};
+  function cycleRowHeight(target: Writable<RowHeight>) {
+    target.update((current) => {
+      if (current === 'minimal') {
+        return 'collapsed';
+      } else if (current === 'collapsed') {
+        return 'expanded';
+      } else {
+        return 'minimal';
+      }
+    });
+    if (target === globalRowHeight) {
+      const result = get(globalRowHeight);
+      for (const row of body) {
+        row.rowHeight.set(result);
+      }
+    }
+  }
+
+  let globalRowHeight = writable<RowHeight>('expanded');
+
+  $: header = [...headerCells(run)];
+  $: body = [...bodyRows(run)];
 </script>
 
 <div class="mb-2 flex items-center gap-1.5">
   <Checkbox id="run-{run.id}-{run.timestamp}" bind:checked={$showVarsColumnsStore} />
   <Label for="run-{run.id}-{run.timestamp}">Show vars columns</Label>
 </div>
+<button
+  on:click={() => {
+    cycleRowHeight(globalRowHeight);
+  }}
+>
+  Global Toggle: {$globalRowHeight}
+</button>
 <div class="rounded-md border">
   <table>
     <thead>
       {#each header as cell}
         {#if cell.type !== 'var' || $showVarsColumnsStore}
-          <th
-            class="text-left align-top font-medium text-muted-foreground"
-          >
+          <th class="p-1 text-left align-top font-medium text-muted-foreground">
             {#if cell.type === 'label'}
               {cell.text}
             {:else if cell.type === 'var'}
@@ -124,13 +164,15 @@
         <tr>
           {#each row.cells as cell}
             {#if cell.type !== 'var' || $showVarsColumnsStore}
-              <td class="align-top">
+              <td class="p-1 align-top">
                 {#if cell.type === 'label'}
                   {cell.text}
+                {:else if cell.type === 'height'}
+                  <RowToggle height={row.rowHeight} cycle={() => cycleRowHeight(row.rowHeight)} />
                 {:else if cell.type === 'var'}
-                  <RunResultsVar value={cell.var}></RunResultsVar>
+                  <RunResultsVar value={cell.var} height={row.rowHeight} />
                 {:else if cell.type === 'result'}
-                  <RunResultsCell testResult={cell.result}></RunResultsCell>
+                  <RunResultsCell testResult={cell.result} height={row.rowHeight} />
                 {/if}
               </td>
             {/if}
