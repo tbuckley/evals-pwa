@@ -31,12 +31,7 @@
     class:max-h-48={$height === 'collapsed'}
     class:overflow-y-auto={$height === 'collapsed'}
   >
-    <Button
-      on:click={copy}
-      variant="ghost"
-      size="icon"
-      class="float-right text-gray-500"
-    >
+    <Button on:click={copy} variant="ghost" size="icon" class="float-right text-gray-500">
       <Copy class="h-5 w-5"></Copy>
     </Button>
     {value}

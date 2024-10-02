@@ -12,7 +12,6 @@
   import RunResultsSized from './RunResultsSized.svelte';
   import GripVertical from 'lucide-svelte/icons/grip-vertical';
 
-
   export let run: LiveRun;
 
   type HeaderCell = VarHeaderCell | EnvHeaderCell | LabelCell | ToggleHeightCell;
@@ -87,15 +86,21 @@
         type: 'label',
         text: run.tests[i].description ?? 'Test',
       },
-      ...run.varNames.map((varName) => ({
-        type: 'var',
-        var: run.tests[i].vars?.[varName],
-      } as VarCell)),
-      ...run.envs.map((env, e) => ({
-        type: 'result',
-        result: run.results[i][e++],
-        env,
-      } as ResultCell)),
+      ...run.varNames.map(
+        (varName) =>
+          ({
+            type: 'var',
+            var: run.tests[i].vars?.[varName],
+          }) as VarCell,
+      ),
+      ...run.envs.map(
+        (env, e) =>
+          ({
+            type: 'result',
+            result: run.results[i][e++],
+            env,
+          }) as ResultCell,
+      ),
     ];
   }
 
@@ -127,18 +132,25 @@
   }
 
   function resizeDown(e: PointerEvent) {
-    (e.target as HTMLDivElement).setPointerCapture(e.pointerId);
+    (e.target as Element).setPointerCapture(e.pointerId);
   }
   function resizeMove(e: PointerEvent, width: Writable<number | undefined>) {
-    if (!(e.target as HTMLDivElement).hasPointerCapture(e.pointerId)) return;
-    width.update((width) => (width ?? 0) + e.movementX);
+    if (!(e.target as Element).hasPointerCapture(e.pointerId)) return;
+    function defaultWidth() {
+      let element = e.target as Element | null;
+      while (element && !['TD', 'TH'].includes(element.tagName)) {
+        element = element.parentElement;
+      }
+      return element?.firstElementChild?.clientWidth ?? 0;
+    }
+    width.update((width) => (width ?? defaultWidth()) + e.movementX);
   }
 
   let globalRowHeight = writable<RowHeight>('expanded');
 
   $: header = [...headerCells(run)];
   $: body = [...bodyRows(run)];
-  $: columnWidths = header.map((_, i) => writable(i > 1 ? 300 : undefined));
+  $: columnWidths = header.map((_, i) => writable<number | undefined>(undefined));
 </script>
 
 <div class="mb-2 flex items-center gap-1.5">
@@ -152,13 +164,13 @@
 >
   Global Toggle: {$globalRowHeight}
 </button>
-<div class="rounded-md border w-[fit-content]">
+<div class="w-[fit-content] rounded-md border">
   <table>
     <thead>
       <tr class="border-b transition-colors hover:bg-muted/50">
         {#each header as cell, i}
           {#if cell.type !== 'var' || $showVarsColumnsStore}
-            <th class="p-1 text-left align-top font-medium text-muted-foreground relative">
+            <th class="relative p-1 text-left align-top font-medium text-muted-foreground">
               <RunResultsSized width={columnWidths[i]}>
                 {#if cell.type === 'label'}
                   {cell.text}
@@ -168,12 +180,13 @@
                   <RunResultsHeader env={cell.env} />
                 {/if}
                 {#if i > 1}
-                <div class="absolute right-0 top-1 z-10 w-4 cursor-col-resize"
-                  on:pointerdown={resizeDown}
-                  on:pointermove={(e) => resizeMove(e, columnWidths[i])}
-                >
-                  <GripVertical class="h-4 w-4"></GripVertical>
-                </div>
+                  <div
+                    class="absolute right-0 top-1 z-10 w-4 cursor-col-resize"
+                    on:pointerdown={resizeDown}
+                    on:pointermove={(e) => resizeMove(e, columnWidths[i])}
+                  >
+                    <GripVertical class="h-4 w-4"></GripVertical>
+                  </div>
                 {/if}
               </RunResultsSized>
             </th>
