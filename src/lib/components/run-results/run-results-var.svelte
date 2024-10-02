@@ -31,15 +31,15 @@
     class:max-h-48={$height === 'collapsed'}
     class:overflow-y-auto={$height === 'collapsed'}
   >
-    {value}
     <Button
       on:click={copy}
       variant="ghost"
       size="icon"
-      class="absolute right-0 top-0 text-gray-500"
+      class="float-right text-gray-500"
     >
       <Copy class="h-5 w-5"></Copy>
     </Button>
+    {value}
   </div>
 {:else if typeof value === 'object' && value !== null}
   {#if value instanceof FileReference}

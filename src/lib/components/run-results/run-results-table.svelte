@@ -152,10 +152,10 @@
 >
   Global Toggle: {$globalRowHeight}
 </button>
-<div class="rounded-md border">
+<div class="rounded-md border w-[fit-content]">
   <table>
     <thead>
-      <tr>
+      <tr class="border-b transition-colors hover:bg-muted/50">
         {#each header as cell, i}
           {#if cell.type !== 'var' || $showVarsColumnsStore}
             <th class="p-1 text-left align-top font-medium text-muted-foreground relative">
@@ -182,7 +182,7 @@
       </tr>
     </thead>
     <tbody>
-      <tr>
+      <tr class="border-b transition-colors hover:bg-muted/50">
         {#each header as cell, i}
           {#if cell.type !== 'var' || $showVarsColumnsStore}
             <td class="p-1 align-top">
@@ -196,7 +196,7 @@
         {/each}
       </tr>
       {#each body as row}
-        <tr>
+        <tr class="border-b transition-colors hover:bg-muted/50">
           {#each row.cells as cell, i}
             {#if cell.type !== 'var' || $showVarsColumnsStore}
               <td class="p-1 align-top">
