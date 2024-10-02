@@ -4,7 +4,7 @@
   import RunResultsHeader from './run-results-header.svelte';
   import RunResultsVar from './run-results-var.svelte';
   import RowToggle from './RowToggle.svelte';
-  import { showVarsColumnsStore } from '$lib/state/settings';
+  import { showVarsColumnsStore, rowHeightStore } from '$lib/state/settings';
   import Label from '../ui/label/label.svelte';
   import Checkbox from '../ui/checkbox/checkbox.svelte';
   import { get, writable, type Writable } from 'svelte/store';
@@ -108,7 +108,7 @@
     for (let i = 0; i < run.tests.length; i++) {
       yield {
         cells: bodyCells(run, i),
-        rowHeight: writable(get(globalRowHeight)),
+        rowHeight: writable(get(rowHeightStore)),
       };
     }
   }
@@ -123,8 +123,8 @@
         return 'minimal';
       }
     });
-    if (target === globalRowHeight) {
-      const result = get(globalRowHeight);
+    if (target === rowHeightStore) {
+      const result = get(rowHeightStore);
       for (const row of body) {
         row.rowHeight.set(result);
       }
@@ -146,8 +146,6 @@
     width.update((width) => (width ?? defaultWidth()) + e.movementX);
   }
 
-  let globalRowHeight = writable<RowHeight>('expanded');
-
   $: header = [...headerCells(run)];
   $: body = [...bodyRows(run)];
   $: columnWidths = header.map(() => writable<number | undefined>(undefined));
@@ -159,10 +157,10 @@
 </div>
 <button
   on:click={() => {
-    cycleRowHeight(globalRowHeight);
+    cycleRowHeight(rowHeightStore);
   }}
 >
-  Global Toggle: {$globalRowHeight}
+  Global Toggle: {$rowHeightStore}
 </button>
 <div class="w-[fit-content] rounded-md border">
   <table>
