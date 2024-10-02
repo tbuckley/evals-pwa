@@ -38,7 +38,7 @@ const rowHeightSchema = z.union([
   z.literal('collapsed'),
   z.literal('expanded'),
 ]);
-type RowHeight = z.infer<typeof rowHeightSchema>;
+export type RowHeight = z.infer<typeof rowHeightSchema>;
 
 export const rowHeightStore = createLocalStorageStore<RowHeight>(
   'rowHeight',

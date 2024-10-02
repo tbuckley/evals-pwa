@@ -4,7 +4,7 @@
   import RunResultsHeader from './run-results-header.svelte';
   import RunResultsVar from './run-results-var.svelte';
   import RowToggle from './RowToggle.svelte';
-  import { showVarsColumnsStore, rowHeightStore } from '$lib/state/settings';
+  import { showVarsColumnsStore, rowHeightStore, type RowHeight } from '$lib/state/settings';
   import Label from '../ui/label/label.svelte';
   import Checkbox from '../ui/checkbox/checkbox.svelte';
   import { get, writable, type Writable } from 'svelte/store';
@@ -16,7 +16,6 @@
 
   type HeaderCell = VarHeaderCell | EnvHeaderCell | LabelCell | ToggleHeightCell;
   type BodyCell = VarCell | ResultCell | LabelCell | ToggleHeightCell;
-  type RowHeight = 'minimal' | 'collapsed' | 'expanded';
 
   interface VarHeaderCell {
     type: 'var';
@@ -162,7 +161,7 @@
 >
   Global Toggle: {$rowHeightStore}
 </button>
-<div class="w-[fit-content] rounded-md border">
+<div class="mr-40 w-[fit-content] rounded-md border">
   <table>
     <thead>
       <tr class="border-b transition-colors hover:bg-muted/50">

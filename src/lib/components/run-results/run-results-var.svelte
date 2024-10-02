@@ -22,37 +22,37 @@
   }
 </script>
 
-{#if typeof value === 'string'}
-  <div
-    class="relative overflow-hidden"
-    class:whitespace-nowrap={$height === 'minimal'}
-    class:whitespace-pre-wrap={$height !== 'minimal'}
-    class:max-w-lg={$height === 'minimal'}
-    class:truncate={$height === 'minimal'}
-    class:max-h-48={$height === 'collapsed'}
-    class:overflow-y-auto={$height === 'collapsed'}
-  >
+<div
+  class="relative overflow-hidden"
+  class:whitespace-nowrap={$height === 'minimal'}
+  class:whitespace-pre-wrap={$height !== 'minimal'}
+  class:max-w-lg={$height === 'minimal'}
+  class:truncate={$height === 'minimal'}
+  class:max-h-48={$height === 'collapsed'}
+  class:overflow-y-auto={$height === 'collapsed'}
+>
+  {#if typeof value === 'string'}
     <Button on:click={copy} variant="ghost" size="icon" class="float-right text-gray-500">
       <Copy class="h-5 w-5"></Copy>
     </Button>
     {value}
-  </div>
-{:else if typeof value === 'object' && value !== null}
-  {#if value instanceof FileReference}
-    {#if isImageFile(value)}
-      <img
-        src={URL.createObjectURL(value.file)}
-        alt={value.file.name}
-        class="max-h-[200px] max-w-[200px]"
-      />
+  {:else if typeof value === 'object' && value !== null}
+    {#if value instanceof FileReference}
+      {#if isImageFile(value)}
+        <img
+          src={URL.createObjectURL(value.file)}
+          alt={value.file.name}
+          class="max-h-[200px] max-w-[200px]"
+        />
+      {:else}
+        {value.uri}
+      {/if}
     {:else}
-      <pre class="text-xs">{value.uri}</pre>
+      {JSON.stringify(value, null, 2)}
     {/if}
+  {:else if !value}
+    <span class="italic">-N/A-</span>
   {:else}
-    <pre class="text-xs">{JSON.stringify(value, null, 2)}</pre>
+    {value}
   {/if}
-{:else if !value}
-  <span class="italic">-N/A-</span>
-{:else}
-  {value}
-{/if}
+</div>
