@@ -9,6 +9,9 @@
   import Checkbox from '../ui/checkbox/checkbox.svelte';
   import { get, writable, type Writable } from 'svelte/store';
   import RunResultsSummary from './run-results-summary.svelte';
+  import RunResultsSized from './RunResultsSized.svelte';
+  import GripVertical from 'lucide-svelte/icons/grip-vertical';
+
 
   export let run: LiveRun;
 
@@ -75,34 +78,31 @@
     }
   }
 
-  function* bodyCells(run: LiveRun, i: number): Generator<BodyCell, void, void> {
-    yield {
-      type: 'height',
-    };
-    yield {
-      type: 'label',
-      text: run.tests[i].description ?? 'Test',
-    };
-    for (const varName of run.varNames) {
-      yield {
+  function bodyCells(run: LiveRun, i: number): BodyCell[] {
+    return [
+      {
+        type: 'height',
+      },
+      {
+        type: 'label',
+        text: run.tests[i].description ?? 'Test',
+      },
+      ...run.varNames.map((varName) => ({
         type: 'var',
         var: run.tests[i].vars?.[varName],
-      };
-    }
-    let e = 0;
-    for (const env of run.envs) {
-      yield {
+      } as VarCell)),
+      ...run.envs.map((env, e) => ({
         type: 'result',
         result: run.results[i][e++],
         env,
-      };
-    }
+      } as ResultCell)),
+    ];
   }
 
   function* bodyRows(run: LiveRun): Generator<BodyRow, void, void> {
     for (let i = 0; i < run.tests.length; i++) {
       yield {
-        cells: [...bodyCells(run, i)],
+        cells: bodyCells(run, i),
         rowHeight: writable(get(globalRowHeight)),
       };
     }
@@ -126,10 +126,19 @@
     }
   }
 
+  function resizeDown(e: PointerEvent) {
+    (e.target as HTMLDivElement).setPointerCapture(e.pointerId);
+  }
+  function resizeMove(e: PointerEvent, width: Writable<number | undefined>) {
+    if (!(e.target as HTMLDivElement).hasPointerCapture(e.pointerId)) return;
+    width.update((width) => (width ?? 0) + e.movementX);
+  }
+
   let globalRowHeight = writable<RowHeight>('expanded');
 
   $: header = [...headerCells(run)];
   $: body = [...bodyRows(run)];
+  $: columnWidths = header.map((_, i) => writable(i > 1 ? 300 : undefined));
 </script>
 
 <div class="mb-2 flex items-center gap-1.5">
@@ -147,16 +156,26 @@
   <table>
     <thead>
       <tr>
-        {#each header as cell}
+        {#each header as cell, i}
           {#if cell.type !== 'var' || $showVarsColumnsStore}
-            <th class="p-1 text-left align-top font-medium text-muted-foreground">
-              {#if cell.type === 'label'}
-                {cell.text}
-              {:else if cell.type === 'var'}
-                {cell.varName}
-              {:else if cell.type === 'env'}
-                <RunResultsHeader env={cell.env} />
-              {/if}
+            <th class="p-1 text-left align-top font-medium text-muted-foreground relative">
+              <RunResultsSized width={columnWidths[i]}>
+                {#if cell.type === 'label'}
+                  {cell.text}
+                {:else if cell.type === 'var'}
+                  {cell.varName}
+                {:else if cell.type === 'env'}
+                  <RunResultsHeader env={cell.env} />
+                {/if}
+                {#if i > 1}
+                <div class="absolute right-0 top-1 z-10 w-4 cursor-col-resize"
+                  on:pointerdown={resizeDown}
+                  on:pointermove={(e) => resizeMove(e, columnWidths[i])}
+                >
+                  <GripVertical class="h-4 w-4"></GripVertical>
+                </div>
+                {/if}
+              </RunResultsSized>
             </th>
           {/if}
         {/each}
@@ -164,32 +183,34 @@
     </thead>
     <tbody>
       <tr>
-        {#each header as cell}
+        {#each header as cell, i}
           {#if cell.type !== 'var' || $showVarsColumnsStore}
-            {#if cell.type === 'env'}
-              <td class="p-1 align-top">
-                <RunResultsSummary summary={cell.summary} />
-              </td>
-            {:else}
-              <td></td>
-            {/if}
+            <td class="p-1 align-top">
+              <RunResultsSized width={columnWidths[i]}>
+                {#if cell.type === 'env'}
+                  <RunResultsSummary summary={cell.summary} />
+                {/if}
+              </RunResultsSized>
+            </td>
           {/if}
         {/each}
       </tr>
       {#each body as row}
         <tr>
-          {#each row.cells as cell}
+          {#each row.cells as cell, i}
             {#if cell.type !== 'var' || $showVarsColumnsStore}
               <td class="p-1 align-top">
-                {#if cell.type === 'label'}
-                  {cell.text}
-                {:else if cell.type === 'height'}
-                  <RowToggle height={row.rowHeight} cycle={() => cycleRowHeight(row.rowHeight)} />
-                {:else if cell.type === 'var'}
-                  <RunResultsVar value={cell.var} height={row.rowHeight} />
-                {:else if cell.type === 'result'}
-                  <RunResultsCell testResult={cell.result} height={row.rowHeight} />
-                {/if}
+                <RunResultsSized width={columnWidths[i]}>
+                  {#if cell.type === 'label'}
+                    {cell.text}
+                  {:else if cell.type === 'height'}
+                    <RowToggle height={row.rowHeight} cycle={() => cycleRowHeight(row.rowHeight)} />
+                  {:else if cell.type === 'var'}
+                    <RunResultsVar value={cell.var} height={row.rowHeight} />
+                  {:else if cell.type === 'result'}
+                    <RunResultsCell testResult={cell.result} height={row.rowHeight} />
+                  {/if}
+                </RunResultsSized>
               </td>
             {/if}
           {/each}
