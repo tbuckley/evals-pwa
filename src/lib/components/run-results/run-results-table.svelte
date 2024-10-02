@@ -8,6 +8,7 @@
   import Label from '../ui/label/label.svelte';
   import Checkbox from '../ui/checkbox/checkbox.svelte';
   import { get, writable, type Writable } from 'svelte/store';
+  import RunResultsSummary from './run-results-summary.svelte';
 
   export let run: LiveRun;
 
@@ -145,21 +146,36 @@
 <div class="rounded-md border">
   <table>
     <thead>
-      {#each header as cell}
-        {#if cell.type !== 'var' || $showVarsColumnsStore}
-          <th class="p-1 text-left align-top font-medium text-muted-foreground">
-            {#if cell.type === 'label'}
-              {cell.text}
-            {:else if cell.type === 'var'}
-              {cell.varName}
-            {:else if cell.type === 'env'}
-              <RunResultsHeader env={cell.env} summary={cell.summary}></RunResultsHeader>
-            {/if}
-          </th>
-        {/if}
-      {/each}
+      <tr>
+        {#each header as cell}
+          {#if cell.type !== 'var' || $showVarsColumnsStore}
+            <th class="p-1 text-left align-top font-medium text-muted-foreground">
+              {#if cell.type === 'label'}
+                {cell.text}
+              {:else if cell.type === 'var'}
+                {cell.varName}
+              {:else if cell.type === 'env'}
+                <RunResultsHeader env={cell.env} />
+              {/if}
+            </th>
+          {/if}
+        {/each}
+      </tr>
     </thead>
     <tbody>
+      <tr>
+        {#each header as cell}
+          {#if cell.type !== 'var' || $showVarsColumnsStore}
+            {#if cell.type === 'env'}
+              <td class="p-1 align-top">
+                <RunResultsSummary summary={cell.summary} />
+              </td>
+            {:else}
+              <td></td>
+            {/if}
+          {/if}
+        {/each}
+      </tr>
       {#each body as row}
         <tr>
           {#each row.cells as cell}
