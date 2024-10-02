@@ -1,5 +1,13 @@
 import { derived, get, writable, type Writable } from 'svelte/store';
-import { configStore, liveRunStore, runStore, selectedRunIdStore, storageStore } from './stores';
+import {
+  configStore,
+  liveRunStore,
+  runStore,
+  selectedRunIdStore,
+  storageStore,
+  configFilesStore,
+  selectedConfigFileStore,
+} from './stores';
 import {
   UiError,
   type AssertionResult,
@@ -33,8 +41,28 @@ if (folder) {
   const permission = await folder.queryPermission({ mode: 'readwrite' });
   if (permission === 'granted') {
     await setStorageDirectory(folder);
+
+    // Remember config, if one was set
+    const configName = await idb.get<string>('config');
+    const configs = get(configFilesStore);
+    if (configName && configs.includes(configName)) {
+      selectedConfigFileStore.set(configName);
+    }
+
+    await loadStateFromStorage();
   }
 }
+
+// Track the selected configuration
+selectedConfigFileStore.subscribe((configName) => {
+  // Only remember it if we are currently in a folder
+  const storage = get(storageStore);
+  if (storage instanceof FileSystemEvalsStorage && storage.fs instanceof WebFileSystemStorage) {
+    idb.set('config', configName).catch((err: unknown) => {
+      console.error('Unable to remember selected config', err);
+    });
+  }
+});
 
 export async function chooseFolder() {
   let dir: FileSystemDirectoryHandle;
@@ -51,6 +79,7 @@ export async function chooseFolder() {
 
   // TODO don't allow the user to select a directory if it is invalid
   await setStorageDirectory(dir);
+  await loadStateFromStorage();
 }
 
 export async function setStorageDirectory(dir: FileSystemDirectoryHandle) {
@@ -63,6 +92,7 @@ export async function setInMemoryConfig(config: string) {
   const storage = new InMemoryStorage();
   await storage.writeFile('file:///config.yaml', config);
   await idb.del('folder');
+  await idb.del('config');
   await setStorage(storage);
 }
 
@@ -106,18 +136,25 @@ export async function setStorage(fileStorage: FileStorage | null) {
     return;
   }
 
-  const storage = new FileSystemEvalsStorage(fileStorage);
-  storageStore.set(storage);
-  await loadStateFromStorage();
+  const evalsStorage = new FileSystemEvalsStorage(fileStorage);
+  storageStore.set(evalsStorage);
+
+  const configFiles = await evalsStorage.getConfigNames();
+  configFilesStore.set(configFiles);
+  selectedConfigFileStore.set(configFiles[0]);
 }
 
-export async function loadStateFromStorage(): Promise<void> {
+export async function loadStateFromStorage() {
   const storage = get(storageStore);
   if (!storage) return;
 
+  const selectedConfigFile = get(selectedConfigFileStore);
   let config, runs;
   try {
-    [config, runs] = await Promise.all([storage.getConfig(), storage.getAllRuns()]);
+    [config, runs] = await Promise.all([
+      storage.getConfig(selectedConfigFile),
+      storage.getAllRuns(selectedConfigFile),
+    ]);
   } catch (err) {
     if (err instanceof UiError) {
       switch (err.detail.type) {
@@ -177,9 +214,10 @@ export async function runTests() {
   if (!storage) {
     throw new Error('Cannot call runTests without a storage');
   }
+  const configFile = get(selectedConfigFileStore);
 
   // Check if the config is the latest
-  const latestConfig = await storage.getConfig();
+  const latestConfig = await storage.getConfig(configFile);
   if (!deepEquals(config, latestConfig)) {
     // Prompt the user to update to the latest config
     const res = await showPrompt({
@@ -305,7 +343,7 @@ export async function runTests() {
   }));
 
   // Save the run to storage
-  await storage.addRun(liveRunToRun(run));
+  await storage.addRun(configFile, liveRunToRun(run));
 
   if (document.visibilityState !== 'visible' && Notification.permission === 'granted') {
     new Notification('Eval complete', { body: 'See your results in Evals.' });

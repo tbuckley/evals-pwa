@@ -41,6 +41,7 @@
 
   async function handleSaveToInMemoryStorage() {
     await setInMemoryConfig(config);
+    await loadStateFromStorage();
     savedConfig = config;
   }
 

@@ -22,12 +22,36 @@ export class FileSystemEvalsStorage implements StorageProvider {
     return this.fs.getName();
   }
 
-  async getConfig(): Promise<NormalizedConfig> {
+  async getConfigNames(): Promise<string[]> {
+    // Get everything matching config.yaml, evals.yaml, or *.evals.yaml
+    const files = await this.fs.load('file:///*.{yaml,evals.yaml}');
+    const fileNames = (files as { uri: string; file: File }[])
+      .map(({ uri }) => uri.split('/').pop() ?? '')
+      .filter(
+        (name) => name === 'config.yaml' || name === 'evals.yaml' || name.endsWith('.evals.yaml'),
+      );
+
+    // Separate the files into categories
+    const evalsYaml = fileNames.find((name) => name === 'evals.yaml');
+    const configYaml = fileNames.find((name) => name === 'config.yaml');
+    const otherEvalsYaml = fileNames
+      .filter((name) => name !== 'evals.yaml' && name !== 'config.yaml')
+      .sort((a, b) => a.localeCompare(b));
+
+    // Combine the results in the desired order
+    return [
+      ...(evalsYaml ? [evalsYaml] : []),
+      ...(configYaml ? [configYaml] : []),
+      ...otherEvalsYaml,
+    ];
+  }
+
+  async getConfig(name = 'config.yaml'): Promise<NormalizedConfig> {
     let file;
     try {
-      file = await this.fs.loadFile('file:///config.yaml');
+      file = await this.fs.loadFile(`file:///${name}`);
     } catch {
-      throw new UiError({ type: 'missing-config', path: 'file:///config.yaml' });
+      throw new UiError({ type: 'missing-config', path: `file:///${name}` });
     }
 
     let text;
@@ -89,10 +113,11 @@ export class FileSystemEvalsStorage implements StorageProvider {
     return normalizeConfig(parsed.data);
   }
 
-  async getAllRuns(): Promise<Run[]> {
+  async getAllRuns(configName: string): Promise<Run[]> {
+    const basePath = getRunsDir(configName);
     let files;
     try {
-      files = (await this.fs.load('file:///runs/*.json')) as { uri: string; file: File }[];
+      files = (await this.fs.load(basePath + '/*.json')) as { uri: string; file: File }[];
     } catch {
       return [];
     }
@@ -124,7 +149,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
     return results.filter((result) => result.status === 'fulfilled').map((result) => result.value);
   }
 
-  async addRun(run: Run): Promise<void> {
+  async addRun(configName: string, run: Run): Promise<void> {
     // TODO switch to yaml?
     // TODO also add a uuid to guarantee uniqueness
     // TODO format as datetime string
@@ -149,10 +174,20 @@ export class FileSystemEvalsStorage implements StorageProvider {
     );
 
     // Then save the run
-    await this.fs.writeFile(`file:///runs/${run.timestamp}.json`, data);
+    const basePath = getRunsDir(configName);
+    await this.fs.writeFile(`${basePath}/${run.timestamp}.json`, data);
   }
 
   loadFile(uri: string): Promise<File> {
     return this.fs.loadFile(uri);
   }
+}
+
+function getRunsDir(configName: string): string {
+  let basePath = 'file:///runs';
+  if (configName.endsWith('.evals.yaml')) {
+    const prefix = configName.slice(0, '.evals.yaml'.length * -1); // Remove '.evals.yaml'
+    basePath += `/${prefix}`;
+  }
+  return basePath;
 }

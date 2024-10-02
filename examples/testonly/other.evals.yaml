@@ -1,0 +1,21 @@
+description: Fake test suite using `only`
+
+providers:
+  - reverser:whatever
+
+prompts:
+  - 'Hello, {{word}}!'
+  - 'The word: {{word}}'
+
+tests:
+  - description: First
+    only: true
+    vars:
+      word: first
+  - description: Second
+    vars:
+      word: second
+  - description: Third
+    only: true
+    vars:
+      word: third
