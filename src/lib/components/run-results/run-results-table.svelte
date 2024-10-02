@@ -36,7 +36,7 @@
 
   interface VarCell {
     type: 'var';
-    var: string;
+    var: unknown;
   }
 
   interface ResultCell {
@@ -150,7 +150,7 @@
 
   $: header = [...headerCells(run)];
   $: body = [...bodyRows(run)];
-  $: columnWidths = header.map((_, i) => writable<number | undefined>(undefined));
+  $: columnWidths = header.map(() => writable<number | undefined>(undefined));
 </script>
 
 <div class="mb-2 flex items-center gap-1.5">
@@ -183,7 +183,9 @@
                   <div
                     class="absolute right-0 top-1 z-10 w-4 cursor-col-resize"
                     on:pointerdown={resizeDown}
-                    on:pointermove={(e) => resizeMove(e, columnWidths[i])}
+                    on:pointermove={(e) => {
+                      resizeMove(e, columnWidths[i]);
+                    }}
                   >
                     <GripVertical class="h-4 w-4"></GripVertical>
                   </div>
@@ -217,7 +219,12 @@
                   {#if cell.type === 'label'}
                     {cell.text}
                   {:else if cell.type === 'height'}
-                    <RowToggle height={row.rowHeight} cycle={() => cycleRowHeight(row.rowHeight)} />
+                    <RowToggle
+                      height={row.rowHeight}
+                      cycle={() => {
+                        cycleRowHeight(row.rowHeight);
+                      }}
+                    />
                   {:else if cell.type === 'var'}
                     <RunResultsVar value={cell.var} height={row.rowHeight} />
                   {:else if cell.type === 'result'}

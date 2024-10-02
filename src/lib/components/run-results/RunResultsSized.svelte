@@ -4,6 +4,6 @@
   export let width: Writable<number | undefined>;
 </script>
 
-<div class="overflow-hidden" style:width={$width ? $width + 'px' : 'auto'}>
+<div class="overflow-hidden" style:width={$width ? `${$width}px` : 'auto'}>
   <slot />
 </div>

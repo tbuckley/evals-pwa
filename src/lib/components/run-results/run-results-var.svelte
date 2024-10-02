@@ -27,6 +27,7 @@
     class="relative overflow-hidden"
     class:whitespace-nowrap={$height === 'minimal'}
     class:whitespace-pre-wrap={$height !== 'minimal'}
+    class:max-w-lg={$height === 'minimal'}
     class:truncate={$height === 'minimal'}
     class:max-h-48={$height === 'collapsed'}
     class:overflow-y-auto={$height === 'collapsed'}
