@@ -151,23 +151,24 @@
 </script>
 
 <div class="mb-2 flex items-center gap-1.5">
-  <Checkbox id="run-{run.id}-{run.timestamp}" bind:checked={$showVarsColumnsStore} />
-  <Label for="run-{run.id}-{run.timestamp}">Show vars columns</Label>
+  <Checkbox id="vars-run-{run.id}-{run.timestamp}" bind:checked={$showVarsColumnsStore} />
+  <Label for="vars-run-{run.id}-{run.timestamp}">Show vars columns</Label>
+  <RowToggle
+    id="height-run-{run.id}-{run.timestamp}"
+    height={rowHeightStore}
+    cycle={() => {
+      cycleRowHeight(rowHeightStore);
+    }}
+  />
+  <Label for="height-run-{run.id}-{run.timestamp}">Toggle row height</Label>
 </div>
-<button
-  on:click={() => {
-    cycleRowHeight(rowHeightStore);
-  }}
->
-  Global Toggle: {$rowHeightStore}
-</button>
-<div class="mr-40 w-[fit-content] rounded-md border">
+<div class="w-[fit-content] rounded-md border pr-40 text-sm">
   <table>
     <thead>
       <tr class="border-b transition-colors hover:bg-muted/50">
         {#each header as cell, i}
           {#if cell.type !== 'var' || $showVarsColumnsStore}
-            <th class="relative p-1 text-left align-top font-medium text-muted-foreground">
+            <th class="relative p-1 pr-4 text-left align-top font-medium text-muted-foreground">
               <RunResultsSized width={columnWidths[i]}>
                 {#if cell.type === 'label'}
                   {cell.text}
@@ -178,7 +179,7 @@
                 {/if}
                 {#if i > 1}
                   <div
-                    class="absolute right-0 top-1 z-10 w-4 cursor-col-resize"
+                    class="absolute right-0 top-2 z-10 w-4 cursor-col-resize"
                     on:pointerdown={resizeDown}
                     on:pointermove={(e) => {
                       resizeMove(e, columnWidths[i]);

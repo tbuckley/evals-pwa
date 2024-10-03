@@ -3,12 +3,13 @@
   import ChevronUp from 'lucide-svelte/icons/chevron-up';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
+  import Button from '../ui/button/button.svelte';
 
   export let height: Writable<'minimal' | 'collapsed' | 'expanded'>;
   export let cycle: () => void;
 </script>
 
-<button on:click={cycle}>
+<Button on:click={cycle} variant="ghost" size="sm" class="text-gray-500" {...$$restProps}>
   {#if $height === 'minimal'}
     <ChevronUp class="h-5 w-5"></ChevronUp>
   {:else if $height === 'collapsed'}
@@ -16,4 +17,4 @@
   {:else}
     <ChevronDown class="h-5 w-5"></ChevronDown>
   {/if}
-</button>
+</Button>
