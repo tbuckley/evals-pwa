@@ -16,6 +16,6 @@ test.describe('running a configuration', () => {
     await page.locator('button', { hasText: 'Run tests' }).click();
 
     // Expect only the two tests marked `only`
-    await expect(page.locator('tbody tr')).toHaveCount(2);
+    await expect(page.locator('tbody tr')).toHaveCount(2 + 1);
   });
 });

@@ -32,3 +32,16 @@ export const showVarsColumnsStore = createLocalStorageStore<boolean>(
   boolSchema,
   true,
 );
+
+const rowHeightSchema = z.union([
+  z.literal('minimal'),
+  z.literal('collapsed'),
+  z.literal('expanded'),
+]);
+export type RowHeight = z.infer<typeof rowHeightSchema>;
+
+export const rowHeightStore = createLocalStorageStore<RowHeight>(
+  'rowHeight',
+  rowHeightSchema,
+  'expanded',
+);
