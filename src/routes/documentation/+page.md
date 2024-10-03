@@ -4,11 +4,11 @@ A [Promptfoo](https://www.promptfoo.dev/docs/intro)-inspired evaluation framewor
 
 ## Getting Started
 
-Create a folder containing a `config.yaml` file (see [YAML spec](https://yaml.org/)). It is mostly following the Promptfoo format, with some minor differences. _TODO: document the differences_
+Create a folder containing a `evals.yaml` file (see [YAML spec](https://yaml.org/)). It is mostly following the Promptfoo format, with some minor differences. _TODO: document the differences_
 
 Once you select it, you will then be prompted (ha) to add API keys (or other required env variables) before continuing. These will be saved in your browser's local storage across sessions. You can edit them from the settings icon in the top-right.
 
-If you run tests and they are taking a while, feel free to navigate elsewhere -- a notification will be shown when your tests are complete. When you run tests, it will check if config.yaml has changed on disk and prompt you to use the updated one if so.
+If you run tests and they are taking a while, feel free to navigate elsewhere -- a notification will be shown when your tests are complete. When you run tests, it will check if your configuration has changed on disk and prompt you to use the updated one if so.
 
 ```yaml
 description: A short description
@@ -324,3 +324,9 @@ tests:
     vars:
       request: Who was the first US president?
 ```
+
+## Multiple configurations
+
+You can create multiple configuration files within your folder (including in subdirectories) by naming them `*.evals.yaml`. A dropdown in the header bar lets you switch between them. Runs will be saved in a corresponding folder, for example runs for `basic.evals.yaml` will be saved to `runs/basic/<ID>.json`.
+
+For legacy reasons, `config.yaml` is also supported.

@@ -1,0 +1,25 @@
+description: Fake test suite using `only`
+
+providers:
+  - reverser:whatever
+
+prompts:
+  - 'Hello, {{word}}!'
+  - 'The word: {{word}}'
+
+tests:
+  - description: First
+    vars:
+      word: first
+  - description: Second
+    only: true
+    vars:
+      word: second
+  - description: Third
+    only: true
+    vars:
+      word: third
+    assert:
+      - type: javascript
+        vars:
+          code: file://./blobmaker.ts

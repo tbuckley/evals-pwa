@@ -14,6 +14,14 @@ import { normalizeConfig } from './normalizeConfig';
 import { fsConfigSchema } from './types';
 import * as yaml from 'yaml';
 import * as CodeSandbox from '$lib/utils/CodeSandbox';
+import {
+  fileUriToPath,
+  getDirname,
+  joinPath,
+  pathIsAbsolute,
+  pathIsRelative,
+  pathToFileUri,
+} from '$lib/utils/path';
 
 export class FileSystemEvalsStorage implements StorageProvider {
   constructor(public fs: FileStorage) {}
@@ -24,9 +32,15 @@ export class FileSystemEvalsStorage implements StorageProvider {
 
   async getConfigNames(): Promise<string[]> {
     // Get everything matching config.yaml, evals.yaml, or *.evals.yaml
-    const files = await this.fs.load('file:///*.{yaml,evals.yaml}');
+    const files = await this.fs.load('file:///**/*.{yaml,evals.yaml}');
     const fileNames = (files as { uri: string; file: File }[])
-      .map(({ uri }) => uri.split('/').pop() ?? '')
+      .map(({ uri }) => {
+        const path = fileUriToPath(uri);
+        if (!pathIsAbsolute(path)) {
+          throw new Error('Absolute paths are required');
+        }
+        return path.substring(1);
+      })
       .filter(
         (name) => name === 'config.yaml' || name === 'evals.yaml' || name.endsWith('.evals.yaml'),
       );
@@ -35,7 +49,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
     const evalsYaml = fileNames.find((name) => name === 'evals.yaml');
     const configYaml = fileNames.find((name) => name === 'config.yaml');
     const otherEvalsYaml = fileNames
-      .filter((name) => name !== 'evals.yaml' && name !== 'config.yaml')
+      .filter((name) => name !== '/evals.yaml' && name !== 'config.yaml')
       .sort((a, b) => a.localeCompare(b));
 
     // Combine the results in the desired order
@@ -77,9 +91,11 @@ export class FileSystemEvalsStorage implements StorageProvider {
       do {
         changed = false;
         try {
+          const baseDir = getDirname('/' + name);
           const derefResult = await dereferenceFilePaths(result, {
             storage: this.fs,
             cache,
+            absolutePath: baseDir,
           });
           changed ||= derefResult.changed;
           result = derefResult.result;
@@ -114,10 +130,10 @@ export class FileSystemEvalsStorage implements StorageProvider {
   }
 
   async getAllRuns(configName: string): Promise<Run[]> {
-    const basePath = getRunsDir(configName);
+    const baseDir = getRunsDir(configName);
     let files;
     try {
-      files = (await this.fs.load(basePath + '/*.json')) as { uri: string; file: File }[];
+      files = (await this.fs.load(baseDir + '*.json')) as { uri: string; file: File }[];
     } catch {
       return [];
     }
@@ -150,6 +166,8 @@ export class FileSystemEvalsStorage implements StorageProvider {
   }
 
   async addRun(configName: string, run: Run): Promise<void> {
+    const baseDir = getRunsDir(configName);
+
     // TODO switch to yaml?
     // TODO also add a uuid to guarantee uniqueness
     // TODO format as datetime string
@@ -168,14 +186,17 @@ export class FileSystemEvalsStorage implements StorageProvider {
         try {
           await this.fs.loadFile(file.uri);
         } catch {
-          await this.fs.writeFile(file.uri, file.file);
+          let filePath = fileUriToPath(file.uri);
+          if (pathIsRelative(filePath)) {
+            filePath = joinPath(fileUriToPath(baseDir), filePath);
+          }
+          await this.fs.writeFile(pathToFileUri(filePath), file.file);
         }
       }),
     );
 
     // Then save the run
-    const basePath = getRunsDir(configName);
-    await this.fs.writeFile(`${basePath}/${run.timestamp}.json`, data);
+    await this.fs.writeFile(`${baseDir}${run.timestamp}.json`, data);
   }
 
   loadFile(uri: string): Promise<File> {
@@ -184,10 +205,10 @@ export class FileSystemEvalsStorage implements StorageProvider {
 }
 
 function getRunsDir(configName: string): string {
-  let basePath = 'file:///runs';
+  let baseDir = 'file:///runs/';
   if (configName.endsWith('.evals.yaml')) {
     const prefix = configName.slice(0, '.evals.yaml'.length * -1); // Remove '.evals.yaml'
-    basePath += `/${prefix}`;
+    baseDir += `${prefix}/`;
   }
-  return basePath;
+  return baseDir;
 }
