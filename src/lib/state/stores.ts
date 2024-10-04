@@ -9,4 +9,4 @@ export const liveRunStore = writable<Record<string, { run: LiveRun; abort: () =>
 export const selectedRunIdStore = writable<string | null>(null);
 
 export const configFilesStore = writable<string[]>([]);
-export const selectedConfigFileStore = writable<string>('config.yaml');
+export const selectedConfigFileStore = writable<string | null>(null);

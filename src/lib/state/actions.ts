@@ -57,7 +57,11 @@ if (folder) {
 selectedConfigFileStore.subscribe((configName) => {
   // Only remember it if we are currently in a folder
   const storage = get(storageStore);
-  if (storage instanceof FileSystemEvalsStorage && storage.fs instanceof WebFileSystemStorage) {
+  if (
+    configName &&
+    storage instanceof FileSystemEvalsStorage &&
+    storage.fs instanceof WebFileSystemStorage
+  ) {
     idb.set('config', configName).catch((err: unknown) => {
       console.error('Unable to remember selected config', err);
     });
@@ -90,7 +94,7 @@ export async function setStorageDirectory(dir: FileSystemDirectoryHandle) {
 
 export async function setInMemoryConfig(config: string) {
   const storage = new InMemoryStorage();
-  await storage.writeFile('file:///config.yaml', config);
+  await storage.writeFile('file:///evals.yaml', config);
   await idb.del('folder');
   await idb.del('config');
   await setStorage(storage);
@@ -135,20 +139,30 @@ export async function setStorage(fileStorage: FileStorage | null) {
     storageStore.set(null);
     return;
   }
-
   const evalsStorage = new FileSystemEvalsStorage(fileStorage);
-  storageStore.set(evalsStorage);
-
   const configFiles = await evalsStorage.getConfigNames();
+
+  // If no config files, consider it an error
+  if (configFiles.length === 0) {
+    throw new Error('Invalid storage, must contain config file');
+  }
+
+  storageStore.set(evalsStorage);
   configFilesStore.set(configFiles);
   selectedConfigFileStore.set(configFiles[0]);
 }
 
 export async function loadStateFromStorage() {
   const storage = get(storageStore);
-  if (!storage) return;
+  if (!storage) {
+    throw new Error('Cannot call loadStateFromStorage() without storage');
+  }
 
   const selectedConfigFile = get(selectedConfigFileStore);
+  if (!selectedConfigFile) {
+    throw new Error('Cannot call loadStateFromStorage() without selected config file');
+  }
+
   let config, runs;
   try {
     [config, runs] = await Promise.all([
@@ -215,6 +229,9 @@ export async function runTests() {
     throw new Error('Cannot call runTests without a storage');
   }
   const configFile = get(selectedConfigFileStore);
+  if (!configFile) {
+    throw new Error('Cannot call runTests without a config file');
+  }
 
   // Check if the config is the latest
   const latestConfig = await storage.getConfig(configFile);

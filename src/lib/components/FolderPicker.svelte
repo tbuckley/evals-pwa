@@ -35,7 +35,7 @@
     {#if $configFilesStore.length > 1}
       <Combobox
         items={$configFilesStore.map((configFile) => ({ value: configFile, label: configFile }))}
-        value={$selectedConfigFileStore}
+        value={$selectedConfigFileStore ?? '--INVALID--'}
         placeholder="Select config file"
         on:select={handleConfigChange}
       />
