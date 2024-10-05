@@ -7,3 +7,6 @@ export const configStore = writable<NormalizedConfig | null>(null);
 export const runStore = writable<Record<string, Run>>({});
 export const liveRunStore = writable<Record<string, { run: LiveRun; abort: () => void }>>({});
 export const selectedRunIdStore = writable<string | null>(null);
+
+export const configFilesStore = writable<string[]>([]);
+export const selectedConfigFileStore = writable<string | null>(null);

@@ -179,7 +179,8 @@ async function handleBlob(
   const ext = getFileExtension(blob);
   const filename = hash + ext;
   const file = new File([blob], filename, { type: blob.type });
-  return handleFile('file:///runs/' + filename, file, options, state);
+  // Use relative path, in case it needs to be saved
+  return handleFile('file://./' + filename, file, options, state);
 }
 
 /**
@@ -191,7 +192,8 @@ export async function blobToFileReference(blob: Blob | File) {
   const ext = getFileExtension(blob);
   const filename = hash + ext;
   const file = new File([blob], filename, { type: blob.type });
-  return new FileReference('file:///runs/' + filename, file);
+  // Use relative path, in case it needs to be saved
+  return new FileReference('file://./' + filename, file);
 }
 
 async function hashBlob(blob: Blob): Promise<string> {

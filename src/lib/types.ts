@@ -129,9 +129,10 @@ export type Run = z.infer<typeof runSchema>;
 
 export interface StorageProvider {
   getName(): string;
-  getConfig(): Promise<NormalizedConfig>;
-  getAllRuns(): Promise<Run[]>;
-  addRun(run: Run): Promise<void>;
+  getConfig(name: string): Promise<NormalizedConfig>;
+  getAllRuns(configName: string): Promise<Run[]>;
+  addRun(configName: string, run: Run): Promise<void>;
+  getConfigNames(): Promise<string[]>;
 }
 
 export interface ReadonlyFileStorage {

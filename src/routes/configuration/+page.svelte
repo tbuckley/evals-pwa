@@ -33,7 +33,7 @@
       $storageStore instanceof FileSystemEvalsStorage &&
       $storageStore.fs instanceof InMemoryStorage
     ) {
-      const file = await $storageStore.fs.loadFile('file:///config.yaml');
+      const file = await $storageStore.fs.loadFile('file:///evals.yaml');
       config = await file.text();
       savedConfig = config;
     }
@@ -41,6 +41,7 @@
 
   async function handleSaveToInMemoryStorage() {
     await setInMemoryConfig(config);
+    await loadStateFromStorage();
     savedConfig = config;
   }
 
