@@ -11,31 +11,30 @@ Once you select it, you will then be prompted (ha) to add API keys (or other req
 If you run tests and they are taking a while, feel free to navigate elsewhere -- a notification will be shown when your tests are complete. When you run tests, it will check if your configuration has changed on disk and prompt you to use the updated one if so.
 
 ```yaml
-description: A short description
-# Note: your description will be shown in a dropdown to help you select a run
+# An optional short description to help identify outputs
+description: My first eval
 
+# One or more prompts you are testing
+prompts:
+  - "Respond like a pirate to this request: {'{{request}}'}"
+  - "Respond with a haiku to this request: {'{{request}}'}"
+
+# One or more providers you want to use for running the prompts
 providers:
   - gemini:gemini-1.5-pro-latest
-  - gemini:gemini-1.5-flash-latest
+  - openai:gpt-4o
 
-prompts:
-  - Speak like a pirate. {{request}}
-  - Only respond with a haiku. {{request}}
-  # For multi-line prompts, you probably want to use ">-"
-  # See https://yaml-multiline.info/
-  - >-
-    This is a multi-line string where all the
-    newlines will be replaced with spaces,
-    and there will be no newline at the end.
-
+# Tests provide values to feed into the prompts, and
+# checks to make sure the output is right
 tests:
   - description: foo
     vars:
       request: Who was the first US president?
-    asserts:
+    assert:
       - type: contains
         vars:
           needle: washington
+          ignoreCase: true
 ```
 
 ## Providers
