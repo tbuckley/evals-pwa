@@ -45,8 +45,8 @@ description: My first eval
 
 # One or more prompts you are testing
 prompts:
-	- Respond like a pirate to this request: {'{{request}}'}}
-	- Respond with a haiku to this request: {'{{request}}'}}
+  - "Respond like a pirate to this request: {'{{request}}'}"
+  - "Respond with a haiku to this request: {'{{request}}'}"
 
 # One or more providers you want to use for running the prompts
 providers:
@@ -56,13 +56,14 @@ providers:
 # Tests provide values to feed into the prompts, and
 # checks to make sure the output is right
 tests:
-	- description: foo
-		vars:
-			request: Who was the first US president?
-		assert:
-			- type: contains
-				vars:
-					needle: washington
+  - description: foo
+    vars:
+      request: Who was the first US president?
+    assert:
+      - type: contains
+        vars:
+          needle: washington
+          ignoreCase: true
 </pre>
     <p>
       For more details, check out the <a href="/documentation">documentation</a>.
