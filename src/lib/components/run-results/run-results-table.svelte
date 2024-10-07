@@ -4,7 +4,13 @@
   import RunResultsHeader from './run-results-header.svelte';
   import RunResultsVar from './run-results-var.svelte';
   import RowToggle from './RowToggle.svelte';
-  import { showVarsColumnsStore, rowHeightStore, type RowHeight } from '$lib/state/settings';
+  import {
+    showVarsColumnsStore,
+    rowHeightStore,
+    headerRowHeightStore,
+    summaryRowHeightStore,
+    type RowHeight,
+  } from '$lib/state/settings';
   import Label from '../ui/label/label.svelte';
   import Checkbox from '../ui/checkbox/checkbox.svelte';
   import { get, writable, type Writable } from 'svelte/store';
@@ -172,10 +178,17 @@
               <RunResultsSized width={columnWidths[i]}>
                 {#if cell.type === 'label'}
                   {cell.text}
+                {:else if cell.type === 'height'}
+                  <RowToggle
+                    height={headerRowHeightStore}
+                    cycle={() => {
+                      cycleRowHeight(headerRowHeightStore);
+                    }}
+                  />
                 {:else if cell.type === 'var'}
                   {cell.varName}
                 {:else if cell.type === 'env'}
-                  <RunResultsHeader env={cell.env} />
+                  <RunResultsHeader env={cell.env} height={headerRowHeightStore} />
                 {/if}
                 {#if i > 1}
                   <div
@@ -201,7 +214,14 @@
             <td class="p-1 align-top">
               <RunResultsSized width={columnWidths[i]}>
                 {#if cell.type === 'env'}
-                  <RunResultsSummary summary={cell.summary} />
+                  <RunResultsSummary summary={cell.summary} height={summaryRowHeightStore} />
+                {:else if cell.type === 'height'}
+                  <RowToggle
+                    height={summaryRowHeightStore}
+                    cycle={() => {
+                      cycleRowHeight(summaryRowHeightStore);
+                    }}
+                  />
                 {/if}
               </RunResultsSized>
             </td>

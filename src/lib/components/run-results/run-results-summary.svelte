@@ -1,14 +1,20 @@
 <script lang="ts">
+  import type { RowHeight } from '$lib/state/settings';
   import type { SummaryStats } from '$lib/types';
   import { type Readable } from 'svelte/store';
 
   export let summary: Readable<SummaryStats>;
+  export let height: Readable<RowHeight>;
 
   $: totalResults = $summary.passed + $summary.failed;
   $: passRate = totalResults > 0 ? ($summary.passed / totalResults) * 100 : 0;
 </script>
 
-<div class="flex flex-col gap-0.5">
+<div
+  class="flex flex-col gap-0.5"
+  class:max-h-48={$height === 'collapsed'}
+  class:overflow-y-auto={$height === 'collapsed'}
+>
   <div class="font-semibold">
     {passRate.toFixed(2)}% pass [{$summary.passed}/{totalResults}]
     {#if $summary.total > totalResults}
@@ -17,7 +23,7 @@
       </div>
     {/if}
   </div>
-  {#if $summary.assertions.length}
+  {#if $summary.assertions.length && $height !== 'minimal'}
     <ul class="list-inside text-sm text-muted-foreground">
       {#each $summary.assertions as assertion}
         <li>

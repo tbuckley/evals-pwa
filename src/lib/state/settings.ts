@@ -45,3 +45,15 @@ export const rowHeightStore = createLocalStorageStore<RowHeight>(
   rowHeightSchema,
   'expanded',
 );
+
+export const headerRowHeightStore = createLocalStorageStore<RowHeight>(
+  'headerRowHeight',
+  rowHeightSchema,
+  'expanded',
+);
+
+export const summaryRowHeightStore = createLocalStorageStore<RowHeight>(
+  'headerRowHeight',
+  rowHeightSchema,
+  'expanded',
+);
