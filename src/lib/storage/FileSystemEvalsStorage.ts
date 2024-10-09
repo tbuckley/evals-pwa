@@ -49,7 +49,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
     const evalsYaml = fileNames.find((name) => name === 'evals.yaml');
     const configYaml = fileNames.find((name) => name === 'config.yaml');
     const otherEvalsYaml = fileNames
-      .filter((name) => name !== '/evals.yaml' && name !== 'config.yaml')
+      .filter((name) => name !== 'evals.yaml' && name !== 'config.yaml')
       .sort((a, b) => a.localeCompare(b));
 
     // Combine the results in the desired order
