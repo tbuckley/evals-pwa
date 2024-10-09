@@ -6,8 +6,8 @@ import {
   type RunContext,
   type TokenUsage,
 } from '$lib/types';
-import { iterateStream } from '$lib/utils/iterateStream';
 import { fileToBase64 } from '$lib/utils/media';
+import { sse } from '$lib/utils/sse';
 import { z } from 'zod';
 
 const generateContentResponseSchema = z.object({
@@ -100,24 +100,12 @@ export class OpenaiProvider implements ModelProvider {
     const stream = resp.body;
     let fullText = '';
     let lastResponseJson: unknown;
-    let buffer = '';
     if (!stream) throw new Error(`Failed to run model: no response`);
-    for await (const chunk of iterateStream(stream.pipeThrough(new TextDecoderStream()))) {
-      // Sometimes the chunks from openai are split/merged.
-      // Buffer them so that we can pull them apart correctly.
-      buffer += chunk;
-      const parts = buffer.split('\n');
-      buffer = parts.pop() ?? '';
-      for (const part of parts) {
-        if (part.startsWith('data: ')) {
-          const value = part.substring(6);
-          if (value === '[DONE]') break;
-          lastResponseJson = JSON.parse(value);
-          const text = this.extractDeltaOutput(lastResponseJson);
-          fullText += text;
-          yield text;
-        }
-      }
+    for await (const value of sse(resp)) {
+      lastResponseJson = JSON.parse(value);
+      const text = this.extractDeltaOutput(lastResponseJson);
+      fullText += text;
+      yield text;
     }
 
     const parsed = generateContentResponseSchema.parse(lastResponseJson);

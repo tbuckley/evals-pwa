@@ -5,7 +5,7 @@ import type {
   RunContext,
   TokenUsage,
 } from '$lib/types';
-import { iterateStream } from '$lib/utils/iterateStream';
+import { sse } from '$lib/utils/sse';
 import { fileToBase64 } from '$lib/utils/media';
 import { z } from 'zod';
 
@@ -154,20 +154,11 @@ export class GeminiProvider implements ModelProvider {
     let fullText = '';
     let lastResponseJson: unknown;
     if (!stream) throw new Error(`Failed to run model: no response`);
-    for await (const chunk of iterateStream(stream.pipeThrough(new TextDecoderStream()))) {
-      // In case multiple chunks arrive at once
-      const chunks = chunk.split('\r\n\r\n').filter((chunk) => chunk.startsWith('data: '));
-      if (chunks.length === 0) {
-        continue;
-      }
-
-      for (const chunk of chunks) {
-        const value = chunk.substring(6);
-        lastResponseJson = JSON.parse(value);
-        const text = this.extractOutput(lastResponseJson);
-        fullText += text;
-        yield text;
-      }
+    for await (const value of sse(resp)) {
+      lastResponseJson = JSON.parse(value);
+      const text = this.extractOutput(lastResponseJson);
+      fullText += text;
+      yield text;
     }
 
     const parsed = generateContentResponseSchema.parse(lastResponseJson);
