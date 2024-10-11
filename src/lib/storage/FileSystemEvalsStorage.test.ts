@@ -26,4 +26,37 @@ describe('FileSystemEvalsStorage', () => {
       },
     ]);
   });
+
+  test('loads relative files', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile(
+      'file:///runs/test.json',
+      JSON.stringify({
+        version: 1,
+        id: 'file://./id.txt',
+        timestamp: 123456,
+        envs: [],
+        tests: [],
+        results: [[]],
+      }),
+    );
+    await storage.writeFile('file:///runs/id.txt', 'my-id');
+
+    const fs = new FileSystemEvalsStorage(storage);
+    const runs = await fs.getAllRuns('evals.yaml');
+    expect(runs).toMatchInlineSnapshot(`
+      [
+        {
+          "envs": [],
+          "id": "my-id",
+          "results": [
+            [],
+          ],
+          "tests": [],
+          "timestamp": 123456,
+          "version": 1,
+        },
+      ]
+    `);
+  });
 });

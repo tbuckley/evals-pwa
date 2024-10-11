@@ -152,6 +152,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
         const dereferenced = await dereferenceFilePaths(json, {
           storage: this.fs,
           ignoreMissing: true,
+          absolutePath: fileUriToPath(baseDir),
         });
         return runSchema.parse(dereferenced.result);
       }),
