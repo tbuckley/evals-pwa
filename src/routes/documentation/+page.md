@@ -16,8 +16,8 @@ description: My first eval
 
 # One or more prompts you are testing
 prompts:
-  - "Respond like a pirate to this request: {'{{request}}'}"
-  - "Respond with a haiku to this request: {'{{request}}'}"
+  - 'Respond like a pirate to this request: {{request}}'
+  - 'Respond with a haiku to this request: {{request}}'
 
 # One or more providers you want to use for running the prompts
 providers:
