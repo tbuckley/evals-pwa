@@ -21,11 +21,13 @@ export class InMemoryStorage implements FileStorage {
   async load(uri: string): Promise<File | { uri: string; file: File }[]> {
     const path = fileUriToPath(uri);
     const { isGlob, base: picoBase, glob: picoGlob } = picomatch.scan(path);
+    const base = picoBase.endsWith('/') ? picoBase : picoBase + '/';
+
     if (isGlob) {
       const re = picomatch.makeRe(picoGlob, { windows: false, cwd: '/', dot: true });
       const files: { uri: string; file: File }[] = [];
       for (const [path, file] of this.files.entries()) {
-        if (path.startsWith(picoBase) && re.test(path.substring(picoBase.length))) {
+        if (path.startsWith(base) && re.test(path.substring(base.length))) {
           files.push({
             uri: pathToFileUri(path),
             file,
