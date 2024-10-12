@@ -55,7 +55,7 @@
     "esbuild-wasm": "^0.23.1",
     "handlebars": "^4.7.8",
     "idb-keyval": "^6.2.1",
-    "lucide-svelte": "^0.445.0",
+    "lucide-svelte": "^0.452.0",
     "mode-watcher": "^0.4.1",
     "picomatch": "^4.0.2",
     "svelte-headless-table": "^0.18.2",
