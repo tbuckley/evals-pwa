@@ -19,6 +19,7 @@
   import { page } from '$app/stores';
   import { alertStore } from '$lib/state/ui';
   import type { Action as SvelteAction } from 'svelte/action';
+  import { Toaster } from '$lib/components/ui/sonner';
 
   const links = [
     { name: 'Dashboard', href: '/', icon: Home },
@@ -168,3 +169,5 @@
   canClose={$validEnvStore}
   on:open-change={handleSettingsOpenChange}
 ></SettingsDialog>
+
+<Toaster></Toaster>
