@@ -48,7 +48,7 @@
     "@mlc-ai/web-llm": "^0.2.68",
     "@sveltejs/adapter-static": "^3.0.5",
     "@types/wicg-file-system-access": "^2023.10.5",
-    "@vitest/browser": "^2.0.5",
+    "@vitest/browser": "^2.1.2",
     "bits-ui": "^0.21.16",
     "clsx": "^2.1.1",
     "cmdk-sv": "^0.0.18",
