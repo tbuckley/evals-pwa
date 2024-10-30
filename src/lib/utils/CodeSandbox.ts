@@ -38,6 +38,7 @@ function initIframe() {
   // Create and configure the iframe
   const iframe = document.createElement('iframe');
   iframe.sandbox.add('allow-scripts'); // Allow scripts but restrict other capabilities
+  iframe.style.display = 'none';
   document.body.appendChild(iframe);
 
   // Set up the iframe content
