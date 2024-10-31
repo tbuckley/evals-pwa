@@ -1,4 +1,4 @@
-import { cast } from './asserts';
+import { assert, cast } from './asserts';
 
 function stringToDataUrl(input: string): string {
   // Encode the string as UTF-8
@@ -96,14 +96,18 @@ function initIframe() {
 }
 
 export function bind(code: string): (...args: unknown[]) => Promise<unknown> {
-  let codePort: MessagePort;
+  let codePortPromise: Promise<MessagePort> | null = null;
   let currentInstance: number;
 
   return async (...args: unknown[]) => {
     while (currentInstance !== instance) {
       currentInstance = instance;
-      codePort = await bindPort(code);
+      codePortPromise = bindPort(code);
     }
+
+    assert(codePortPromise);
+    const codePort = await codePortPromise;
+
     return new Promise<unknown>((resolve, reject) => {
       const callPortChannel = new MessageChannel();
       const callPort = callPortChannel.port1;
