@@ -1,6 +1,6 @@
 import type { ModelProvider, MultiPartPrompt, TokenUsage } from '$lib/types';
 
-interface Assistant {
+interface LanguageModel {
   create(): Promise<Session>;
 }
 
@@ -12,7 +12,7 @@ interface Session {
 declare global {
   interface Window {
     ai?: {
-      assistant: Assistant;
+      languageModel: LanguageModel;
     };
   }
 }
@@ -20,10 +20,10 @@ declare global {
 export class ChromeProvider implements ModelProvider {
   async *run(prompt: MultiPartPrompt) {
     yield '';
-    if (!window.ai) {
-      throw new Error('window.ai not supported in this browser');
+    if (!window.ai?.languageModel) {
+      throw new Error('window.ai.languageModel not supported in this browser');
     }
-    const session = await window.ai.assistant.create();
+    const session = await window.ai.languageModel.create();
     const input = prompt.map((part) => ('text' in part ? part.text : '')).join('\n');
     let reply = '';
     for await (const chunk of session.promptStreaming(input)) {
