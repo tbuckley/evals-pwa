@@ -109,7 +109,7 @@
 	`;
 </script>
 
-<article class="prose">
+<article class="flex h-screen flex-col">
   {#if $storageStore !== null && $storageStore instanceof FileSystemEvalsStorage && $storageStore.fs instanceof WebFileSystemStorage}
     <p>This page shows your current configuraton. Editing is not yet supported.</p>
     <Button on:click={reload}>Reload</Button>
@@ -122,7 +122,7 @@
     <Textarea
       bind:value={config}
       rows={10}
-      class="font-mono"
+      class="w-full flex-grow font-mono"
       style="tab-size: 2;"
       on:keydown={handleTabKey}
     ></Textarea>
