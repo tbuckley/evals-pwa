@@ -135,7 +135,7 @@
         <span class="sr-only">Toggle user menu</span>
       </Button>
     </header>
-    <main class="flex flex-1 flex-col gap-4 overflow-scroll p-4">
+    <main class="flex flex-1 flex-col gap-4 overflow-auto p-4">
       <slot></slot>
     </main>
   </div>
