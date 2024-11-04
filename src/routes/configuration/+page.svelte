@@ -37,8 +37,9 @@
     const encoded = await encodeGzipB64(data);
     const url = `${window.location.origin}/configuration?template=${encoded}`;
 
-    // Some browsers have a maximum URL length of ~2048
-    if (url.length > 2048) {
+    // It's not clear what the maximum safe URL length is across browsers.
+    // But this seems safe.
+    if (url.length > 32000) {
       toast('Configuration is too large for sharing via URL');
       return;
     }
