@@ -1,7 +1,12 @@
-import type { ModelProvider, MultiPartPrompt, TokenUsage } from '$lib/types';
+import type { ModelProvider, ModelUpdate, MultiPartPrompt, TokenUsage } from '$lib/types';
+import { generator } from '$lib/utils/generator';
 
-interface Assistant {
-  create(): Promise<Session>;
+interface LanguageModelOptions {
+  monitor?: (m: EventTarget) => void;
+}
+
+interface LanguageModel {
+  create(createOptions?: LanguageModelOptions): Promise<Session>;
 }
 
 interface Session {
@@ -12,7 +17,7 @@ interface Session {
 declare global {
   interface Window {
     ai?: {
-      assistant: Assistant;
+      languageModel: LanguageModel;
     };
   }
 }
@@ -20,11 +25,35 @@ declare global {
 export class ChromeProvider implements ModelProvider {
   async *run(prompt: MultiPartPrompt) {
     yield '';
-    if (!window.ai) {
-      throw new Error('window.ai not supported in this browser');
+    if (!window.ai?.languageModel) {
+      throw new Error('window.ai.languageModel not supported in this browser');
     }
-    const session = await window.ai.assistant.create();
+    const progress = generator<ProgressEvent>();
+    const create = window.ai.languageModel
+      .create({
+        monitor(m) {
+          m.addEventListener('downloadprogress', (e) => {
+            progress.yield(e as ProgressEvent);
+          });
+        },
+      })
+      .then((session) => {
+        progress.return();
+        return session;
+      });
+
+    for await (const e of progress.generator) {
+      yield {
+        type: 'replace',
+        output: `Downloaded ${e.loaded} of ${e.total} bytes.`,
+      } as ModelUpdate;
+    }
+
+    const session = await create;
     const input = prompt.map((part) => ('text' in part ? part.text : '')).join('\n');
+
+    yield { type: 'replace', output: '' } as ModelUpdate;
+
     let reply = '';
     for await (const chunk of session.promptStreaming(input)) {
       yield chunk.substring(reply.length);
