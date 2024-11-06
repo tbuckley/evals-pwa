@@ -78,7 +78,9 @@ const testOutputSchema = z.object({
 
   // Success
   rawOutput: z.unknown().optional(),
-  output: z.string().optional(),
+  output: z
+    .union([z.string(), z.array(z.union([z.string(), z.instanceof(FileReference)]))])
+    .optional(),
   latencyMillis: z.number().optional(),
   tokenUsage: tokenUsageSchema.optional(),
 
@@ -162,7 +164,7 @@ export interface ModelProvider {
     prompt: MultiPartPrompt,
     context: RunContext,
   ): AsyncGenerator<string | ModelUpdate, unknown, void>;
-  extractOutput(response: unknown): string;
+  extractOutput(response: unknown): MaybePromise<string | (string | Blob)[]>;
   extractTokenUsage(response: unknown): TokenUsage;
   mimeTypes?: string[];
 }
@@ -187,7 +189,7 @@ export interface FileLoader {
 
 export type MaybePromise<T> = T | Promise<T>;
 export interface AssertionProvider {
-  run(output: string): MaybePromise<AssertionResult>;
+  run(output: string | (string | FileReference)[]): MaybePromise<AssertionResult>;
   destroy?: () => void;
 }
 
@@ -216,7 +218,7 @@ export interface LiveResult {
   state: 'waiting' | 'in-progress' | 'success' | 'error';
 
   // Success
-  output?: string;
+  output?: (string | FileReference)[];
   rawOutput?: unknown;
   latencyMillis?: number;
   tokenUsage?: TokenUsage;

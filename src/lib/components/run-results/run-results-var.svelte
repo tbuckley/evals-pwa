@@ -3,17 +3,10 @@
   import type { Readable } from 'svelte/store';
   import Button from '../ui/button/button.svelte';
   import Copy from 'lucide-svelte/icons/copy';
+  import { isImageFile } from '$lib/utils/media';
 
   export let value: unknown;
   export let height: Readable<'minimal' | 'collapsed' | 'expanded'>;
-
-  function isImageFile(val: unknown): boolean {
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
-    return (
-      val instanceof FileReference &&
-      imageExtensions.some((ext) => val.uri.toLowerCase().endsWith(ext))
-    );
-  }
 
   async function copy() {
     if (typeof value === 'string') {

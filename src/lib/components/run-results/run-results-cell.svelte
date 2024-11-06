@@ -5,6 +5,7 @@
   import Button from '../ui/button/button.svelte';
   import SquareCode from 'lucide-svelte/icons/square-code';
   import { FileReference } from '$lib/storage/FileReference';
+  import { isImageFile } from '$lib/utils/media';
 
   export let testResult: Readable<LiveResult>;
   export let height: Readable<'minimal' | 'collapsed' | 'expanded'>;
@@ -59,7 +60,25 @@
   {/if}
   {#if $height !== 'minimal'}
     <div class="whitespace-pre-wrap break-words">
-      {$testResult.error ?? $testResult.output ?? '--no output--'}
+      {#if $testResult.error}
+        {$testResult.error}
+      {:else if $testResult.output}
+        {#each $testResult.output as output}
+          {#if typeof output === 'string'}
+            {output}
+          {:else if output instanceof FileReference && isImageFile(output)}
+            <img
+              src={URL.createObjectURL(output.file)}
+              alt={output.file.name}
+              class="max-h-[512px] w-full max-w-[512px]"
+            />
+          {:else}
+            {output.uri}
+          {/if}
+        {/each}
+      {:else}
+        '--no output--'
+      {/if}
     </div>
     <Button
       on:click={openRawPromptDialog}

@@ -1,5 +1,6 @@
 import type { AssertionProvider, AssertionResult } from '$lib/types';
 import { z } from 'zod';
+import { wrapLegacyAssertion } from './legacyAssertion';
 
 const argsSchema = z.object({
   value: z.string(),
@@ -15,7 +16,7 @@ export function createEqualsAssertion(args: unknown): AssertionProvider {
 
   const { value, ignoreCase, trim } = parsedArgs.data;
   const groundTruth = ignoreCase ? value.toLocaleLowerCase() : value;
-  return {
+  return wrapLegacyAssertion({
     run: function (output: string): AssertionResult {
       const outputValue = ignoreCase ? output.toLocaleLowerCase() : output;
       const pass = trim ? outputValue.trim() === groundTruth.trim() : outputValue === groundTruth;
@@ -24,5 +25,5 @@ export function createEqualsAssertion(args: unknown): AssertionProvider {
         message: pass ? undefined : `Does not equal: "${value}"`,
       };
     },
-  };
+  });
 }

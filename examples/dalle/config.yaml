@@ -1,0 +1,28 @@
+description: Fake test suite
+
+providers:
+  - dalle:dall-e-3
+  # - gemini:gemini-1.5-flash-002
+
+prompts:
+  - A flat illustration of {{subject}} in vibrant colors
+
+tests:
+  - vars:
+      subject: a cat
+    assert:
+      - type: llm-rubric
+        vars:
+          rubric: Is this a cat?
+  - vars:
+      subject: a rube goldberg machine
+    assert:
+      - type: javascript
+        vars:
+          code: |
+            function execute(output) {
+              if(output.length > 0 && output[0].file instanceof File) {
+                return {pass: true};
+              }
+              return {pass: false};
+            }

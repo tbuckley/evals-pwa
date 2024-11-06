@@ -1,5 +1,6 @@
 import type { AssertionProvider, AssertionResult } from '$lib/types';
 import { z } from 'zod';
+import { wrapLegacyAssertion } from './legacyAssertion';
 
 const argsSchema = z.object({
   needle: z.string(),
@@ -14,7 +15,7 @@ export function createContainsAssertion(args: unknown): AssertionProvider {
 
   const { needle, ignoreCase } = parsedArgs.data;
   const needleValue = ignoreCase ? needle.toLocaleLowerCase() : needle;
-  return {
+  return wrapLegacyAssertion({
     run: function (output: string): AssertionResult {
       const outputValue = ignoreCase ? output.toLocaleLowerCase() : output;
       const pass = outputValue.includes(needleValue);
@@ -23,5 +24,5 @@ export function createContainsAssertion(args: unknown): AssertionProvider {
         message: pass ? undefined : `Does not contain: "${needle}"`,
       };
     },
-  };
+  });
 }

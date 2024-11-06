@@ -1,5 +1,6 @@
 import type { AssertionProvider, AssertionResult } from '$lib/types';
 import { z } from 'zod';
+import { wrapLegacyAssertion } from './legacyAssertion';
 
 const argsSchema = z.object({
   pattern: z.string(),
@@ -13,7 +14,7 @@ export function createRegexAssertion(args: unknown): AssertionProvider {
   }
 
   const regex = new RegExp(parsedArgs.data.pattern, parsedArgs.data.flags);
-  return {
+  return wrapLegacyAssertion({
     run: function (output: string): AssertionResult {
       const pass = regex.test(output);
       return {
@@ -21,5 +22,5 @@ export function createRegexAssertion(args: unknown): AssertionProvider {
         message: pass ? undefined : `Match not found: "${parsedArgs.data.pattern}"`,
       };
     },
-  };
+  });
 }

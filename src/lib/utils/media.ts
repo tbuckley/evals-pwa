@@ -1,3 +1,5 @@
+import { FileReference } from '$lib/storage/FileReference';
+
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -40,4 +42,12 @@ export function matchesMimeType(pattern: string, mimeType: string): boolean {
   const mainMatch = mainType === mainType2 || mainType === '*';
   const subMatch = subType === subType2 || subType === '*';
   return mainMatch && subMatch;
+}
+
+export function isImageFile(val: unknown): boolean {
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+  return (
+    val instanceof FileReference &&
+    imageExtensions.some((ext) => val.uri.toLowerCase().endsWith(ext))
+  );
 }

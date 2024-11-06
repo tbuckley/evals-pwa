@@ -19,9 +19,9 @@ Does not speak like a pirate
 </Rubric>
 {"message": "'avast ye' is a common pirate term", "pass": false}
 
-<Output>
-{{ output }}
-</Output>
+<Output>{{#each output}}
+{{ this }}
+{{/each}}</Output>
 <Rubric>
 {{ rubric }}
 </Rubric>
