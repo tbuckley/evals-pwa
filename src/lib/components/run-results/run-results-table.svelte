@@ -18,7 +18,11 @@
   import RunResultsSized from './RunResultsSized.svelte';
   import GripVertical from 'lucide-svelte/icons/grip-vertical';
 
-  export let run: LiveRun;
+  interface Props {
+    run: LiveRun;
+  }
+
+  let { run }: Props = $props();
 
   type HeaderCell = VarHeaderCell | EnvHeaderCell | LabelCell | ToggleHeightCell;
   type BodyCell = VarCell | ResultCell | LabelCell | ToggleHeightCell;
@@ -151,9 +155,9 @@
     width.update((width) => (width ?? defaultWidth()) + e.movementX);
   }
 
-  $: header = [...headerCells(run)];
-  $: body = [...bodyRows(run)];
-  $: columnWidths = header.map(() => writable<number | undefined>(undefined));
+  let header = $derived([...headerCells(run)]);
+  let body = $derived([...bodyRows(run)]);
+  let columnWidths = $derived(header.map(() => writable<number | undefined>(undefined)));
 </script>
 
 <div class="mb-2 flex items-center gap-1.5">
@@ -193,8 +197,8 @@
                 {#if i > 1}
                   <div
                     class="absolute right-0 top-2 z-10 w-4 cursor-col-resize"
-                    on:pointerdown={resizeDown}
-                    on:pointermove={(e) => {
+                    onpointerdown={resizeDown}
+                    onpointermove={(e) => {
                       resizeMove(e, columnWidths[i]);
                     }}
                   >

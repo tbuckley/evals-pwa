@@ -6,12 +6,15 @@
   import EnvEditor from './env-editor.svelte';
   import Button from './ui/button/button.svelte';
 
-  export let open = false;
-  export let canClose = true;
+  interface Props {
+    open?: boolean;
+    canClose?: boolean;
+  }
+
+  let { open = false, canClose = true }: Props = $props();
 
   const dispatch = createEventDispatcher();
 
-  $: envEditorEntries = getEnvEditorEntries($requiredEnvStore, open);
   function getEnvEditorEntries(requiredEnv: string[], _open: boolean): [string, string][] {
     return requiredEnv.map((req) => [req, $parsedEnvStore[req]]);
   }
@@ -32,6 +35,7 @@
   function dispatchOpenState(open: boolean) {
     dispatch('open-change', open);
   }
+  let envEditorEntries = $derived(getEnvEditorEntries($requiredEnvStore, open));
 </script>
 
 <Dialog.Root

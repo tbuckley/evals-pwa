@@ -3,11 +3,15 @@
   import type { SummaryStats } from '$lib/types';
   import { type Readable } from 'svelte/store';
 
-  export let summary: Readable<SummaryStats>;
-  export let height: Readable<RowHeight>;
+  interface Props {
+    summary: Readable<SummaryStats>;
+    height: Readable<RowHeight>;
+  }
 
-  $: totalResults = $summary.passed + $summary.failed;
-  $: passRate = totalResults > 0 ? ($summary.passed / totalResults) * 100 : 0;
+  let { summary, height }: Props = $props();
+
+  let totalResults = $derived($summary.passed + $summary.failed);
+  let passRate = $derived(totalResults > 0 ? ($summary.passed / totalResults) * 100 : 0);
 </script>
 
 <div

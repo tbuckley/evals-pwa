@@ -3,10 +3,14 @@
   import type { Env } from '$lib/types';
   import type { Readable } from 'svelte/store';
 
-  export let env: Env;
-  export let height: Readable<RowHeight>;
+  interface Props {
+    env: Env;
+    height: Readable<RowHeight>;
+  }
 
-  $: providerId = typeof env.provider === 'string' ? env.provider : env.provider.id;
+  let { env, height }: Props = $props();
+
+  let providerId = $derived(typeof env.provider === 'string' ? env.provider : env.provider.id);
 </script>
 
 <div class="flex flex-col gap-1">

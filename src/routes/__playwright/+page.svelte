@@ -9,4 +9,4 @@
   }
 </script>
 
-<button on:click={useOpfs}>Use OPFS</button>
+<button onclick={useOpfs}>Use OPFS</button>

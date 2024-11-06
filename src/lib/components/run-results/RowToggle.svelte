@@ -5,11 +5,16 @@
   import ChevronDown from 'lucide-svelte/icons/chevron-down';
   import Button from '../ui/button/button.svelte';
 
-  export let height: Writable<'minimal' | 'collapsed' | 'expanded'>;
-  export let cycle: () => void;
+  interface Props {
+    height: Writable<'minimal' | 'collapsed' | 'expanded'>;
+    cycle: () => void;
+    [key: string]: any;
+  }
+
+  let { height, cycle, ...rest }: Props = $props();
 </script>
 
-<Button on:click={cycle} variant="ghost" size="sm" class="text-gray-500" {...$$restProps}>
+<Button on:click={cycle} variant="ghost" size="sm" class="text-gray-500" {...rest}>
   {#if $height === 'minimal'}
     <ChevronUp class="h-5 w-5"></ChevronUp>
   {:else if $height === 'collapsed'}

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { preventDefault } from 'svelte/legacy';
+
   import Combobox from '$lib/components/Combobox.svelte';
   import RunResultsTable from '$lib/components/run-results/run-results-table.svelte';
   import Button from '$lib/components/ui/button/button.svelte';
@@ -36,7 +38,7 @@
     </p>
     <h2>Getting started</h2>
     <p>
-      To get started, <a href="##" on:click|preventDefault={chooseFolder}>choose a folder</a>
+      To get started, <a href="##" onclick={preventDefault(chooseFolder)}>choose a folder</a>
       containing a <code>config.yaml</code> file that looks like this:
     </p>
     <pre>

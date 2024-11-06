@@ -20,6 +20,11 @@
   import { alertStore } from '$lib/state/ui';
   import type { Action as SvelteAction } from 'svelte/action';
   import { Toaster } from '$lib/components/ui/sonner';
+  interface Props {
+    children?: import('svelte').Snippet;
+  }
+
+  let { children }: Props = $props();
 
   const links = [
     { name: 'Dashboard', href: '/', icon: Home },
@@ -27,7 +32,7 @@
     { name: 'Documentation', href: '/documentation', icon: DocumentationIcon },
   ];
 
-  let settingsOpen = false;
+  let settingsOpen = $state(false);
 
   function handleAlertOpenChange(open: boolean) {
     if (!open && $alertStore) {
@@ -69,7 +74,8 @@
               )}
             >
               {#if icon}
-                <svelte:component this={icon} class="h-4 w-4" />
+                {@const SvelteComponent = icon}
+                <SvelteComponent class="h-4 w-4" />
               {/if}
               {name}
             </a>
@@ -81,11 +87,13 @@
   <div class="flex flex-col overflow-hidden">
     <header class="flex h-14 items-center gap-4 border-b bg-muted/40 px-4">
       <Sheet.Root>
-        <Sheet.Trigger asChild let:builder>
-          <Button variant="outline" size="icon" class="shrink-0 md:hidden" builders={[builder]}>
-            <Menu class="h-5 w-5" />
-            <span class="sr-only">Toggle navigation menu</span>
-          </Button>
+        <Sheet.Trigger asChild>
+          {#snippet children({ builder })}
+            <Button variant="outline" size="icon" class="shrink-0 md:hidden" builders={[builder]}>
+              <Menu class="h-5 w-5" />
+              <span class="sr-only">Toggle navigation menu</span>
+            </Button>
+          {/snippet}
         </Sheet.Trigger>
         <Sheet.Content side="left" class="flex flex-col">
           <nav class="grid gap-2 text-lg font-medium">
@@ -94,18 +102,21 @@
               <span class="sr-only">Evals</span>
             </a>
             {#each links as { name, href, icon }}
-              <Sheet.Close asChild let:builder>
-                {@const action = castSheetCloseBuilder(builder).action}
-                <a
-                  use:action
-                  {href}
-                  class="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
-                >
-                  {#if icon}
-                    <svelte:component this={icon} class="h-4 w-4" />
-                  {/if}
-                  {name}
-                </a>
+              <Sheet.Close asChild>
+                {#snippet children({ builder })}
+                  {@const action = castSheetCloseBuilder(builder).action}
+                  <a
+                    use:action
+                    {href}
+                    class="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
+                  >
+                    {#if icon}
+                      {@const SvelteComponent_1 = icon}
+                      <SvelteComponent_1 class="h-4 w-4" />
+                    {/if}
+                    {name}
+                  </a>
+                {/snippet}
               </Sheet.Close>
             {/each}
           </nav>
@@ -136,7 +147,7 @@
       </Button>
     </header>
     <main class="flex flex-1 flex-col gap-4 overflow-scroll p-4">
-      <slot></slot>
+      {@render children?.()}
     </main>
   </div>
 </div>

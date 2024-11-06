@@ -1,13 +1,17 @@
 <script lang="ts">
   import Input from './ui/input/input.svelte';
 
-  export let entries: [string, string][] = [];
+  interface Props {
+    entries?: [string, string][];
+  }
+
+  let { entries = [] }: Props = $props();
 </script>
 
-{#each entries as [key, value], i (i)}
+{#each entries as [key, _value], i (i)}
   <div class="mb-2 flex items-center gap-1">
     <Input type="text" value={key} readonly class="bg-gray-50 text-gray-500" tabindex={-1} />
-    <Input name="env-{key.toLocaleLowerCase()}" type="text" bind:value />
+    <Input name="env-{key.toLocaleLowerCase()}" type="text" bind:value={entries[i][1]} />
   </div>
 {:else}
   <div class="mb-2 text-gray-500">

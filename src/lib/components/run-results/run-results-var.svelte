@@ -4,8 +4,12 @@
   import Button from '../ui/button/button.svelte';
   import Copy from 'lucide-svelte/icons/copy';
 
-  export let value: unknown;
-  export let height: Readable<'minimal' | 'collapsed' | 'expanded'>;
+  interface Props {
+    value: unknown;
+    height: Readable<'minimal' | 'collapsed' | 'expanded'>;
+  }
+
+  let { value, height }: Props = $props();
 
   function isImageFile(val: unknown): boolean {
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];

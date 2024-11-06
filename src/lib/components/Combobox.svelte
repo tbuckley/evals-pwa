@@ -7,16 +7,26 @@
   import { Button } from '$lib/components/ui/button/index.js';
   import { cn } from '$lib/utils/shadcn.js';
 
-  export let items: { value: string; label: string }[] = [];
-  export let value = '';
-  export let placeholder = 'Select...';
-  export let searchPlaceholder = 'Search...';
-  export let empty = 'No matches found.';
+  interface Props {
+    items?: { value: string; label: string }[];
+    value?: string;
+    placeholder?: string;
+    searchPlaceholder?: string;
+    empty?: string;
+  }
+
+  let {
+    items = [],
+    value = '',
+    placeholder = 'Select...',
+    searchPlaceholder = 'Search...',
+    empty = 'No matches found.',
+  }: Props = $props();
 
   const dispatch = createEventDispatcher();
-  let open = false;
+  let open = $state(false);
 
-  $: selectedValue = items.find((f) => f.value === value)?.label ?? placeholder;
+  let selectedValue = $derived(items.find((f) => f.value === value)?.label ?? placeholder);
 
   // We want to refocus the trigger button when the user selects
   // an item from the list so users can continue navigating the
@@ -37,36 +47,40 @@
   }
 </script>
 
-<Popover.Root bind:open let:ids>
-  <Popover.Trigger asChild let:builder>
-    <Button
-      builders={[builder]}
-      variant="outline"
-      role="combobox"
-      aria-expanded={open}
-      class="w-auto justify-between"
-    >
-      {selectedValue}
-      <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
-    </Button>
-  </Popover.Trigger>
-  <Popover.Content class="w-auto p-0" align="start">
-    <Command.Root>
-      <Command.Input placeholder={searchPlaceholder} />
-      <Command.Empty>{empty}</Command.Empty>
-      <Command.Group>
-        {#each items as item}
-          <Command.Item
-            onSelect={() => {
-              dispatch('select', item.value);
-              closeAndFocusTrigger(castPopoverIds(ids).trigger);
-            }}
-          >
-            <Check class={cn('mr-2 h-4 w-4', value !== item.value && 'text-transparent')} />
-            {item.label}
-          </Command.Item>
-        {/each}
-      </Command.Group>
-    </Command.Root>
-  </Popover.Content>
+<Popover.Root bind:open>
+  {#snippet children({ ids })}
+    <Popover.Trigger asChild>
+      {#snippet children({ builder })}
+        <Button
+          builders={[builder]}
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          class="w-auto justify-between"
+        >
+          {selectedValue}
+          <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      {/snippet}
+    </Popover.Trigger>
+    <Popover.Content class="w-auto p-0" align="start">
+      <Command.Root>
+        <Command.Input placeholder={searchPlaceholder} />
+        <Command.Empty>{empty}</Command.Empty>
+        <Command.Group>
+          {#each items as item}
+            <Command.Item
+              onSelect={() => {
+                dispatch('select', item.value);
+                closeAndFocusTrigger(castPopoverIds(ids).trigger);
+              }}
+            >
+              <Check class={cn('mr-2 h-4 w-4', value !== item.value && 'text-transparent')} />
+              {item.label}
+            </Command.Item>
+          {/each}
+        </Command.Group>
+      </Command.Root>
+    </Popover.Content>
+  {/snippet}
 </Popover.Root>

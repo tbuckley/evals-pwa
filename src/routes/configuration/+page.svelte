@@ -30,8 +30,8 @@
     }
   }
 
-  let savedConfig = '';
-  let config = '';
+  let savedConfig = $state('');
+  let config = $state('');
 
   async function generateConfigUrl(data: string) {
     const encoded = await encodeGzipB64(data);

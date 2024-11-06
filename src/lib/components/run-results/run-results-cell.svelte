@@ -6,10 +6,13 @@
   import SquareCode from 'lucide-svelte/icons/square-code';
   import { FileReference } from '$lib/storage/FileReference';
 
-  export let testResult: Readable<LiveResult>;
-  export let height: Readable<'minimal' | 'collapsed' | 'expanded'>;
+  interface Props {
+    testResult: Readable<LiveResult>;
+    height: Readable<'minimal' | 'collapsed' | 'expanded'>;
+  }
 
-  $: errorMessage = getErrorMessage($testResult);
+  let { testResult, height }: Props = $props();
+
   function getErrorMessage(result: LiveResult): string | null {
     if (result.error) {
       return result.error;
@@ -28,13 +31,13 @@
     });
   }
 
-  $: visuals = ($testResult.assertionResults ?? []).flatMap((a) => a.visuals ?? []);
-
   // FIXME we need to free these URLs when the component is destroyed
   function getBlobUrl(blob: Blob): string {
     const url = URL.createObjectURL(blob);
     return url;
   }
+  let errorMessage = $derived(getErrorMessage($testResult));
+  let visuals = $derived(($testResult.assertionResults ?? []).flatMap((a) => a.visuals ?? []));
 </script>
 
 <div
