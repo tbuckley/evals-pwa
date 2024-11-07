@@ -52,7 +52,7 @@
     "bits-ui": "^0.21.16",
     "clsx": "^2.1.1",
     "cmdk-sv": "^0.0.18",
-    "esbuild-wasm": "^0.23.1",
+    "esbuild-wasm": "^0.24.0",
     "handlebars": "^4.7.8",
     "idb-keyval": "^6.2.1",
     "lucide-svelte": "^0.452.0",
