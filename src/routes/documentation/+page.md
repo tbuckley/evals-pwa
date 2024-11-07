@@ -223,7 +223,20 @@ tests:
 
 #### Javascript Assertions
 
-For `javascript` assertions, your code must provide a function `execute(output: string, context: { vars: Record<string, unknown> }): MaybePromise<AssertionResult>`. Typescript is also supported, and will be compiled to Javascript. Your `execute` function must return whether the assertion passed, along with optional additional information.
+For `javascript` assertions, your code must provide a function with this signature:
+
+```typescript
+execute(output: string | ArrayOutput, context: Context): MaybePromise<AssertionResult>
+
+type ArrayOutput = Array<string | { file: File; uri: string }>; // Used for DALL-E
+type Context = {
+  vars: Record<string, unknown>; // Test case vars
+  provider: { id: string }; // Provider
+  prompt: Prompt; // Prompt
+};
+```
+
+Typescript is also supported, and will be compiled to Javascript. Your `execute` function must return whether the assertion passed, along with optional additional information.
 
 Note: with DALL-E, `output` will be an array of `[{file: File, uri: string}, string|undefined]` containing the image and the (optional) revised prompt.
 
