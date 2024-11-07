@@ -41,7 +41,7 @@ export class ProviderManager {
       }
       return new AnthropicProvider(modelName, this.env.ANTHROPIC_API_KEY, config);
     } else if (providerId === 'reverser') {
-      return new ReverserProvider();
+      return new ReverserProvider(modelName);
     } else if (providerId === 'chrome' && modelName === 'ai') {
       return new ChromeProvider();
     } else if (providerId === 'web-llm') {

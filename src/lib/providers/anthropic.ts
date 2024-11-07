@@ -83,6 +83,10 @@ export class AnthropicProvider implements ModelProvider {
     this.request = request;
   }
 
+  get id(): string {
+    return `anthropic:${this.model}`;
+  }
+
   mimeTypes = [
     // Image
     'image/png',

@@ -21,7 +21,7 @@ test.describe('File System', () => {
       'Matches a regex',
       'Equals a value',
       'javascript',
-      'function execute(output)',
+      'function execute(output, context)',
     ];
     for (const line of lines) {
       await expect(page.locator('pre')).toContainText(line);

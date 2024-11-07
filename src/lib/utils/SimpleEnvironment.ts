@@ -13,16 +13,23 @@ import type {
 
 export interface Config {
   model: ModelProvider;
-  prompt: PromptFormatter;
+  promptFormatter: PromptFormatter;
 }
 
 export class SimpleEnvironment implements TestEnvironment {
   model: ModelProvider;
-  prompt: PromptFormatter;
+  promptFormatter: PromptFormatter;
 
   constructor(options: Config) {
     this.model = options.model;
-    this.prompt = options.prompt;
+    this.promptFormatter = options.promptFormatter;
+  }
+
+  get provider() {
+    return { id: this.model.id };
+  }
+  get prompt() {
+    return this.promptFormatter.prompt;
   }
 
   async *run(
@@ -31,7 +38,7 @@ export class SimpleEnvironment implements TestEnvironment {
   ): AsyncGenerator<string | ModelUpdate, TestOutput, void> {
     let prompt: ConversationPrompt;
     try {
-      prompt = await this.prompt.format(vars, this.model.mimeTypes);
+      prompt = await this.promptFormatter.format(vars, this.model.mimeTypes);
     } catch (e) {
       if (e instanceof Error) {
         return {

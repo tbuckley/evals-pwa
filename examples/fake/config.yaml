@@ -33,7 +33,7 @@ tests:
         type: javascript
         vars:
           code: |
-            function execute(output) {
-              const pass = output.split('').reverse().join('').includes('friend');
+            function execute(output, context) {
+              const pass = output.split('').reverse().join('').includes('friend') && context.provider.id.startsWith("reverser");
               return {pass, message: pass ? undefined : `Output doesn't contain 'friend' in reverse: ${output}`};
             }

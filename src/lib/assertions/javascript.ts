@@ -5,7 +5,6 @@ import {
   type AssertionProvider,
   type AssertionResult,
   type NormalizedTestCase,
-  type TestResult,
 } from '$lib/types';
 import { z } from 'zod';
 
@@ -29,13 +28,13 @@ export function createJavascriptAssertion(
 
   let execute: Executable | undefined;
   return {
-    async run(output: NonNullable<TestResult['output']>): Promise<AssertionResult> {
+    async run(output, context): Promise<AssertionResult> {
       try {
         if (!execute) {
           const code = await toCodeReference(parsedArgs.data.code);
           execute = await code.bind();
         }
-        const res = await execute(output, { vars: testVars });
+        const res = await execute(output, { vars: testVars, ...context });
         const parsed = jsResultSchema.parse(res);
         const visuals: AssertionResult['visuals'] = parsed.visuals
           ? await Promise.all(

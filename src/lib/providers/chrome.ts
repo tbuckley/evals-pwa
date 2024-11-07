@@ -24,6 +24,8 @@ declare global {
 }
 
 export class ChromeProvider implements ModelProvider {
+  readonly id = 'chrome:ai';
+
   async *run(conversation: ConversationPrompt) {
     const prompt = conversationToSinglePrompt(conversation);
 

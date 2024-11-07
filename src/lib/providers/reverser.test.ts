@@ -3,7 +3,7 @@ import { ReverserProvider } from './reverser';
 
 describe('ReverserProvider', () => {
   test('reverses its input', async function () {
-    const provider = new ReverserProvider();
+    const provider = new ReverserProvider('whatever');
     const resp = provider.run([{ role: 'user', content: [{ text: 'hello' }] }]);
     let next;
     do {
@@ -13,7 +13,7 @@ describe('ReverserProvider', () => {
     expect(output).toBe('olleh');
   });
   test('supports multi-part', async function () {
-    const provider = new ReverserProvider();
+    const provider = new ReverserProvider('whatever');
     const resp = provider.run([
       {
         role: 'user',

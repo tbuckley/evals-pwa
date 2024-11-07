@@ -62,6 +62,10 @@ export class OpenaiProvider implements ModelProvider {
     this.request = request;
   }
 
+  get id(): string {
+    return `openai:${this.model}`;
+  }
+
   mimeTypes = [
     // Image
     'image/png',

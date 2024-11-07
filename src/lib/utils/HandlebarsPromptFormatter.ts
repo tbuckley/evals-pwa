@@ -14,10 +14,10 @@ import * as yaml from 'yaml';
 import { z } from 'zod';
 
 export class HandlebarsPromptFormatter implements PromptFormatter {
-  prompt: HandlebarsTemplateDelegate;
+  template: HandlebarsTemplateDelegate;
 
-  constructor(prompt: Prompt) {
-    this.prompt = Handlebars.compile(prompt);
+  constructor(public readonly prompt: Prompt) {
+    this.template = Handlebars.compile(prompt);
   }
   async format(vars: VarSet, mimeTypes?: string[]): Promise<ConversationPrompt> {
     const files: Record<string, FileReference> = {};
@@ -47,7 +47,7 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
       return val;
     });
 
-    const rendered = this.prompt(placeholderVars);
+    const rendered = this.template(placeholderVars);
     const conversation = getAsConversation(rendered);
 
     // Find all file placeholders, and use the file

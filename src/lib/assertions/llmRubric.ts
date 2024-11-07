@@ -41,7 +41,7 @@ export function createLlmRubricAssertion(
   const model = providerManager.getProvider(provider.id, provider.config);
   const env = new SimpleEnvironment({
     model,
-    prompt: new HandlebarsPromptFormatter(prompt ?? LLM_RUBRIC_PROMPT),
+    promptFormatter: new HandlebarsPromptFormatter(prompt ?? LLM_RUBRIC_PROMPT),
   });
   // TODO also populate placeholders in the rubric
   // TODO make rubric optional if prompt is provided
