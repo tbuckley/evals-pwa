@@ -61,7 +61,7 @@ Currently supported model providers:
 - [x] [Chrome](https://goo.gle/chrome-ai-dev-preview) -- use `chrome:ai`.
 - [x] Ollama -- prefix with `ollama:`, e.g. `ollama:gemma-2:2b`. Requires `OLLAMA_ENDPOINT` (e.g. `http://localhost:11434`) in your environment, or the `apiBaseUrl` config option.
 - [x] [WebLLM](https://github.com/mlc-ai/web-llm) -- prefix with `web-llm:`, e.g. `web-llm:gemma-2-2b-it-q4f32_1-MLC`. See [here](https://github.com/mlc-ai/web-llm/blob/main/src/config.ts#L309) for a list of supported model IDs. Requires [WebGPU](https://caniuse.com/webgpu).
-- [x] Anthropic -- prefix with `anthropic:`, e.g. `anthropic:claude-3-5-sonnet-20240620`. Requires `ANTHROPIC_API_KEY` in your environment.
+- [x] Anthropic -- prefix with `anthropic:`, e.g. `anthropic:claude-3-5-sonnet-latest`. Requires `ANTHROPIC_API_KEY` in your environment.
 - [x] DALL-E -- prefix with `dalle:`, e.g. `dalle:dall-e-3`. Requires `OPENAI_API_KEY` in your environment. Output is an array containing an image. View a result's details to see the revised prompt DALL-E creates.
 
 #### Provider Config
@@ -117,6 +117,19 @@ interface Config {
 `prompts` is an array of prompts. Prompts use [Handlebars](https://handlebarsjs.com/) format (unlike Promptfoo's nunjucks). Test case variables are all considered "safe" strings and will not be escaped.
 
 A prompt variable may also be substituted with a file, depending on what the provider supports. For example, Gemini models supports PDF and various image, video, and audio formats.
+
+To include system instructions or simulate a conversation, you can specify roles. Note that the prompt is still just a string, but it contains valid yaml; this approach supports iterating over a set of messages if desired.
+
+```yaml
+prompts:
+  - |-
+    - system: You are {{persona}} named {{name}}.
+    - user: What is your name?
+    - assistant: I am {{name}}.
+    - user: Where do you live?
+```
+
+Multi-role prompts are currently only supported for Gemini, OpenAI, and Anthropic models.
 
 ### Tests
 

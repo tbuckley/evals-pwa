@@ -8,15 +8,16 @@ import {
   type ModelRecord,
 } from '@mlc-ai/web-llm';
 import type {
+  ConversationPrompt,
   ModelProvider,
   ModelUpdate,
-  MultiPartPrompt,
   RunContext,
   TokenUsage,
 } from '$lib/types';
 import { cast } from '$lib/utils/asserts';
 import { multiPartPromptToOpenAI } from './openai';
 import { generator } from '$lib/utils/generator';
+import { conversationToSinglePrompt } from './legacyProvider';
 
 interface Response {
   reply: string;
@@ -49,7 +50,9 @@ export class WebLlm implements ModelProvider {
     'image/gif',
   ];
 
-  async *run(prompt: MultiPartPrompt, context: RunContext) {
+  async *run(conversation: ConversationPrompt, context: RunContext) {
+    const prompt = conversationToSinglePrompt(conversation);
+
     const progress = generator<InitProgressReport>();
     let cacheEntry;
     let engine;

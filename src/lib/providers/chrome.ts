@@ -1,5 +1,6 @@
-import type { ModelProvider, ModelUpdate, MultiPartPrompt, TokenUsage } from '$lib/types';
+import type { ConversationPrompt, ModelProvider, ModelUpdate, TokenUsage } from '$lib/types';
 import { generator } from '$lib/utils/generator';
+import { conversationToSinglePrompt } from './legacyProvider';
 
 interface LanguageModelOptions {
   monitor?: (m: EventTarget) => void;
@@ -23,7 +24,9 @@ declare global {
 }
 
 export class ChromeProvider implements ModelProvider {
-  async *run(prompt: MultiPartPrompt) {
+  async *run(conversation: ConversationPrompt) {
+    const prompt = conversationToSinglePrompt(conversation);
+
     yield '';
     if (!window.ai?.languageModel) {
       throw new Error('window.ai.languageModel not supported in this browser');

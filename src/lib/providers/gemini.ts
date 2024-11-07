@@ -1,4 +1,5 @@
 import type {
+  ConversationPrompt,
   ModelProvider,
   MultiPartPrompt,
   NormalizedProviderConfig,
@@ -40,8 +41,9 @@ export type Part = z.infer<typeof partSchema>;
 
 export const contentSchema = z.object({
   parts: z.array(partSchema),
-  role: z.string().optional(),
+  role: z.union([z.literal('user'), z.literal('model')]).optional(),
 });
+export type Content = z.infer<typeof contentSchema>;
 
 export const requestSchema = z
   .object({
@@ -132,7 +134,17 @@ export class GeminiProvider implements ModelProvider {
     'application/pdf',
   ];
 
-  async *run(prompt: MultiPartPrompt, context: RunContext): AsyncGenerator<string, unknown, void> {
+  async *run(
+    conversation: ConversationPrompt,
+    context: RunContext,
+  ): AsyncGenerator<string, unknown, void> {
+    const contents = await conversationToGemini(conversation);
+    const systemContent = await conversationToSystemContent(conversation);
+    const extensions: { systemInstruction?: Content } = {};
+    if (systemContent) {
+      extensions.systemInstruction = systemContent;
+    }
+
     const resp = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:streamGenerateContent?alt=sse&key=${this.apiKey}`,
       {
@@ -142,7 +154,8 @@ export class GeminiProvider implements ModelProvider {
         },
         body: JSON.stringify({
           ...this.config,
-          contents: [{ parts: await multiPartPromptToGemini(prompt) }],
+          ...extensions,
+          contents,
         }),
         signal: context.abortSignal,
       },
@@ -204,6 +217,48 @@ function getCost(model: string, prompt: number, completion: number): number | un
   }
 
   return (prompt * inputCostPerMillion + completion * outputCostPerMillion) / 1000000;
+}
+
+async function conversationToGemini(conversation: ConversationPrompt): Promise<Content[]> {
+  const contents = await Promise.all(
+    conversation.map(async (part): Promise<Content | null> => {
+      if (part.role === 'user') {
+        return { role: 'user', parts: await multiPartPromptToGemini(part.content) };
+      }
+      if (part.role === 'assistant') {
+        return { role: 'model', parts: await multiPartPromptToGemini(part.content) };
+      }
+
+      // Ignore system messages
+      return null;
+    }),
+  );
+  const messages = contents.filter((c): c is Content => c !== null);
+  if (messages.length === 1) {
+    // Remove the role if there's just one message
+    return [{ parts: messages[0].parts }];
+  }
+  return messages;
+}
+
+async function conversationToSystemContent(
+  conversation: ConversationPrompt,
+): Promise<Content | null> {
+  const parts = await Promise.all(
+    conversation.map(async (part): Promise<Part[] | null> => {
+      if (part.role === 'system') {
+        return multiPartPromptToGemini(part.content);
+      }
+      return null;
+    }),
+  );
+
+  // TODO filter to text parts
+  const systemParts = parts.filter((p): p is Part[] => p !== null).flat();
+  if (systemParts.length > 0) {
+    return { parts: systemParts };
+  }
+  return null;
 }
 
 async function multiPartPromptToGemini(prompt: MultiPartPrompt): Promise<Part[]> {

@@ -1,7 +1,7 @@
 import {
   normalizedProviderConfigSchema,
+  type ConversationPrompt,
   type ModelProvider,
-  type MultiPartPrompt,
   type PromptPart,
   type RunContext,
   type TokenUsage,
@@ -91,7 +91,14 @@ export class AnthropicProvider implements ModelProvider {
     'image/gif',
   ];
 
-  async *run(prompt: MultiPartPrompt, context: RunContext) {
+  async *run(conversation: ConversationPrompt, context: RunContext) {
+    const messages = await conversationToAnthropic(conversation);
+    const systemContent = await conversationToSystemContent(conversation);
+    const extensions: { system?: Part[] } = {};
+    if (systemContent) {
+      extensions.system = systemContent;
+    }
+
     yield '';
     const resp = await fetch(`https://api.anthropic.com/v1/messages`, {
       method: 'POST',
@@ -104,14 +111,10 @@ export class AnthropicProvider implements ModelProvider {
       body: JSON.stringify({
         model: this.model,
         ...this.request,
+        ...extensions,
         stream: true,
         max_tokens: getMaxTokens(this.model), // Anthropic requires max_tokens
-        messages: [
-          {
-            role: 'user',
-            content: await Promise.all(prompt.map(multiPartPromptToAnthropic)),
-          },
-        ],
+        messages,
       }),
       signal: context.abortSignal,
     });
@@ -244,4 +247,52 @@ async function multiPartPromptToAnthropic(part: PromptPart): Promise<Part> {
   } else {
     throw new Error('Unsupported part type');
   }
+}
+
+export interface Message {
+  role: 'user' | 'assistant';
+  content: Part[];
+}
+
+async function conversationToAnthropic(conversation: ConversationPrompt): Promise<Message[]> {
+  const contents = await Promise.all(
+    conversation.map(async (part): Promise<Message | null> => {
+      if (part.role === 'user') {
+        return {
+          role: 'user',
+          content: await Promise.all(part.content.map(multiPartPromptToAnthropic)),
+        };
+      }
+      if (part.role === 'assistant') {
+        return {
+          role: 'assistant',
+          content: await Promise.all(part.content.map(multiPartPromptToAnthropic)),
+        };
+      }
+
+      // Ignore system messages
+      return null;
+    }),
+  );
+  return contents.filter((c): c is Message => c !== null);
+}
+
+async function conversationToSystemContent(
+  conversation: ConversationPrompt,
+): Promise<Part[] | null> {
+  const parts = await Promise.all(
+    conversation.map(async (part): Promise<Part[] | null> => {
+      if (part.role === 'system') {
+        return await Promise.all(part.content.map(multiPartPromptToAnthropic));
+      }
+      return null;
+    }),
+  );
+
+  // TODO filter to text parts
+  const systemParts = parts.filter((p): p is Part[] => p !== null).flat();
+  if (systemParts.length > 0) {
+    return systemParts;
+  }
+  return null;
 }

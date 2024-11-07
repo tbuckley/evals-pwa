@@ -7,8 +7,8 @@ import type {
   TokenUsage,
   VarSet,
   RunContext,
-  MultiPartPrompt,
   ModelUpdate,
+  ConversationPrompt,
 } from '$lib/types';
 
 export interface Config {
@@ -29,7 +29,7 @@ export class SimpleEnvironment implements TestEnvironment {
     vars: VarSet,
     context: RunContext,
   ): AsyncGenerator<string | ModelUpdate, TestOutput, void> {
-    let prompt: MultiPartPrompt;
+    let prompt: ConversationPrompt;
     try {
       prompt = await this.prompt.format(vars, this.model.mimeTypes);
     } catch (e) {

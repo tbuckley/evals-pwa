@@ -1,7 +1,10 @@
-import type { ModelProvider, MultiPartPrompt, TokenUsage } from '$lib/types';
+import type { ConversationPrompt, ModelProvider, TokenUsage } from '$lib/types';
+import { conversationToSinglePrompt } from './legacyProvider';
 
 export class ReverserProvider implements ModelProvider {
-  async *run(prompt: MultiPartPrompt) {
+  async *run(conversation: ConversationPrompt) {
+    const prompt = conversationToSinglePrompt(conversation);
+
     yield await Promise.resolve('');
     const textParts = prompt.filter((part) => 'text' in part) as { text: string }[];
     const text = textParts.map((part) => part.text).join('\n');

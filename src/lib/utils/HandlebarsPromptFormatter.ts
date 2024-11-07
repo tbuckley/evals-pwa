@@ -1,8 +1,17 @@
-import { type MultiPartPrompt, type Prompt, type PromptFormatter, type VarSet } from '$lib/types';
+import {
+  type ConversationPrompt,
+  type MultiPartPrompt,
+  type Prompt,
+  type PromptFormatter,
+  type RolePromptPart,
+  type VarSet,
+} from '$lib/types';
 import Handlebars from 'handlebars';
 import { FileReference } from '$lib/storage/FileReference';
 import { asyncObjectDfsMap } from './objectDFS';
 import { matchesMimeType } from './media';
+import * as yaml from 'yaml';
+import { z } from 'zod';
 
 export class HandlebarsPromptFormatter implements PromptFormatter {
   prompt: HandlebarsTemplateDelegate;
@@ -10,7 +19,7 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
   constructor(prompt: Prompt) {
     this.prompt = Handlebars.compile(prompt);
   }
-  async format(vars: VarSet, mimeTypes?: string[]): Promise<MultiPartPrompt> {
+  async format(vars: VarSet, mimeTypes?: string[]): Promise<ConversationPrompt> {
     const files: Record<string, FileReference> = {};
     const errorFiles: Record<string, FileReference> = {};
     const placeholderVars = await asyncObjectDfsMap(vars, async (val, path) => {
@@ -39,21 +48,61 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
     });
 
     const rendered = this.prompt(placeholderVars);
+    const conversation = getAsConversation(rendered);
 
-    // Find all file placeholders, and use the image
-    const parsed: MultiPartPrompt = [];
-    rendered.split(/(__FILE_PLACEHOLDER_[a-zA-Z0-9_\-[\].$]+?__)/).forEach((part) => {
-      if (part.startsWith('__FILE_PLACEHOLDER_')) {
-        const key = part.slice(19, -2);
-        if (key in errorFiles) {
-          throw new Error(`Cannot read file ${errorFiles[key].uri}: unsupported file type`);
-        }
-        parsed.push({ file: files[key].file });
-      } else if (part.length > 0) {
-        parsed.push({ text: part });
+    // Find all file placeholders, and use the file
+    return conversation.map((part): RolePromptPart => {
+      if ('system' in part) {
+        return { role: 'system', content: replaceFilePlaceholders(part.system, files, errorFiles) };
       }
+      if ('user' in part) {
+        return { role: 'user', content: replaceFilePlaceholders(part.user, files, errorFiles) };
+      }
+      if ('assistant' in part) {
+        return {
+          role: 'assistant',
+          content: replaceFilePlaceholders(part.assistant, files, errorFiles),
+        };
+      }
+      throw new Error(`Invalid conversation part: ${JSON.stringify(part)}`);
     });
-
-    return parsed;
   }
+}
+
+function getAsConversation(rendered: string): Conversation {
+  try {
+    const parsed: unknown = yaml.parse(rendered);
+    return conversationSchema.parse(parsed);
+  } catch {
+    return [{ user: rendered }];
+  }
+}
+
+const conversationSchema = z.array(
+  z.union([
+    z.object({ system: z.string() }),
+    z.object({ user: z.string() }),
+    z.object({ assistant: z.string() }),
+  ]),
+);
+type Conversation = z.infer<typeof conversationSchema>;
+
+function replaceFilePlaceholders(
+  rendered: string,
+  files: Record<string, FileReference>,
+  errorFiles: Record<string, FileReference>,
+): MultiPartPrompt {
+  const parsed: MultiPartPrompt = [];
+  rendered.split(/(__FILE_PLACEHOLDER_[a-zA-Z0-9_\-[\].$]+?__)/).forEach((part) => {
+    if (part.startsWith('__FILE_PLACEHOLDER_')) {
+      const key = part.slice(19, -2);
+      if (key in errorFiles) {
+        throw new Error(`Cannot read file ${errorFiles[key].uri}: unsupported file type`);
+      }
+      parsed.push({ file: files[key].file });
+    } else if (part.length > 0) {
+      parsed.push({ text: part });
+    }
+  });
+  return parsed;
 }
