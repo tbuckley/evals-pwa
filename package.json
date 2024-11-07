@@ -58,6 +58,8 @@
     "lucide-svelte": "^0.452.0",
     "mode-watcher": "^0.4.1",
     "picomatch": "^4.0.2",
+    "rehype-slug": "^6.0.0",
+    "remark-toc": "^9.0.0",
     "svelte-headless-table": "^0.18.2",
     "svelte-radix": "^1.1.0",
     "svelte-sonner": "^0.3.28",

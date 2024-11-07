@@ -1,6 +1,8 @@
 import adapter from '@sveltejs/adapter-static';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import { mdsvex } from 'mdsvex';
+import remarkToc from 'remark-toc';
+import rehypeSlug from 'rehype-slug';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -13,6 +15,8 @@ const config = {
     mdsvex({
       // The default mdsvex extension is .svx; this overrides that.
       extensions: ['.md'],
+      remarkPlugins: [[remarkToc, { maxDepth: 3 }]],
+      rehypePlugins: [rehypeSlug],
     }),
   ],
 

@@ -2,6 +2,8 @@
 
 A [Promptfoo](https://www.promptfoo.dev/docs/intro)-inspired evaluation framework for AI prompts. There is no cloud backend, so all your data stays on your device -- prompts run directly against the Gemini/etc backends. It's free (ignoring LLM costs), private, and requires no installation.
 
+## Table of Contents
+
 ## Getting Started
 
 First, create a folder where your evaluation data and output will be stored. Create an `evals.yaml` file inside it and add the following:
@@ -327,15 +329,15 @@ interface AssertionResult {
 }
 ```
 
-# Other Features
+## Other Features
 
-## User Interface
+### User Interface
 
 - The Configuration tab lets you write a configuration in the browser, which will be saved in-memory. You can save it to disk at any point.
 - When you run tests, it will check if your configuration has changed on disk and prompt you to use the updated one if so.
 - If you run tests and they are taking a while, feel free to navigate elsewhere -- a notification will be shown when your tests are complete.
 
-## Splitting configuration across multiple files
+### Splitting configuration across multiple files
 
 You can split your configuration across multiple files. You reference another file either with an absolute path from the root project folder (e.g. `file:///path/from/folder/file.yaml`), or via a relative path from the current file (e.g. `file://./path/from/folder/file.yaml`).
 
@@ -367,7 +369,7 @@ tests:
       request: Who was the first US president?
 ```
 
-## Generators
+### Generators
 
 Generators can help you quickly create tests (or any other configuration) from whatever data you already have. They allow you to use code to create any portion of the configuration file. You can optionally pass them arguments.
 
@@ -407,12 +409,12 @@ tests:
   =gen-tests: file:///foo.csv
 ```
 
-## Multiple configurations
+### Multiple configurations
 
 You can create multiple configuration files within your folder (including in subdirectories) by naming them `*.evals.yaml`. A dropdown in the header bar lets you switch between them. Runs will be saved in a corresponding folder, for example runs for `basic.evals.yaml` will be saved to `runs/basic/<ID>.json`.
 
 For legacy reasons, `config.yaml` is also supported.
 
-## Development
+### Development
 
 For testing, there is a `reverser:` provider (suffix is ignored). It will concatenate any text messages with newlines and output the reversed value.
