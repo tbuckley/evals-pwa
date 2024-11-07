@@ -149,6 +149,11 @@ export interface FileStorage extends ReadonlyFileStorage {
 
 export type PromptPart = { text: string } | { file: File };
 export type MultiPartPrompt = PromptPart[];
+export interface RolePromptPart {
+  role: 'user' | 'assistant' | 'system';
+  content: MultiPartPrompt;
+}
+export type ConversationPrompt = RolePromptPart[];
 
 export interface RunContext {
   abortSignal: AbortSignal;
@@ -161,7 +166,7 @@ export interface ModelUpdate {
 
 export interface ModelProvider {
   run(
-    prompt: MultiPartPrompt,
+    prompt: ConversationPrompt,
     context: RunContext,
   ): AsyncGenerator<string | ModelUpdate, unknown, void>;
   extractOutput(response: unknown): MaybePromise<string | (string | Blob)[]>;
@@ -180,7 +185,7 @@ export interface TaskQueue {
 }
 
 export interface PromptFormatter {
-  format(vars: VarSet, mimeTypes: string[] | undefined): Promise<MultiPartPrompt>;
+  format(vars: VarSet, mimeTypes: string[] | undefined): Promise<ConversationPrompt>;
 }
 
 export interface FileLoader {

@@ -1,7 +1,7 @@
 import {
   normalizedProviderConfigSchema,
+  type ConversationPrompt,
   type ModelProvider,
-  type MultiPartPrompt,
   type PromptPart,
   type RunContext,
   type TokenUsage,
@@ -70,7 +70,9 @@ export class OpenaiProvider implements ModelProvider {
     'image/gif',
   ];
 
-  async *run(prompt: MultiPartPrompt, context: RunContext) {
+  async *run(conversation: ConversationPrompt, context: RunContext) {
+    const messages = await conversationToOpenAI(conversation);
+
     yield '';
     const resp = await fetch(`${this.apiBaseUrl}/v1/chat/completions`, {
       method: 'POST',
@@ -85,12 +87,7 @@ export class OpenaiProvider implements ModelProvider {
         stream_options: {
           include_usage: true,
         },
-        messages: [
-          {
-            role: 'user',
-            content: await Promise.all(prompt.map(multiPartPromptToOpenAI)),
-          },
-        ],
+        messages,
       }),
       signal: context.abortSignal,
     });
@@ -192,4 +189,20 @@ export async function multiPartPromptToOpenAI(part: PromptPart): Promise<Part> {
   } else {
     throw new Error('Unsupported part type');
   }
+}
+
+export interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: Part[];
+}
+
+async function conversationToOpenAI(conversation: ConversationPrompt): Promise<Message[]> {
+  return await Promise.all(
+    conversation.map(
+      async (part): Promise<Message> => ({
+        role: part.role,
+        content: await Promise.all(part.content.map(multiPartPromptToOpenAI)),
+      }),
+    ),
+  );
 }

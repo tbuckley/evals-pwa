@@ -1,11 +1,13 @@
 import {
   normalizedProviderConfigSchema,
+  type ConversationPrompt,
   type ModelProvider,
   type MultiPartPrompt,
   type RunContext,
   type TokenUsage,
 } from '$lib/types';
 import { z } from 'zod';
+import { conversationToSinglePrompt } from './legacyProvider';
 
 const dalleResponseSchema = z.object({
   created: z.number(),
@@ -39,7 +41,9 @@ export class DalleProvider implements ModelProvider {
 
   mimeTypes: string[] = [];
 
-  async *run(prompt: MultiPartPrompt, context: RunContext) {
+  async *run(conversation: ConversationPrompt, context: RunContext) {
+    const prompt = conversationToSinglePrompt(conversation);
+
     yield '';
     const resp = await fetch(`https://api.openai.com/v1/images/generations`, {
       method: 'POST',

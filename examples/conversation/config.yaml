@@ -1,0 +1,23 @@
+description: Conversation example
+
+providers:
+  - gemini:gemini-1.5-flash-002
+  - openai:gpt-4o
+  - anthropic:claude-3-5-sonnet-latest
+
+prompts:
+  - |-
+    - system: You are {{persona}}. You have an elaborate backstory. Respond to all questions in character, staying consistent.
+    - user: What is your name?
+    - assistant: My name is {{name}}.
+    - user: Where do you live?
+
+tests:
+  - description: Penguin
+    vars:
+      persona: a penguin
+      name: Peng
+  - description: Robot
+    vars:
+      persona: a robot
+      name: R2-D2
