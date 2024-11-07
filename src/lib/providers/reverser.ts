@@ -2,6 +2,12 @@ import type { ConversationPrompt, ModelProvider, TokenUsage } from '$lib/types';
 import { conversationToSinglePrompt } from './legacyProvider';
 
 export class ReverserProvider implements ModelProvider {
+  constructor(private readonly model: string) {}
+
+  get id(): string {
+    return `reverser:${this.model}`;
+  }
+
   async *run(conversation: ConversationPrompt) {
     const prompt = conversationToSinglePrompt(conversation);
 

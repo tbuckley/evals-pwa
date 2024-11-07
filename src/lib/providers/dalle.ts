@@ -39,6 +39,10 @@ export class DalleProvider implements ModelProvider {
     this.request = request;
   }
 
+  get id(): string {
+    return `dalle:${this.model}`;
+  }
+
   mimeTypes: string[] = [];
 
   async *run(conversation: ConversationPrompt, context: RunContext) {

@@ -395,7 +395,7 @@ function createEnvironments(
     envs.push(
       new SimpleEnvironment({
         model,
-        prompt: new HandlebarsPromptFormatter(prompt),
+        promptFormatter: new HandlebarsPromptFormatter(prompt),
       }),
     );
   }
@@ -479,7 +479,10 @@ async function runTest(
   }));
   const assertionResults: AssertionResult[] = [];
   for (const assertion of assertions) {
-    const result = await assertion.assert.run(testResult.output);
+    const result = await assertion.assert.run(testResult.output, {
+      provider: env.provider,
+      prompt: env.prompt,
+    });
     result.id = assertion.id;
     assertionResults.push(result);
   }

@@ -165,6 +165,7 @@ export interface ModelUpdate {
 }
 
 export interface ModelProvider {
+  id: string;
   run(
     prompt: ConversationPrompt,
     context: RunContext,
@@ -176,6 +177,8 @@ export interface ModelProvider {
 
 export interface TestEnvironment {
   run(test: TestCase, context: RunContext): AsyncGenerator<string | ModelUpdate, TestOutput, void>;
+  provider: Pick<NormalizedProvider, 'id'>;
+  prompt: Prompt;
 }
 
 export interface TaskQueue {
@@ -185,6 +188,7 @@ export interface TaskQueue {
 }
 
 export interface PromptFormatter {
+  prompt: Prompt;
   format(vars: VarSet, mimeTypes: string[] | undefined): Promise<ConversationPrompt>;
 }
 
@@ -194,7 +198,10 @@ export interface FileLoader {
 
 export type MaybePromise<T> = T | Promise<T>;
 export interface AssertionProvider {
-  run(output: string | (string | FileReference)[]): MaybePromise<AssertionResult>;
+  run(
+    output: string | (string | FileReference)[],
+    context: { provider: Pick<NormalizedProvider, 'id'>; prompt: Prompt },
+  ): MaybePromise<AssertionResult>;
   destroy?: () => void;
 }
 

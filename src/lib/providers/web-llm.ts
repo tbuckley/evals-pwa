@@ -42,6 +42,10 @@ export class WebLlm implements ModelProvider {
     this.#modelRecord = record;
   }
 
+  get id(): string {
+    return `web-llm:${this.model}`;
+  }
+
   mimeTypes = [
     // Image
     'image/png',

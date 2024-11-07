@@ -10,5 +10,9 @@ export class OllamaProvider extends OpenaiProvider implements ModelProvider {
     super(model, apiKey, config, () => 0);
   }
 
+  get id(): string {
+    return `ollama:${this.model}`;
+  }
+
   mimeTypes = ['*/*'];
 }

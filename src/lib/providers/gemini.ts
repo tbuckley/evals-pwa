@@ -103,6 +103,10 @@ export class GeminiProvider implements ModelProvider {
     }
   }
 
+  get id(): string {
+    return `gemini:${this.model}`;
+  }
+
   mimeTypes = [
     // Image
     'image/png',
