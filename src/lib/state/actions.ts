@@ -421,33 +421,48 @@ async function runTest(
     if (!next.done) {
       if (typeof next.value === 'string') {
         const delta = next.value;
-        result.update((state) => ({
-          ...state,
-          state: 'in-progress',
-          output: (state.output ?? '') + delta,
-        }));
+        result.update((state) => {
+          const output = [...(state.output ?? [])]; // Copy so we don't mutate the original
+          let lastOutputString = '';
+          if (output.length > 0 && typeof output[output.length - 1] === 'string') {
+            lastOutputString = output.pop() as string;
+          }
+          return {
+            ...state,
+            state: 'in-progress',
+            // For now, we know that the output is always a string
+            output: [...output, lastOutputString + delta],
+          };
+        });
       } else {
         const output = next.value.output;
         result.update((state) => ({
           ...state,
           state: 'in-progress',
-          output,
+          output: [output],
         }));
       }
     }
   }
-  const output = next.value;
+  const testResult = next.value;
 
-  if (output.error) {
+  // FIXME: We should guarantee that SimpleEnvironment returns an array
+  let arrayOutput: LiveResult['output'];
+  if (testResult.output) {
+    arrayOutput = Array.isArray(testResult.output) ? testResult.output : [testResult.output];
+  }
+
+  if (testResult.error) {
     result.update((state) => ({
       ...state,
-      ...output,
+      ...testResult,
+      output: arrayOutput,
       state: 'error',
       pass: false,
     }));
     return;
   }
-  if (!output.output) {
+  if (!testResult.output) {
     result.update((state) => ({
       ...state,
       state: 'error',
@@ -464,13 +479,14 @@ async function runTest(
   }));
   const assertionResults: AssertionResult[] = [];
   for (const assertion of assertions) {
-    const result = await assertion.assert.run(output.output);
+    const result = await assertion.assert.run(testResult.output);
     result.id = assertion.id;
     assertionResults.push(result);
   }
   result.update((state) => ({
     ...state,
-    ...output,
+    ...testResult,
+    output: arrayOutput,
     state: assertionResults.every((r) => r.pass) ? 'success' : 'error',
     assertionResults,
   }));

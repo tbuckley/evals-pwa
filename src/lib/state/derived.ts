@@ -2,7 +2,7 @@ import { derived, readable } from 'svelte/store';
 import { configStore, liveRunStore, runStore, selectedRunIdStore } from './stores';
 import { ProviderManager } from '$lib/providers/ProviderManager';
 import { envStore } from './env';
-import type { LiveRun, Run } from '$lib/types';
+import type { LiveResult, LiveRun, Run } from '$lib/types';
 import { getVarNamesForTests } from '$lib/utils/testCase';
 import { summarizeResults } from '$lib/utils/summarizeResults';
 
@@ -160,10 +160,20 @@ function runToLiveRun(run: Run): LiveRun {
     results: run.results.map((row) =>
       row.map((res) => {
         const state = res.pass ? 'success' : 'error';
-        const { pass: _, rawPrompt, ...rest } = res;
+        const { pass: _, rawPrompt, output, ...rest } = res;
+
+        // Transform output to an array if it's a string
+        let outputArray: LiveResult['output'];
+        if (typeof output === 'string') {
+          outputArray = [output];
+        } else {
+          outputArray = output ?? undefined;
+        }
+
         return readable({
           ...rest,
           rawPrompt: rawPrompt ?? null,
+          output: outputArray,
           state,
         });
       }),

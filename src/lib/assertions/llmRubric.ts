@@ -6,6 +6,8 @@ import {
   type AssertionProvider,
   type AssertionResult,
   type NormalizedTestCase,
+  type TestOutput,
+  type TestResult,
 } from '$lib/types';
 import { extractAllJsonObjects } from '$lib/utils/extractAllJson';
 import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
@@ -45,7 +47,10 @@ export function createLlmRubricAssertion(
   // TODO make rubric optional if prompt is provided
 
   return {
-    run: async function (output: string): Promise<AssertionResult> {
+    run: async function (output: NonNullable<TestResult['output']>): Promise<AssertionResult> {
+      if (!Array.isArray(output)) {
+        output = [output];
+      }
       const generator = env.run({ output, rubric, ...testVars }, { abortSignal });
       let next;
       while (!next?.done) {
@@ -53,7 +58,7 @@ export function createLlmRubricAssertion(
         next = await generator.next();
       }
       const result = next.value;
-      const rubricOutput = result.output;
+      const rubricOutput = extractOutputAsString(result.output);
       if (!rubricOutput) {
         return {
           pass: false,
@@ -73,4 +78,20 @@ export function createLlmRubricAssertion(
       }
     },
   };
+}
+
+function extractOutputAsString(output: TestOutput['output']): string | undefined {
+  if (!output) {
+    return undefined;
+  }
+  if (typeof output === 'string') {
+    return output;
+  }
+
+  // It's an array
+  const strings = output.filter((val): val is string => typeof val === 'string');
+  if (strings.length === 0) {
+    return undefined;
+  }
+  return strings.join(' '); // Just concatenate all strings
 }

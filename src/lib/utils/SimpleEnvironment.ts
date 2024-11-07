@@ -1,3 +1,4 @@
+import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 import type {
   TestEnvironment,
   ModelProvider,
@@ -63,10 +64,24 @@ export class SimpleEnvironment implements TestEnvironment {
     }
     const latencyMillis = Date.now() - start;
 
-    let output: string;
+    let output: TestOutput['output'];
     let tokenUsage: TokenUsage;
     try {
-      output = this.model.extractOutput(resp);
+      const directOutput = await this.model.extractOutput(resp);
+      if (Array.isArray(directOutput)) {
+        // Convert blobs to file references
+        output = await Promise.all(
+          directOutput.map(async (val) => {
+            if (val instanceof Blob) {
+              return blobToFileReference(val);
+            }
+            return val;
+          }),
+        );
+      } else {
+        output = directOutput;
+      }
+
       tokenUsage = this.model.extractTokenUsage(resp);
     } catch (e) {
       if (e instanceof Error) {
@@ -83,7 +98,7 @@ export class SimpleEnvironment implements TestEnvironment {
     return {
       rawPrompt: prompt,
       rawOutput: resp,
-      output: output,
+      output,
       latencyMillis,
       tokenUsage,
     };

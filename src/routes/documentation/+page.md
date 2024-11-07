@@ -62,6 +62,7 @@ Currently supported model providers:
 - [x] Ollama -- prefix with `ollama:`, e.g. `ollama:gemma-2:2b`. Requires `OLLAMA_ENDPOINT` (e.g. `http://localhost:11434`) in your environment, or the `apiBaseUrl` config option.
 - [x] [WebLLM](https://github.com/mlc-ai/web-llm) -- prefix with `web-llm:`, e.g. `web-llm:gemma-2-2b-it-q4f32_1-MLC`. See [here](https://github.com/mlc-ai/web-llm/blob/main/src/config.ts#L309) for a list of supported model IDs. Requires [WebGPU](https://caniuse.com/webgpu).
 - [x] Anthropic -- prefix with `anthropic:`, e.g. `anthropic:claude-3-5-sonnet-20240620`. Requires `ANTHROPIC_API_KEY` in your environment.
+- [x] DALL-E -- prefix with `dalle:`, e.g. `dalle:dall-e-3`. Requires `OPENAI_API_KEY` in your environment. Output is an array containing an image. View a result's details to see the revised prompt DALL-E creates.
 
 #### Provider Config
 
@@ -169,7 +170,7 @@ A test may include a list of assertions to check whether the output meets certai
 - [ ] is-json
 - [ ] cost
 - [ ] latency
-- [x] llm-rubric -- ask an LLM to validate the output. Provider defaults to `gemini-1.5-pro-latest`. If you override `prompt`, it should be a template containing both `{{output}}` and `{{rubric}}`. Vars: `{ rubric: string; prompt?: string; provider?: string}`
+- [x] llm-rubric -- ask an LLM to validate the output. Provider defaults to `gemini-1.5-pro-latest`. If you override `prompt`, it should be a template containing both `{{#each output}}{{this}}{{/each}}` and `{{rubric}}`. Vars: `{ rubric: string; prompt?: string; provider?: string}`. Note that output is an array to support cases like DALL-E.
 
 Any assertion vars that are strings will be treated as Handlebars templates, and the test case's vars will be populated. (Note: this does not apply to `javascript` assertions, which receive the test case's vars directly.)
 
@@ -207,7 +208,9 @@ tests:
 
 #### Javascript Assertions
 
-For `javascript` assertions, your code must provide a function `execute(output: string, context: { vars: Record<string, unknown> }): Promise<AssertionResult>`. Typescript is also supported, and will be compiled to Javascript. Your `execute` function must return whether the assertion passed, along with optional additional information.
+For `javascript` assertions, your code must provide a function `execute(output: string, context: { vars: Record<string, unknown> }): MaybePromise<AssertionResult>`. Typescript is also supported, and will be compiled to Javascript. Your `execute` function must return whether the assertion passed, along with optional additional information.
+
+Note: with DALL-E, `output` will be an array of `[{file: File, uri: string}, string|undefined]` containing the image and the (optional) revised prompt.
 
 ```typescript
 interface AssertionResult {
