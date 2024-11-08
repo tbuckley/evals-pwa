@@ -9,7 +9,7 @@
   export let cycle: () => void;
 </script>
 
-<Button on:click={cycle} variant="ghost" size="sm" class="text-gray-500" {...$$restProps}>
+<Button on:click={cycle} variant="ghost" size="icon" class="text-gray-500" {...$$restProps}>
   {#if $height === 'minimal'}
     <ChevronUp class="h-5 w-5"></ChevronUp>
   {:else if $height === 'collapsed'}
