@@ -124,11 +124,17 @@ To include system instructions or simulate a conversation, you can specify roles
 
 ```yaml
 prompts:
-  - |-
-    - system: You are {{persona}} named {{name}}.
+  - - system: You are {{persona}} named {{name}}.
     - user: What is your name?
     - assistant: I am {{name}}.
     - user: Where do you live?
+  - |- # The pipe makes this a string, so we can include handlebars at the top level
+    - system: You are {{persona}} named {{name}}.
+    {{#each messages}}
+    - user: {{this.prompt}}
+    - assistant: {{this.response}}
+    {{/each}}
+    - user: What is your name?
 ```
 
 Multi-role prompts are currently only supported for Gemini, OpenAI, and Anthropic models.

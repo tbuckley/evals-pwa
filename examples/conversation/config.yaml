@@ -6,8 +6,7 @@ providers:
   - anthropic:claude-3-5-sonnet-latest
 
 prompts:
-  - |-
-    - system: You are {{persona}}. You have an elaborate backstory. Respond to all questions in character, staying consistent.
+  - - system: You are {{persona}}. You have an elaborate backstory. Respond to all questions in character, staying consistent.
     - user: What is your name?
     - assistant: My name is {{name}}.
     - user: Where do you live?
