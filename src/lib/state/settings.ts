@@ -33,6 +33,12 @@ export const showVarsColumnsStore = createLocalStorageStore<boolean>(
   true,
 );
 
+export const showOnlyFailuresStore = createLocalStorageStore<boolean>(
+  'showOnlyFailures',
+  boolSchema,
+  false,
+);
+
 const rowHeightSchema = z.union([
   z.literal('minimal'),
   z.literal('collapsed'),
