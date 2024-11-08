@@ -6,6 +6,7 @@
   import RowToggle from './RowToggle.svelte';
   import {
     showVarsColumnsStore,
+    showOnlyFailuresStore,
     rowHeightStore,
     headerRowHeightStore,
     summaryRowHeightStore,
@@ -35,6 +36,7 @@
   }
 
   interface BodyRow {
+    hasFailures: boolean;
     cells: Iterable<BodyCell>;
     rowHeight: Writable<RowHeight>;
   }
@@ -112,6 +114,7 @@
   function* bodyRows(run: LiveRun): Generator<BodyRow, void, void> {
     for (let i = 0; i < run.tests.length; i++) {
       yield {
+        hasFailures: run.results[i].some((env) => get(env).state === 'error'),
         cells: bodyCells(run, i),
         rowHeight: writable(get(rowHeightStore)),
       };
@@ -156,17 +159,28 @@
   $: columnWidths = header.map(() => writable<number | undefined>(undefined));
 </script>
 
-<div class="mb-2 flex items-center gap-1.5">
-  <Checkbox id="vars-run-{run.id}-{run.timestamp}" bind:checked={$showVarsColumnsStore} />
-  <Label for="vars-run-{run.id}-{run.timestamp}">Show vars columns</Label>
-  <RowToggle
-    id="height-run-{run.id}-{run.timestamp}"
-    height={rowHeightStore}
-    cycle={() => {
-      cycleRowHeight(rowHeightStore);
-    }}
-  />
-  <Label for="height-run-{run.id}-{run.timestamp}">Toggle row height</Label>
+<div class="mb-2 flex items-center gap-4">
+  <div class="flex items-center gap-1.5">
+    <RowToggle
+      id="height-run-{run.id}-{run.timestamp}"
+      height={rowHeightStore}
+      cycle={() => {
+        cycleRowHeight(rowHeightStore);
+      }}
+    />
+    <Label for="height-run-{run.id}-{run.timestamp}">Toggle row height</Label>
+  </div>
+  <div class="flex items-center gap-1.5">
+    <Checkbox id="vars-run-{run.id}-{run.timestamp}-vars" bind:checked={$showVarsColumnsStore} />
+    <Label for="vars-run-{run.id}-{run.timestamp}-vars">Show vars columns</Label>
+  </div>
+  <div class="flex items-center gap-1.5">
+    <Checkbox
+      id="vars-run-{run.id}-{run.timestamp}-failures"
+      bind:checked={$showOnlyFailuresStore}
+    />
+    <Label for="vars-run-{run.id}-{run.timestamp}-failures">Show only failures</Label>
+  </div>
 </div>
 <div class="w-[fit-content] rounded-md border pr-40 text-sm">
   <table>
@@ -229,7 +243,10 @@
         {/each}
       </tr>
       {#each body as row}
-        <tr class="border-b transition-colors hover:bg-muted/50">
+        <tr
+          class="border-b transition-colors hover:bg-muted/50"
+          class:hidden={$showOnlyFailuresStore && !row.hasFailures}
+        >
           {#each row.cells as cell, i}
             {#if cell.type !== 'var' || $showVarsColumnsStore}
               <td class="p-1 align-top">
