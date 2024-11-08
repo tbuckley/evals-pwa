@@ -1,5 +1,6 @@
 import type { NormalizedConfig, NormalizedProvider, NormalizedTestCase } from '$lib/types';
-import type { FsConfig, FsTestCase } from './types';
+import type { FsConfig, FsPrompt, FsTestCase } from './types';
+import yaml from 'yaml';
 
 export function normalizeConfig(config: FsConfig): NormalizedConfig {
   return {
@@ -14,7 +15,16 @@ function normalizePrompts(prompts: FsConfig['prompts']): string[] {
   if (!prompts) {
     return [];
   }
-  return prompts;
+  return prompts.map(normalizePrompt);
+}
+
+function normalizePrompt(prompt: FsPrompt): string {
+  if (typeof prompt === 'string') {
+    return prompt;
+  }
+
+  // If it's a conversation, encode it as a yaml string
+  return yaml.stringify(prompt);
 }
 
 function normalizeProviders(providers: FsConfig['providers']): NormalizedProvider[] {

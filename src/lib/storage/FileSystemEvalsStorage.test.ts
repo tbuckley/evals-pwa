@@ -59,4 +59,31 @@ describe('FileSystemEvalsStorage', () => {
       ]
     `);
   });
+
+  test('normalizes conversations', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile(
+      'file:///config.yaml',
+      dedent`
+            prompts:
+              - - system: A system prompt.
+                - user: A user prompt.
+                - assistant: An assistant response.
+                - user: A final user prompt.
+            providers:
+              - gemini:gemini-1.5-flash-latest
+        `,
+    );
+
+    const fs = new FileSystemEvalsStorage(storage);
+    const config = await fs.getConfig();
+    expect(config.prompts).toEqual([
+      dedent`
+        - system: A system prompt.
+        - user: A user prompt.
+        - assistant: An assistant response.
+        - user: A final user prompt.
+      ` + '\n', // Annoyingly, yaml.stringify() adds a newline...
+    ]);
+  });
 });

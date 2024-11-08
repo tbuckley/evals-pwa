@@ -24,7 +24,17 @@ export const fsExpandedProviderSchema = z.object({
 });
 export const fsProviderSchema = z.union([z.string(), fsExpandedProviderSchema]);
 
-export const fsPromptSchema = z.string();
+export const fsPromptSchema = z.union([
+  z.string(),
+  z.array(
+    z.union([
+      z.object({ system: z.string() }),
+      z.object({ user: z.string() }),
+      z.object({ assistant: z.string() }),
+    ]),
+  ),
+]);
+export type FsPrompt = z.infer<typeof fsPromptSchema>;
 
 export const fsTestCaseSchema = z.object({
   // Optional
