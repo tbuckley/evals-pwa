@@ -138,10 +138,7 @@ export class GeminiProvider implements ModelProvider {
     'application/pdf',
   ];
 
-  async *run(
-    conversation: ConversationPrompt,
-    context: RunContext,
-  ): AsyncGenerator<string, unknown, void> {
+  async run(conversation: ConversationPrompt, context: RunContext) {
     const contents = await conversationToGemini(conversation);
     const systemContent = await conversationToSystemContent(conversation);
     const extensions: { systemInstruction?: Content } = {};
@@ -149,38 +146,43 @@ export class GeminiProvider implements ModelProvider {
       extensions.systemInstruction = systemContent;
     }
 
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:streamGenerateContent?alt=sse&key=${this.apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...this.config,
-          ...extensions,
-          contents,
-        }),
-        signal: context.abortSignal,
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:streamGenerateContent?alt=sse&key=${this.apiKey}`;
+    const body = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-    );
-    if (!resp.ok) {
-      throw new Error(`Failed to run model: ${resp.statusText}`);
-    }
-    const stream = resp.body;
-    let fullText = '';
-    let lastResponseJson: unknown;
-    if (!stream) throw new Error(`Failed to run model: no response`);
-    for await (const value of sse(resp)) {
-      lastResponseJson = JSON.parse(value);
-      const text = this.extractOutput(lastResponseJson);
-      fullText += text;
-      yield text;
-    }
+      body: JSON.stringify({
+        ...this.config,
+        ...extensions,
+        contents,
+      }),
+      signal: context.abortSignal,
+    } as const;
+    async function* run(): AsyncGenerator<string, unknown, void> {
+      const resp = await fetch(url, body);
+      if (!resp.ok) {
+        throw new Error(`Failed to run model: ${resp.statusText}`);
+      }
+      const stream = resp.body;
+      let fullText = '';
+      let lastResponseJson: unknown;
+      if (!stream) throw new Error(`Failed to run model: no response`);
+      for await (const value of sse(resp)) {
+        lastResponseJson = JSON.parse(value);
+        const text = this.extractOutput(lastResponseJson);
+        fullText += text;
+        yield text;
+      }
 
-    const parsed = generateContentResponseSchema.parse(lastResponseJson);
-    parsed.candidates[0].content.parts[0] = { text: fullText };
-    return parsed;
+      const parsed = generateContentResponseSchema.parse(lastResponseJson);
+      parsed.candidates[0].content.parts[0] = { text: fullText };
+      return parsed;
+    }
+    return {
+      key: [url, body],
+      run,
+    };
   }
 
   extractOutput(response: unknown): string {
