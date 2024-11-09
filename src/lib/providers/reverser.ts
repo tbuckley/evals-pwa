@@ -8,13 +8,19 @@ export class ReverserProvider implements ModelProvider {
     return `reverser:${this.model}`;
   }
 
-  async *run(conversation: ConversationPrompt) {
+  run(conversation: ConversationPrompt) {
     const prompt = conversationToSinglePrompt(conversation);
-
-    yield await Promise.resolve('');
     const textParts = prompt.filter((part) => 'text' in part) as { text: string }[];
     const text = textParts.map((part) => part.text).join('\n');
-    return { reversed: reverseString(text) };
+
+    return {
+      request: { input: text },
+      // eslint-disable-next-line @typescript-eslint/require-await
+      run: async function* () {
+        yield '';
+        return { reversed: reverseString(text) };
+      },
+    };
   }
 
   extractOutput(response: unknown): string {

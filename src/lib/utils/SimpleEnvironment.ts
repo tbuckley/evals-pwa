@@ -9,20 +9,35 @@ import type {
   RunContext,
   ModelUpdate,
   ConversationPrompt,
+  ModelCache,
 } from '$lib/types';
+import { z } from 'zod';
 
 export interface Config {
   model: ModelProvider;
   promptFormatter: PromptFormatter;
+  cache?: ModelCache;
+}
+
+const cacheValueSchema = z.object({
+  latencyMillis: z.number(),
+  response: z.unknown(),
+});
+type CacheValue = z.infer<typeof cacheValueSchema>;
+
+function isValidCacheValue(value: unknown): value is CacheValue {
+  return cacheValueSchema.safeParse(value).success;
 }
 
 export class SimpleEnvironment implements TestEnvironment {
   model: ModelProvider;
   promptFormatter: PromptFormatter;
+  cache?: ModelCache;
 
   constructor(options: Config) {
     this.model = options.model;
     this.promptFormatter = options.promptFormatter;
+    this.cache = options.cache;
   }
 
   get provider() {
@@ -49,27 +64,53 @@ export class SimpleEnvironment implements TestEnvironment {
     }
 
     const start = Date.now();
-    let resp: unknown;
-    try {
-      const generator = this.model.run(prompt, context);
-      let next;
-      while (!next?.done) {
-        next = await generator.next();
-        if (!next.done) {
-          yield next.value;
-        }
-      }
-      resp = next.value;
-    } catch (e) {
-      if (e instanceof Error) {
-        return {
-          rawPrompt: prompt,
-          error: e.toString(),
-        };
-      }
-      throw e;
+    const { request, run } = await this.model.run(prompt, context);
+
+    const cacheKey = {
+      provider: this.provider.id,
+      request,
+    };
+
+    const cachedValue = await this.cache?.get(cacheKey);
+    let validCacheValue: CacheValue | undefined;
+    if (isValidCacheValue(cachedValue)) {
+      validCacheValue = cachedValue;
     }
-    const latencyMillis = Date.now() - start;
+
+    let resp: unknown;
+    let latencyMillis: number;
+
+    if (validCacheValue) {
+      resp = validCacheValue.response;
+      latencyMillis = validCacheValue.latencyMillis;
+    } else {
+      try {
+        const generator = run();
+
+        let next;
+        while (!next?.done) {
+          next = await generator.next();
+          if (!next.done) {
+            yield next.value;
+          }
+        }
+        resp = next.value;
+      } catch (e) {
+        if (e instanceof Error) {
+          return {
+            rawPrompt: prompt,
+            error: e.toString(),
+          };
+        }
+        throw e;
+      }
+      latencyMillis = Date.now() - start;
+
+      await this.cache?.set(cacheKey, {
+        latencyMillis,
+        response: resp,
+      });
+    }
 
     let output: TestOutput['output'];
     let tokenUsage: TokenUsage;

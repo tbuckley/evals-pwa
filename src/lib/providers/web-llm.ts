@@ -54,79 +54,87 @@ export class WebLlm implements ModelProvider {
     'image/gif',
   ];
 
-  async *run(conversation: ConversationPrompt, context: RunContext) {
+  async run(conversation: ConversationPrompt, context: RunContext) {
     const prompt = conversationToSinglePrompt(conversation);
+    const content =
+      // eslint-disable-next-line -- ModelType can't be imported...
+      this.#modelRecord.model_type === 2 /* VLM */
+        ? await Promise.all(prompt.map(multiPartPromptToOpenAI))
+        : prompt.map((part) => ('text' in part ? part.text : '')).join('\n');
+    const messages: ChatCompletionMessageParam[] = [
+      // { role: 'system', content: 'You are a helpful AI assistant.' },
+      { role: 'user', content },
+    ];
 
-    const progress = generator<InitProgressReport>();
-    let cacheEntry;
-    let engine;
-    try {
-      if (!cache.has(this.model)) {
-        const worker = new Worker(new URL('./web-llm.worker.ts', import.meta.url), {
-          type: 'module',
-        });
-        const load = CreateWebWorkerMLCEngine(worker, this.model, {
-          initProgressCallback: (report) => {
-            progress.yield(report);
-          },
-        }).then((engine) => {
-          progress.return();
-          return engine;
-        });
-        cacheEntry = { refCount: 1, load };
-        cache.set(this.model, cacheEntry);
-        for await (const report of progress.generator) {
-          yield { type: 'replace', output: report.text } as ModelUpdate;
-        }
-      } else {
-        cacheEntry = cast(cache.get(this.model));
-        cacheEntry.refCount++;
-      }
-      engine = await cacheEntry.load;
-      const content =
-        // eslint-disable-next-line -- ModelType can't be imported...
-        this.#modelRecord.model_type === 2 /* VLM */
-          ? await Promise.all(prompt.map(multiPartPromptToOpenAI))
-          : prompt.map((part) => ('text' in part ? part.text : '')).join('\n');
-      const messages: ChatCompletionMessageParam[] = [
-        // { role: 'system', content: 'You are a helpful AI assistant.' },
-        { role: 'user', content },
-      ];
+    const request = {
+      messages,
+      stream: true,
+      stream_options: { include_usage: true },
+    } as const;
 
-      const chunks = await engine.chat.completions.create({
-        messages,
-        stream: true,
-        stream_options: { include_usage: true },
-      });
-      yield { type: 'replace', output: '' } as ModelUpdate;
-      let reply = '';
-      let usage: CompletionUsage | undefined;
-      for await (const chunk of chunks) {
-        if (context.abortSignal.aborted) {
+    const { model } = this;
+    return {
+      request,
+      run: async function* () {
+        const progress = generator<InitProgressReport>();
+        let cacheEntry;
+        let engine;
+        try {
+          if (!cache.has(model)) {
+            const worker = new Worker(new URL('./web-llm.worker.ts', import.meta.url), {
+              type: 'module',
+            });
+            const load = CreateWebWorkerMLCEngine(worker, model, {
+              initProgressCallback: (report) => {
+                progress.yield(report);
+              },
+            }).then((engine) => {
+              progress.return();
+              return engine;
+            });
+            cacheEntry = { refCount: 1, load };
+            cache.set(model, cacheEntry);
+            for await (const report of progress.generator) {
+              yield { type: 'replace', output: report.text } as ModelUpdate;
+            }
+          } else {
+            cacheEntry = cast(cache.get(model));
+            cacheEntry.refCount++;
+          }
+          engine = await cacheEntry.load;
+
+          const chunks = await engine.chat.completions.create(request);
+          yield { type: 'replace', output: '' } as ModelUpdate;
+          let reply = '';
+          let usage: CompletionUsage | undefined;
+          for await (const chunk of chunks) {
+            if (context.abortSignal.aborted) {
+              return {
+                reply,
+              };
+            }
+            const delta = chunk.choices[0]?.delta.content ?? '';
+            yield delta;
+            reply += delta;
+            if (chunk.usage) {
+              usage = chunk.usage;
+            }
+          }
           return {
             reply,
-          };
+            usage,
+          } as Response;
+        } finally {
+          if (cacheEntry) {
+            cacheEntry.refCount--;
+            if (cacheEntry.refCount === 0) {
+              cache.delete(model);
+              await engine?.unload();
+            }
+          }
         }
-        const delta = chunk.choices[0]?.delta.content ?? '';
-        yield delta;
-        reply += delta;
-        if (chunk.usage) {
-          usage = chunk.usage;
-        }
-      }
-      return {
-        reply,
-        usage,
-      } as Response;
-    } finally {
-      if (cacheEntry) {
-        cacheEntry.refCount--;
-        if (cacheEntry.refCount === 0) {
-          cache.delete(this.model);
-          await engine?.unload();
-        }
-      }
-    }
+      },
+    };
   }
 
   extractOutput(response: unknown): string {

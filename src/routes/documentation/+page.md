@@ -350,6 +350,10 @@ interface AssertionResult {
 
 ## Other Features
 
+### Cache
+
+In Settings, you can enable the cache. When enabled, provider responses are cached to reduce latency and cost when re-running the same prompt.
+
 ### User Interface
 
 - The Configuration tab lets you write a configuration in the browser, which will be saved in-memory. You can save it to disk at any point.
