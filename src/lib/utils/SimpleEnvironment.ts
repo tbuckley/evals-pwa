@@ -79,10 +79,12 @@ export class SimpleEnvironment implements TestEnvironment {
 
     let resp: unknown;
     let latencyMillis: number;
+    let fromCache = false;
 
     if (validCacheValue) {
       resp = validCacheValue.response;
       latencyMillis = validCacheValue.latencyMillis;
+      fromCache = true;
     } else {
       try {
         const generator = run();
@@ -105,14 +107,9 @@ export class SimpleEnvironment implements TestEnvironment {
         throw e;
       }
       latencyMillis = Date.now() - start;
-
-      await this.cache?.set(cacheKey, {
-        latencyMillis,
-        response: resp,
-      });
     }
 
-    let output: TestOutput['output'];
+    let output: NonNullable<TestOutput['output']>;
     let tokenUsage: TokenUsage;
     try {
       const directOutput = await this.model.extractOutput(resp);
@@ -141,6 +138,13 @@ export class SimpleEnvironment implements TestEnvironment {
         };
       }
       throw e;
+    }
+
+    if (!fromCache) {
+      await this.cache?.set(cacheKey, {
+        latencyMillis,
+        response: resp,
+      });
     }
 
     return {
