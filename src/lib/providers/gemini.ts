@@ -41,7 +41,7 @@ export const partSchema = z.union([
 export type Part = z.infer<typeof partSchema>;
 
 export const contentSchema = z.object({
-  parts: z.array(partSchema),
+  parts: z.array(partSchema).optional(),
   role: z.union([z.literal('user'), z.literal('model')]).optional(),
 });
 export type Content = z.infer<typeof contentSchema>;
@@ -187,6 +187,9 @@ export class GeminiProvider implements ModelProvider {
         }
 
         const parsed = generateContentResponseSchema.parse(lastResponseJson);
+        if (!parsed.candidates[0].content.parts) {
+          parsed.candidates[0].content.parts = [];
+        }
         parsed.candidates[0].content.parts[0] = { text: fullText };
         return parsed;
       },
@@ -195,7 +198,12 @@ export class GeminiProvider implements ModelProvider {
 
   extractOutput(response: unknown): string {
     const json = generateContentResponseSchema.parse(response);
-    const firstCandidatePart = json.candidates[0].content.parts[0];
+    const firstCandidateContent = json.candidates[0].content;
+    if (!firstCandidateContent.parts) {
+      return ''; // Sometimes it is empty at the end of the stream
+    }
+
+    const firstCandidatePart = firstCandidateContent.parts[0];
     if ('text' in firstCandidatePart) {
       return firstCandidatePart.text;
     }
