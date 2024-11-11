@@ -38,7 +38,7 @@ export function pathIsRelative(path: string): boolean {
   return path.startsWith('./') || path.startsWith('../');
 }
 export function pathIsAbsolute(path: string): boolean {
-  return !pathIsRelative(path);
+  return path.startsWith('/');
 }
 
 export function pathIsDirectory(path: string): boolean {

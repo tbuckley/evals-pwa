@@ -14,6 +14,7 @@ import {
   type FileStorage,
   type LiveResult,
   type LiveRun,
+  type ModelCache,
   type NormalizedProvider,
   type NormalizedTestCase,
   type Prompt,
@@ -35,6 +36,8 @@ import { summarizeResults } from '$lib/utils/summarizeResults';
 import * as idb from 'idb-keyval';
 import { InMemoryStorage } from '$lib/storage/InMemoryStorage';
 import * as CodeSandbox from '$lib/utils/CodeSandbox';
+import { FileSystemCache } from '$lib/storage/FileSystemCache';
+import { useCacheStore } from './settings';
 
 const folder = await idb.get<FileSystemDirectoryHandle>('folder');
 if (folder) {
@@ -276,7 +279,12 @@ export async function runTests() {
 
   // Create environments
   const runEnvs: RunEnv[] = getRunEnvs(globalProviders, globalPrompts);
-  const envs: TestEnvironment[] = createEnvironments(runEnvs, providerManager);
+  const useCache = get(useCacheStore);
+  const cache =
+    storage instanceof FileSystemEvalsStorage && useCache
+      ? new FileSystemCache(storage.fs)
+      : undefined;
+  const envs: TestEnvironment[] = createEnvironments(runEnvs, providerManager, cache);
 
   // Run tests
   const abortController = new AbortController();
@@ -386,6 +394,7 @@ function getRunEnvs(providers: NormalizedProvider[], prompts: Prompt[]): RunEnv[
 function createEnvironments(
   runEnvs: RunEnv[],
   providerManager: ProviderManager,
+  cache?: ModelCache,
 ): TestEnvironment[] {
   const envs: TestEnvironment[] = [];
   for (const env of runEnvs) {
@@ -396,6 +405,7 @@ function createEnvironments(
       new SimpleEnvironment({
         model,
         promptFormatter: new HandlebarsPromptFormatter(prompt),
+        cache,
       }),
     );
   }

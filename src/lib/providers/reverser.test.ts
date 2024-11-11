@@ -1,10 +1,13 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { describe, test, expect } from 'vitest';
 import { ReverserProvider } from './reverser';
 
 describe('ReverserProvider', () => {
   test('reverses its input', async function () {
     const provider = new ReverserProvider('whatever');
-    const resp = provider.run([{ role: 'user', content: [{ text: 'hello' }] }]);
+    const { run } = provider.run([{ role: 'user', content: [{ text: 'hello' }] }]);
+    const resp = run();
+
     let next;
     do {
       next = await resp.next();
@@ -14,12 +17,14 @@ describe('ReverserProvider', () => {
   });
   test('supports multi-part', async function () {
     const provider = new ReverserProvider('whatever');
-    const resp = provider.run([
+    const { run } = provider.run([
       {
         role: 'user',
         content: [{ text: 'hello' }, { file: new File([], 'foo.png') }, { text: 'world' }],
       },
     ]);
+    const resp = run();
+
     let next;
     do {
       next = await resp.next();

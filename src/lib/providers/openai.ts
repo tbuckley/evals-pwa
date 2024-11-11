@@ -74,44 +74,53 @@ export class OpenaiProvider implements ModelProvider {
     'image/gif',
   ];
 
-  async *run(conversation: ConversationPrompt, context: RunContext) {
+  async run(conversation: ConversationPrompt, context: RunContext) {
     const messages = await conversationToOpenAI(conversation);
 
-    yield '';
-    const resp = await fetch(`${this.apiBaseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
+    const request = {
+      model: this.model,
+      ...this.request,
+      stream: true,
+      stream_options: {
+        include_usage: true,
       },
-      body: JSON.stringify({
-        model: this.model,
-        ...this.request,
-        stream: true,
-        stream_options: {
-          include_usage: true,
-        },
-        messages,
-      }),
-      signal: context.abortSignal,
-    });
-    if (!resp.ok) {
-      throw new Error(`Failed to run model: ${resp.statusText}`);
-    }
-    const stream = resp.body;
-    let fullText = '';
-    let lastResponseJson: unknown;
-    if (!stream) throw new Error(`Failed to run model: no response`);
-    for await (const value of sse(resp)) {
-      lastResponseJson = JSON.parse(value);
-      const text = this.extractDeltaOutput(lastResponseJson);
-      fullText += text;
-      yield text;
-    }
+      messages,
+    } as const;
 
-    const parsed = generateContentResponseSchema.parse(lastResponseJson);
-    parsed.choices = [{ message: { role: 'assistant', content: fullText } }];
-    return parsed;
+    const { apiBaseUrl, apiKey } = this;
+    const extractDeltaOutput = this.extractDeltaOutput.bind(this);
+    return {
+      request,
+      run: async function* () {
+        yield '';
+        const resp = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(request),
+          signal: context.abortSignal,
+        });
+        if (!resp.ok) {
+          throw new Error(`Failed to run model: ${resp.statusText}`);
+        }
+        const stream = resp.body;
+        let fullText = '';
+        let lastResponseJson: unknown;
+        if (!stream) throw new Error(`Failed to run model: no response`);
+        for await (const value of sse(resp)) {
+          lastResponseJson = JSON.parse(value);
+          const text = extractDeltaOutput(lastResponseJson);
+          fullText += text;
+          yield text;
+        }
+
+        const parsed = generateContentResponseSchema.parse(lastResponseJson);
+        parsed.choices = [{ message: { role: 'assistant', content: fullText } }];
+        return parsed;
+      },
+    };
   }
 
   extractDeltaOutput(response: unknown): string {

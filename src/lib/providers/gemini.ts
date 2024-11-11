@@ -1,5 +1,6 @@
 import type {
   ConversationPrompt,
+  ModelGenerator,
   ModelProvider,
   MultiPartPrompt,
   NormalizedProviderConfig,
@@ -138,10 +139,10 @@ export class GeminiProvider implements ModelProvider {
     'application/pdf',
   ];
 
-  async *run(
+  async run(
     conversation: ConversationPrompt,
     context: RunContext,
-  ): AsyncGenerator<string, unknown, void> {
+  ): Promise<{ request: unknown; run: ModelGenerator }> {
     const contents = await conversationToGemini(conversation);
     const systemContent = await conversationToSystemContent(conversation);
     const extensions: { systemInstruction?: Content } = {};
@@ -149,38 +150,47 @@ export class GeminiProvider implements ModelProvider {
       extensions.systemInstruction = systemContent;
     }
 
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:streamGenerateContent?alt=sse&key=${this.apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...this.config,
-          ...extensions,
-          contents,
-        }),
-        signal: context.abortSignal,
-      },
-    );
-    if (!resp.ok) {
-      throw new Error(`Failed to run model: ${resp.statusText}`);
-    }
-    const stream = resp.body;
-    let fullText = '';
-    let lastResponseJson: unknown;
-    if (!stream) throw new Error(`Failed to run model: no response`);
-    for await (const value of sse(resp)) {
-      lastResponseJson = JSON.parse(value);
-      const text = this.extractOutput(lastResponseJson);
-      fullText += text;
-      yield text;
-    }
+    const request = {
+      ...this.config,
+      ...extensions,
+      contents,
+    } as const;
 
-    const parsed = generateContentResponseSchema.parse(lastResponseJson);
-    parsed.candidates[0].content.parts[0] = { text: fullText };
-    return parsed;
+    const { apiKey, model } = this;
+    const extractOutput = this.extractOutput.bind(this);
+    return {
+      request,
+      run: async function* () {
+        const resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(request),
+            signal: context.abortSignal,
+          },
+        );
+        if (!resp.ok) {
+          throw new Error(`Failed to run model: ${resp.statusText}`);
+        }
+        const stream = resp.body;
+        let fullText = '';
+        let lastResponseJson: unknown;
+        if (!stream) throw new Error(`Failed to run model: no response`);
+        for await (const value of sse(resp)) {
+          lastResponseJson = JSON.parse(value);
+          const text = extractOutput(lastResponseJson);
+          fullText += text;
+          yield text;
+        }
+
+        const parsed = generateContentResponseSchema.parse(lastResponseJson);
+        parsed.candidates[0].content.parts[0] = { text: fullText };
+        return parsed;
+      },
+    };
   }
 
   extractOutput(response: unknown): string {

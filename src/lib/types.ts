@@ -138,13 +138,13 @@ export interface StorageProvider {
 }
 
 export interface ReadonlyFileStorage {
-  load(path: string): Promise<File | { uri: string; file: File }[]>;
-  loadFile(path: string): Promise<File>;
+  load(uri: string): Promise<File | { uri: string; file: File }[]>;
+  loadFile(uri: string): Promise<File>;
 }
 
 export interface FileStorage extends ReadonlyFileStorage {
   getName(): string;
-  writeFile(path: string, data: string | Blob): Promise<void>;
+  writeFile(uri: string, data: string | Blob): Promise<void>;
 }
 
 export type PromptPart = { text: string } | { file: File };
@@ -157,6 +157,7 @@ export type ConversationPrompt = RolePromptPart[];
 
 export interface RunContext {
   abortSignal: AbortSignal;
+  cache?: ModelCache;
 }
 
 export interface ModelUpdate {
@@ -164,12 +165,14 @@ export interface ModelUpdate {
   output: string;
 }
 
+export type ModelGenerator = () => AsyncGenerator<string | ModelUpdate, unknown, void>;
+
 export interface ModelProvider {
   id: string;
   run(
     prompt: ConversationPrompt,
     context: RunContext,
-  ): AsyncGenerator<string | ModelUpdate, unknown, void>;
+  ): MaybePromise<{ request: unknown; run: ModelGenerator }>;
   extractOutput(response: unknown): MaybePromise<string | (string | Blob)[]>;
   extractTokenUsage(response: unknown): TokenUsage;
   mimeTypes?: string[];
@@ -273,4 +276,9 @@ export interface SummaryStats {
   avgLatencyMillis?: number;
   avgCostDollars?: number;
   assertions: AssertionStats[];
+}
+
+export interface ModelCache {
+  set(key: unknown, value: unknown): Promise<void>;
+  get(key: unknown): Promise<unknown>;
 }

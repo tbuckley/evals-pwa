@@ -95,7 +95,7 @@ export class AnthropicProvider implements ModelProvider {
     'image/gif',
   ];
 
-  async *run(conversation: ConversationPrompt, context: RunContext) {
+  async run(conversation: ConversationPrompt, context: RunContext) {
     const messages = await conversationToAnthropic(conversation);
     const systemContent = await conversationToSystemContent(conversation);
     const extensions: { system?: Part[] } = {};
@@ -103,39 +103,49 @@ export class AnthropicProvider implements ModelProvider {
       extensions.system = systemContent;
     }
 
-    yield '';
-    const resp = await fetch(`https://api.anthropic.com/v1/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.apiKey,
-        'anthropic-version': '2023-06-01', // SSE change to align with openai
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: this.model,
-        ...this.request,
-        ...extensions,
-        stream: true,
-        max_tokens: getMaxTokens(this.model), // Anthropic requires max_tokens
-        messages,
-      }),
-      signal: context.abortSignal,
-    });
-    if (!resp.ok) {
-      throw new Error(`Failed to run model: ${resp.statusText}`);
-    }
-    const stream = resp.body;
-    let message: AnthropicMessage | null = null;
-    if (!stream) throw new Error(`Failed to run model: no response`);
-    for await (const value of sse(resp)) {
-      const resp = streamedResponseSchema.parse(JSON.parse(value));
-      const text = this.extractDeltaOutput(resp);
-      message = this.applyStreamedResponse(message, resp);
-      yield text;
-    }
+    const request = {
+      model: this.model,
+      ...this.request,
+      ...extensions,
+      stream: true,
+      max_tokens: getMaxTokens(this.model), // Anthropic requires max_tokens
+      messages,
+    } as const;
 
-    return message;
+    const { apiKey } = this;
+    const extractDeltaOutput = this.extractDeltaOutput.bind(this);
+    const applyStreamedResponse = this.applyStreamedResponse.bind(this);
+    return {
+      request,
+      run: async function* () {
+        yield '';
+        const resp = await fetch(`https://api.anthropic.com/v1/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01', // SSE change to align with openai
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: JSON.stringify(request),
+          signal: context.abortSignal,
+        });
+        if (!resp.ok) {
+          throw new Error(`Failed to run model: ${resp.statusText}`);
+        }
+        const stream = resp.body;
+        let message: AnthropicMessage | null = null;
+        if (!stream) throw new Error(`Failed to run model: no response`);
+        for await (const value of sse(resp)) {
+          const resp = streamedResponseSchema.parse(JSON.parse(value));
+          const text = extractDeltaOutput(resp);
+          message = applyStreamedResponse(message, resp);
+          yield text;
+        }
+
+        return message;
+      },
+    };
   }
 
   private extractDeltaOutput(json: StreamedResponse): string {

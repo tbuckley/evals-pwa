@@ -45,30 +45,38 @@ export class DalleProvider implements ModelProvider {
 
   mimeTypes: string[] = [];
 
-  async *run(conversation: ConversationPrompt, context: RunContext) {
+  run(conversation: ConversationPrompt, context: RunContext) {
     const prompt = conversationToSinglePrompt(conversation);
 
-    yield '';
-    const resp = await fetch(`https://api.openai.com/v1/images/generations`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.model,
-        ...this.request,
-        prompt: multiPartPromptToString(prompt),
-        response_format: 'b64_json',
-      }),
-      signal: context.abortSignal,
-    });
-    if (!resp.ok) {
-      throw new Error(`Failed to run model: ${resp.statusText}`);
-    }
+    const request = {
+      model: this.model,
+      ...this.request,
+      prompt: multiPartPromptToString(prompt),
+      response_format: 'b64_json',
+    } as const;
 
-    const json: unknown = await resp.json();
-    return json;
+    const { apiKey } = this;
+    return {
+      request,
+      run: async function* () {
+        yield '';
+        const resp = await fetch(`https://api.openai.com/v1/images/generations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(request),
+          signal: context.abortSignal,
+        });
+        if (!resp.ok) {
+          throw new Error(`Failed to run model: ${resp.statusText}`);
+        }
+
+        const json: unknown = await resp.json();
+        return json;
+      },
+    };
   }
 
   extractOutput(response: unknown): (Blob | string)[] {
