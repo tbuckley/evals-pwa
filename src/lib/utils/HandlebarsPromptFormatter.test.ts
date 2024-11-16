@@ -80,6 +80,17 @@ describe('HandlebarsPromptFormatter', () => {
       { role: 'user', content: [{ text: 'Hello, world!' }] },
     ]);
   });
+  test('substitutes conversations with variables with newlines', async function () {
+    const formatter = new HandlebarsPromptFormatter(dedent`
+      - system: You are a penguin.
+      - user: Hello, {{ target }}
+    `);
+    const output = await formatter.format({ target: 'world!\nThis is a test.' });
+    expect(output).toEqual([
+      { role: 'system', content: [{ text: 'You are a penguin.' }] },
+      { role: 'user', content: [{ text: 'Hello, world!\nThis is a test.' }] },
+    ]);
+  });
   test('supports dynamic conversation lengths', async function () {
     const formatter = new HandlebarsPromptFormatter(dedent`
       - system: You are a penguin.

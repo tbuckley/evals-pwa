@@ -21,6 +21,7 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
   }
   async format(vars: VarSet, mimeTypes?: string[]): Promise<ConversationPrompt> {
     const files: Record<string, FileReference> = {};
+    const stringVars: Record<string, string> = {};
     const errorFiles: Record<string, FileReference> = {};
     const placeholderVars = await asyncObjectDfsMap(vars, async (val, path) => {
       if (val instanceof FileReference) {
@@ -42,7 +43,8 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
         }
       }
       if (typeof val === 'string') {
-        return new Handlebars.SafeString(val);
+        stringVars[path] = val;
+        return `__STRING_PLACEHOLDER_${path}__`;
       }
       return val;
     });
@@ -53,15 +55,21 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
     // Find all file placeholders, and use the file
     return conversation.map((part): RolePromptPart => {
       if ('system' in part) {
-        return { role: 'system', content: replaceFilePlaceholders(part.system, files, errorFiles) };
+        return {
+          role: 'system',
+          content: replacePlaceholders(part.system, stringVars, files, errorFiles),
+        };
       }
       if ('user' in part) {
-        return { role: 'user', content: replaceFilePlaceholders(part.user, files, errorFiles) };
+        return {
+          role: 'user',
+          content: replacePlaceholders(part.user, stringVars, files, errorFiles),
+        };
       }
       if ('assistant' in part) {
         return {
           role: 'assistant',
-          content: replaceFilePlaceholders(part.assistant, files, errorFiles),
+          content: replacePlaceholders(part.assistant, stringVars, files, errorFiles),
         };
       }
       throw new Error(`Invalid conversation part: ${JSON.stringify(part)}`);
@@ -87,15 +95,30 @@ const conversationSchema = z.array(
 );
 type Conversation = z.infer<typeof conversationSchema>;
 
-function replaceFilePlaceholders(
+function replacePlaceholders(
   rendered: string,
+  stringVars: Record<string, string>,
   files: Record<string, FileReference>,
   errorFiles: Record<string, FileReference>,
 ): MultiPartPrompt {
+  const replacedStrings = rendered
+    .split(/(__STRING_PLACEHOLDER_[a-zA-Z0-9_\-[\].$]+?__)/)
+    .map((part) => {
+      if (part.startsWith('__STRING_PLACEHOLDER_')) {
+        const key = part.slice('__STRING_PLACEHOLDER_'.length, -2);
+        if (!(key in stringVars)) {
+          throw new Error(`Cannot read string ${key}`);
+        }
+        return stringVars[key];
+      }
+      return part;
+    })
+    .join('');
+
   const parsed: MultiPartPrompt = [];
-  rendered.split(/(__FILE_PLACEHOLDER_[a-zA-Z0-9_\-[\].$]+?__)/).forEach((part) => {
+  replacedStrings.split(/(__FILE_PLACEHOLDER_[a-zA-Z0-9_\-[\].$]+?__)/).forEach((part) => {
     if (part.startsWith('__FILE_PLACEHOLDER_')) {
-      const key = part.slice(19, -2);
+      const key = part.slice('__FILE_PLACEHOLDER_'.length, -2);
       if (key in errorFiles) {
         throw new Error(`Cannot read file ${errorFiles[key].uri}: unsupported file type`);
       }
