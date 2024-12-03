@@ -1,0 +1,8 @@
+description: Test errors
+
+# This config will cause an error because the file path is invalid
+
+tests:
+  - name: test-error
+    vars:
+      file: file:///foo/bar/*.txt
