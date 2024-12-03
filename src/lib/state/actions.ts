@@ -52,7 +52,7 @@ if (folder) {
       selectedConfigFileStore.set(configName);
     }
 
-    await loadStateFromStorage();
+    void loadStateFromStorage();
   }
 }
 

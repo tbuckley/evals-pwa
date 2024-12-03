@@ -122,4 +122,17 @@ test.describe('File System', () => {
       await expect(page.locator('pre')).toContainText(line);
     }
   });
+
+  test('loads examples/errors with a visible error', async ({ page }) => {
+    await chooseDirectory(page, '../examples/errors');
+
+    // Ensure error dialog is visible
+    await expect(page.locator('#alert-dialog')).toHaveCount(1);
+
+    // Refresh the page
+    await page.reload();
+
+    // Ensure error dialog is visible
+    await expect(page.locator('#alert-dialog')).toHaveCount(1);
+  });
 });
