@@ -19,14 +19,14 @@ describe('dereferenceFilePaths', () => {
     const input = { a: 1, b: 'file:///a.txt' };
     const ouput = await dereferenceFilePaths(input, { storage });
     expect(ouput).toMatchInlineSnapshot(`
-			{
-			  "changed": true,
-			  "result": {
-			    "a": 1,
-			    "b": "hello world!",
-			  },
-			}
-		`);
+            {
+              "changed": true,
+              "result": {
+                "a": 1,
+                "b": "hello world!",
+              },
+            }
+        `);
   });
 
   test('inserts yaml files', async () => {
@@ -36,20 +36,20 @@ describe('dereferenceFilePaths', () => {
     const input = { a: 1, b: 'file:///a.yaml' };
     const ouput = await dereferenceFilePaths(input, { storage });
     expect(ouput).toMatchInlineSnapshot(`
-			{
-			  "changed": true,
-			  "result": {
-			    "a": 1,
-			    "b": {
-			      "c": 3,
-			      "d": [
-			        5,
-			        6,
-			      ],
-			    },
-			  },
-			}
-		`);
+            {
+              "changed": true,
+              "result": {
+                "a": 1,
+                "b": {
+                  "c": 3,
+                  "d": [
+                    5,
+                    6,
+                  ],
+                },
+              },
+            }
+        `);
   });
 
   test('inserts json files', async () => {
@@ -59,20 +59,20 @@ describe('dereferenceFilePaths', () => {
     const input = { a: 1, b: 'file:///a.json' };
     const ouput = await dereferenceFilePaths(input, { storage });
     expect(ouput).toMatchInlineSnapshot(`
-			{
-			  "changed": true,
-			  "result": {
-			    "a": 1,
-			    "b": {
-			      "c": 3,
-			      "d": [
-			        5,
-			        6,
-			      ],
-			    },
-			  },
-			}
-		`);
+            {
+              "changed": true,
+              "result": {
+                "a": 1,
+                "b": {
+                  "c": 3,
+                  "d": [
+                    5,
+                    6,
+                  ],
+                },
+              },
+            }
+        `);
   });
 
   test('allows referenced yaml to reference additional files', async () => {
@@ -83,17 +83,17 @@ describe('dereferenceFilePaths', () => {
     const input = { a: 1, b: 'file:///a.yaml' };
     const ouput = await dereferenceFilePaths(input, { storage });
     expect(ouput).toMatchInlineSnapshot(`
-			{
-			  "changed": true,
-			  "result": {
-			    "a": 1,
-			    "b": {
-			      "c": 3,
-			      "d": "hello world!",
-			    },
-			  },
-			}
-		`);
+            {
+              "changed": true,
+              "result": {
+                "a": 1,
+                "b": {
+                  "c": 3,
+                  "d": "hello world!",
+                },
+              },
+            }
+        `);
   });
 
   test('throws an error on recursive cycles', async () => {
@@ -113,16 +113,40 @@ describe('dereferenceFilePaths', () => {
     const input = { values: 'file:///*.txt' };
     const output = await dereferenceFilePaths(input, { storage });
     expect(output).toMatchInlineSnapshot(`
-			{
-			  "changed": true,
-			  "result": {
-			    "values": [
-			      "a",
-			      "b",
-			    ],
-			  },
-			}
-		`);
+            {
+              "changed": true,
+              "result": {
+                "values": [
+                  "a",
+                  "b",
+                ],
+              },
+            }
+        `);
+  });
+
+  test('supports glob references as arrays deeply nested within arrays', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile('file:///a.txt', 'a');
+    await storage.writeFile('file:///b.txt', 'b');
+
+    const input = { values: [{ test: 'file:///*.txt' }] };
+    const output = await dereferenceFilePaths(input, { storage });
+    expect(output).toMatchInlineSnapshot(`
+      {
+        "changed": true,
+        "result": {
+          "values": [
+            {
+              "test": [
+                "a",
+                "b",
+              ],
+            },
+          ],
+        },
+      }
+    `);
   });
 
   test('flattens any glob references within an array', async () => {
@@ -133,17 +157,17 @@ describe('dereferenceFilePaths', () => {
     const input = { values: ['file:///*.txt', 'c'] };
     const output = await dereferenceFilePaths(input, { storage });
     expect(output).toMatchInlineSnapshot(`
-			{
-			  "changed": true,
-			  "result": {
-			    "values": [
-			      "a",
-			      "b",
-			      "c",
-			    ],
-			  },
-			}
-		`);
+            {
+              "changed": true,
+              "result": {
+                "values": [
+                  "a",
+                  "b",
+                  "c",
+                ],
+              },
+            }
+        `);
   });
 
   test('embeds image files as FileReference', async () => {
@@ -176,34 +200,34 @@ describe('dereferenceFilePaths', () => {
     const input = { tests: ['file:///tests/a.yaml'] };
     const output = await dereferenceFilePaths(input, { storage });
     expect(output).toMatchInlineSnapshot(`
-			{
-			  "changed": true,
-			  "result": {
-			    "tests": [
-			      {
-			        "abs": CodeReference {
-			          "file": File {},
-			          "type": "code",
-			          "uri": "file:///assert.js",
-			        },
-			        "assert": CodeReference {
-			          "file": File {},
-			          "type": "code",
-			          "uri": "file:///assert.js",
-			        },
-			        "vars": {
-			          "bar": 2,
-			          "baz": FileReference {
-			            "file": File {},
-			            "type": "image",
-			            "uri": "file:///tests/baz/c.png",
-			          },
-			          "foo": 1,
-			        },
-			      },
-			    ],
-			  },
-			}
-		`);
+            {
+              "changed": true,
+              "result": {
+                "tests": [
+                  {
+                    "abs": CodeReference {
+                      "file": File {},
+                      "type": "code",
+                      "uri": "file:///assert.js",
+                    },
+                    "assert": CodeReference {
+                      "file": File {},
+                      "type": "code",
+                      "uri": "file:///assert.js",
+                    },
+                    "vars": {
+                      "bar": 2,
+                      "baz": FileReference {
+                        "file": File {},
+                        "type": "image",
+                        "uri": "file:///tests/baz/c.png",
+                      },
+                      "foo": 1,
+                    },
+                  },
+                ],
+              },
+            }
+        `);
   });
 });
