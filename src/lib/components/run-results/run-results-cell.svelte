@@ -4,6 +4,7 @@
   import { resultDialogStore } from '$lib/state/ui';
   import Button from '../ui/button/button.svelte';
   import SquareCode from 'lucide-svelte/icons/square-code';
+  import Copy from 'lucide-svelte/icons/copy';
   import { FileReference } from '$lib/storage/FileReference';
   import { isImageFile } from '$lib/utils/media';
 
@@ -35,6 +36,16 @@
   function getBlobUrl(blob: Blob): string {
     const url = URL.createObjectURL(blob);
     return url;
+  }
+
+  async function copy() {
+    if (
+      $testResult.output &&
+      $testResult.output.length === 1 &&
+      typeof $testResult.output[0] === 'string'
+    ) {
+      await navigator.clipboard.writeText($testResult.output[0]);
+    }
   }
 </script>
 
@@ -80,14 +91,16 @@
         '--no output--'
       {/if}
     </div>
-    <Button
-      on:click={openRawPromptDialog}
-      variant="ghost"
-      size="icon"
-      class="absolute right-0 top-0 text-gray-500"
-    >
-      <SquareCode class="h-5 w-5"></SquareCode>
-    </Button>
+    <div class="absolute right-0 top-0 flex">
+      {#if ['success', 'error'].includes($testResult.state) && $testResult.output && $testResult.output.length === 1 && typeof $testResult.output[0] === 'string'}
+        <Button on:click={copy} variant="ghost" size="icon" class="float-right text-gray-500">
+          <Copy class="h-5 w-5"></Copy>
+        </Button>
+      {/if}
+      <Button on:click={openRawPromptDialog} variant="ghost" size="icon" class="text-gray-500">
+        <SquareCode class="h-5 w-5"></SquareCode>
+      </Button>
+    </div>
     {#if visuals.length > 0}
       <div class="mt-4">
         <h4 class="mb-2 text-sm font-semibold">Visuals:</h4>
