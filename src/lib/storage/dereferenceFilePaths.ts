@@ -40,6 +40,9 @@ export async function dereferenceFilePathsImpl(
   options: DereferenceOptions,
   state: { changed: boolean },
 ): Promise<unknown> {
+  const markGlobs = options.markGlobs ?? false;
+  options = { ...options, markGlobs: false }; // Reset markGlobs to false for nested files
+
   if (typeof val === 'string') {
     if (isValidFileUri(val)) {
       let path = fileUriToPath(val);
@@ -70,7 +73,7 @@ export async function dereferenceFilePathsImpl(
         );
 
         // If markGlobs is true, return a special object so we can flatten it later
-        return options.markGlobs ? { type: GLOB_TYPE, value: arr } : arr;
+        return markGlobs ? { type: GLOB_TYPE, value: arr } : arr;
       }
 
       const file = res;
