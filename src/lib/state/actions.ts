@@ -273,6 +273,26 @@ export async function runTests() {
     globalTests = globalTests.filter((test) => test.only);
   }
 
+  // If any tests are marked to repeat, repeat them
+  if (globalTests.some((test) => test.repeat)) {
+    const tests: NormalizedTestCase[] = [];
+    for (const test of globalTests) {
+      if (!test.repeat || test.repeat === 1) {
+        tests.push(test);
+      } else {
+        for (let i = 0; i < test.repeat; i++) {
+          const copy = { ...test };
+          if (i > 0) {
+            // Add a cache key to avoid reusing the same results for each test
+            copy.cacheKey = { repeatIndex: i };
+          }
+          tests.push(copy);
+        }
+      }
+    }
+    globalTests = tests;
+  }
+
   // Create the provider manager
   const env = get(parsedEnvStore); // TODO validate that env variables for each provider is set
   const providerManager = new ProviderManager(env);
@@ -298,7 +318,7 @@ export async function runTests() {
         const result = writable<LiveResult>({ rawPrompt: null, state: 'waiting' });
         testResults.push(result);
         runner.enqueue(async ({ abortSignal }) => {
-          await runTest(test, env, mgr, result, { abortSignal });
+          await runTest(test, env, mgr, result, { abortSignal, cacheKey: test.cacheKey });
         });
       }
       results.push(testResults);

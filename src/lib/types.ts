@@ -40,6 +40,8 @@ export interface NormalizedTestCase {
   vars: VarSet;
   assert: NormalizedAssertion[];
   only?: boolean;
+  repeat?: number;
+  cacheKey?: Record<string, unknown>; // Used for resetting the cache
 }
 
 export interface NormalizedConfig {
@@ -102,6 +104,8 @@ const testCaseSchema = z.object({
   description: z.string().optional(),
   assert: z.array(assertionSchema).optional(),
   only: z.boolean().optional(),
+  repeat: z.number().int().positive().optional(),
+  cacheKey: z.record(z.string(), z.unknown()).optional(),
 });
 export type TestCase = z.infer<typeof testCaseSchema>;
 
@@ -158,6 +162,7 @@ export type ConversationPrompt = RolePromptPart[];
 export interface RunContext {
   abortSignal: AbortSignal;
   cache?: ModelCache;
+  cacheKey?: Record<string, unknown>;
 }
 
 export interface ModelUpdate {

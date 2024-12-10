@@ -72,6 +72,9 @@ function normalizeTestCase(test: FsTestCase, defaultTest: Partial<FsTestCase>): 
   if (test.only !== undefined) {
     result.only = test.only;
   }
+  if (test.repeat !== undefined || defaultTest.repeat !== undefined) {
+    result.repeat = test.repeat ?? defaultTest.repeat;
+  }
 
   return result;
 }
