@@ -39,7 +39,7 @@ export const showOnlyFailuresStore = createLocalStorageStore<boolean>(
   false,
 );
 
-export const useCacheStore = createLocalStorageStore<boolean>('useCache', boolSchema, false);
+export const useCacheStore = createLocalStorageStore<boolean>('useCache', boolSchema, true);
 
 const rowHeightSchema = z.union([
   z.literal('minimal'),
