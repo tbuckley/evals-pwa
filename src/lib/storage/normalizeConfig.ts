@@ -1,5 +1,11 @@
-import type { NormalizedConfig, NormalizedProvider, NormalizedTestCase } from '$lib/types';
-import type { FsConfig, FsPrompt, FsTestCase } from './types';
+import type {
+  NormalizedConfig,
+  NormalizedPipelineStep,
+  NormalizedPrompt,
+  NormalizedProvider,
+  NormalizedTestCase,
+} from '$lib/types';
+import type { FsConfig, FsPipelinePrompt, FsPrompt, FsTestCase } from './types';
 import yaml from 'yaml';
 
 export function normalizeConfig(config: FsConfig): NormalizedConfig {
@@ -11,20 +17,38 @@ export function normalizeConfig(config: FsConfig): NormalizedConfig {
   };
 }
 
-function normalizePrompts(prompts: FsConfig['prompts']): string[] {
+function normalizePrompts(prompts: FsConfig['prompts']): NormalizedPrompt[] {
   if (!prompts) {
     return [];
   }
   return prompts.map(normalizePrompt);
 }
 
-function normalizePrompt(prompt: FsPrompt): string {
+function normalizePrompt(prompt: FsPrompt): NormalizedPrompt {
   if (typeof prompt === 'string') {
     return prompt;
   }
+  if (Array.isArray(prompt)) {
+    // If it's a conversation, encode it as a yaml string
+    return yaml.stringify(prompt);
+  }
+  return { $pipeline: prompt.$pipeline.map((step, index) => normalizePipelineStep(step, index)) };
+}
 
-  // If it's a conversation, encode it as a yaml string
-  return yaml.stringify(prompt);
+function normalizePipelineStep(
+  step: FsPipelinePrompt['$pipeline'][number],
+  index: number,
+): NormalizedPipelineStep {
+  if (typeof step === 'string') {
+    return {
+      id: `step-${index}`,
+      prompt: step,
+    };
+  }
+  return {
+    id: `step-${index}`, // Provide a default ID
+    ...step,
+  };
 }
 
 function normalizeProviders(providers: FsConfig['providers']): NormalizedProvider[] {

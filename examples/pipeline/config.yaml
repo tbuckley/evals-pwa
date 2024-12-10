@@ -1,0 +1,17 @@
+description: Simple pipeline example
+
+providers:
+  - gemini:gemini-1.5-flash-latest
+
+prompts:
+  - $pipeline:
+      - 'What is the capital of {{country}}?'
+      - 'What is the population of {{$output}}?'
+
+tests:
+  - vars:
+      country: France
+  - vars:
+      country: Germany
+  - vars:
+      country: England
