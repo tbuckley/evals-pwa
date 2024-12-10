@@ -1,4 +1,5 @@
-import { MissingFileError, type FileStorage } from '$lib/types';
+import { type FileStorage } from '$lib/types/storage';
+import { MissingFileError } from '$lib/types/errors';
 import { cast } from '$lib/utils/asserts';
 import { fileUriToPath, getFilename, pathToFileUri } from '$lib/utils/path';
 import picomatch from 'picomatch';

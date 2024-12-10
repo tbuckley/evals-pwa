@@ -1,12 +1,6 @@
-import {
-  MissingFileError,
-  runSchema,
-  UiError,
-  type FileStorage,
-  type NormalizedConfig,
-  type Run,
-  type StorageProvider,
-} from '$lib/types';
+import { runSchema, type NormalizedConfig, type Run, type StorageProvider } from '$lib/types';
+import { type FileStorage } from '$lib/types/storage';
+import { MissingFileError, UiError } from '$lib/types/errors';
 import { dereferenceFilePaths } from './dereferenceFilePaths';
 import { FileReference } from './FileReference';
 import { runGenerators } from './runGenerators';

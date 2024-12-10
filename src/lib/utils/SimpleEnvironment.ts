@@ -1,4 +1,3 @@
-import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 import type {
   TestEnvironment,
   ModelProvider,
@@ -11,22 +10,12 @@ import type {
   ConversationPrompt,
   ModelCache,
 } from '$lib/types';
-import { z } from 'zod';
+import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
 
 export interface Config {
   model: ModelProvider;
   promptFormatter: PromptFormatter;
   cache?: ModelCache;
-}
-
-const cacheValueSchema = z.object({
-  latencyMillis: z.number(),
-  response: z.unknown(),
-});
-type CacheValue = z.infer<typeof cacheValueSchema>;
-
-function isValidCacheValue(value: unknown): value is CacheValue {
-  return cacheValueSchema.safeParse(value).success;
 }
 
 export class SimpleEnvironment implements TestEnvironment {
@@ -63,77 +52,27 @@ export class SimpleEnvironment implements TestEnvironment {
       throw e;
     }
 
-    const start = Date.now();
     const { request, run } = await this.model.run(prompt, context);
 
     const cacheKey = {
       provider: this.provider.id,
       request,
-      cacheKey: context.cacheKey ?? {},
+      ...(context.cacheKey ?? {}),
     };
 
-    const cachedValue = await this.cache?.get(cacheKey);
-    let validCacheValue: CacheValue | undefined;
-    if (isValidCacheValue(cachedValue)) {
-      validCacheValue = cachedValue;
-    }
-
-    let resp: unknown;
-    let latencyMillis: number;
-    let fromCache = false;
-
-    if (validCacheValue) {
-      resp = validCacheValue.response;
-      latencyMillis = validCacheValue.latencyMillis;
-      fromCache = true;
-    } else {
-      try {
-        const generator = run();
-
-        let next;
-        while (!next?.done) {
-          next = await generator.next();
-          if (!next.done) {
-            yield next.value;
-          }
-        }
-        resp = next.value;
-      } catch (e) {
-        if (e instanceof Error) {
-          return {
-            rawPrompt: prompt,
-            error: e.toString(),
-          };
-        }
-        throw e;
-      }
-      latencyMillis = Date.now() - start;
-    }
+    const { response, latencyMillis } = yield* maybeUseCache(this.cache, cacheKey, run);
 
     let output: NonNullable<TestOutput['output']>;
     let tokenUsage: TokenUsage;
     try {
-      const directOutput = await this.model.extractOutput(resp);
-      if (Array.isArray(directOutput)) {
-        // Convert blobs to file references
-        output = await Promise.all(
-          directOutput.map(async (val) => {
-            if (val instanceof Blob) {
-              return blobToFileReference(val);
-            }
-            return val;
-          }),
-        );
-      } else {
-        output = directOutput;
-      }
-
-      tokenUsage = this.model.extractTokenUsage(resp);
+      const rawOutput = await this.model.extractOutput(response);
+      output = await modelOutputToTestOutput(rawOutput);
+      tokenUsage = this.model.extractTokenUsage(response);
     } catch (e) {
       if (e instanceof Error) {
         return {
           rawPrompt: prompt,
-          rawOutput: resp,
+          rawOutput: response,
           error: e.toString(),
           latencyMillis,
         };
@@ -141,16 +80,9 @@ export class SimpleEnvironment implements TestEnvironment {
       throw e;
     }
 
-    if (!fromCache) {
-      await this.cache?.set(cacheKey, {
-        latencyMillis,
-        response: resp,
-      });
-    }
-
     return {
       rawPrompt: prompt,
-      rawOutput: resp,
+      rawOutput: response,
       output,
       latencyMillis,
       tokenUsage,

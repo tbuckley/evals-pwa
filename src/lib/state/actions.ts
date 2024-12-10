@@ -9,19 +9,19 @@ import {
   selectedConfigFileStore,
 } from './stores';
 import {
-  UiError,
   type AssertionResult,
-  type FileStorage,
   type LiveResult,
   type LiveRun,
   type ModelCache,
   type NormalizedProvider,
   type NormalizedTestCase,
-  type Prompt,
+  type NormalizedPrompt,
   type Run,
   type RunContext,
   type TestEnvironment,
 } from '$lib/types';
+import { UiError } from '$lib/types/errors';
+import { type FileStorage } from '$lib/types/storage';
 import { ProviderManager } from '$lib/providers/ProviderManager';
 import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
 import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
@@ -38,6 +38,7 @@ import { InMemoryStorage } from '$lib/storage/InMemoryStorage';
 import * as CodeSandbox from '$lib/utils/CodeSandbox';
 import { FileSystemCache } from '$lib/storage/FileSystemCache';
 import { useCacheStore } from './settings';
+import { PipelineEnvironment } from '$lib/utils/PipelineEnvironment';
 
 const folder = await idb.get<FileSystemDirectoryHandle>('folder');
 if (folder) {
@@ -264,7 +265,7 @@ export async function runTests() {
   }
 
   // Get global prompts + tests
-  const globalPrompts: Prompt[] = config.prompts;
+  const globalPrompts: NormalizedPrompt[] = config.prompts;
   const globalProviders: NormalizedProvider[] = config.providers;
   let globalTests: NormalizedTestCase[] = config.tests;
 
@@ -397,13 +398,14 @@ export async function runTests() {
 
 interface RunEnv {
   provider: NormalizedProvider;
-  prompt: Prompt;
+  prompt: NormalizedPrompt;
 }
-function getRunEnvs(providers: NormalizedProvider[], prompts: Prompt[]): RunEnv[] {
+function getRunEnvs(providers: NormalizedProvider[], prompts: NormalizedPrompt[]): RunEnv[] {
   const envs: RunEnv[] = [];
   for (const provider of providers) {
     // First use any provider-specific prompts; otherwise, use the global prompts
-    const providerPrompts: Prompt[] = provider.prompts ? provider.prompts : prompts;
+    // FIXME: Support pipeline prompts in providers too
+    const providerPrompts: NormalizedPrompt[] = provider.prompts ? provider.prompts : prompts;
     for (const prompt of providerPrompts) {
       envs.push({ provider, prompt });
     }
@@ -421,13 +423,24 @@ function createEnvironments(
     const { provider, prompt } = env;
 
     const model = providerManager.getProvider(provider.id, provider.config);
-    envs.push(
-      new SimpleEnvironment({
-        model,
-        promptFormatter: new HandlebarsPromptFormatter(prompt),
-        cache,
-      }),
-    );
+    if (typeof prompt === 'string') {
+      envs.push(
+        new SimpleEnvironment({
+          model,
+          promptFormatter: new HandlebarsPromptFormatter(prompt),
+          cache,
+        }),
+      );
+    } else {
+      // Pipeline
+      envs.push(
+        new PipelineEnvironment({
+          models: { default: model, labeled: {} },
+          pipeline: prompt,
+          cache,
+        }),
+      );
+    }
   }
   return envs;
 }

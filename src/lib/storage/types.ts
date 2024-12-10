@@ -1,3 +1,4 @@
+import { pipelinePromptSchema } from '$lib/types';
 import { z } from 'zod';
 
 // Schemas & types for validating files match the expected structure
@@ -33,7 +34,9 @@ export const fsPromptSchema = z.union([
       z.object({ assistant: z.string() }),
     ]),
   ),
+  pipelinePromptSchema,
 ]);
+export type FsPipelinePrompt = z.infer<typeof pipelinePromptSchema>;
 export type FsPrompt = z.infer<typeof fsPromptSchema>;
 
 export const fsTestCaseSchema = z.object({
