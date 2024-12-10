@@ -42,6 +42,7 @@ export const fsTestCaseSchema = z.object({
   description: z.string().optional(),
   assert: z.array(fsAssertionSchema).optional(),
   only: z.boolean().optional(),
+  repeat: z.number().int().positive().optional(),
 });
 export type FsTestCase = z.infer<typeof fsTestCaseSchema>;
 

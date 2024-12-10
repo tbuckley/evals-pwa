@@ -69,6 +69,7 @@ export class SimpleEnvironment implements TestEnvironment {
     const cacheKey = {
       provider: this.provider.id,
       request,
+      cacheKey: context.cacheKey ?? {},
     };
 
     const cachedValue = await this.cache?.get(cacheKey);
