@@ -1,7 +1,6 @@
 import {
   type ConversationPrompt,
   type MultiPartPrompt,
-  type Prompt,
   type PromptFormatter,
   type RolePromptPart,
   type VarSet,
@@ -16,7 +15,7 @@ import { z } from 'zod';
 export class HandlebarsPromptFormatter implements PromptFormatter {
   template: HandlebarsTemplateDelegate;
 
-  constructor(public readonly prompt: Prompt) {
+  constructor(public readonly prompt: string) {
     this.template = Handlebars.compile(prompt);
   }
   async format(vars: VarSet, mimeTypes?: string[]): Promise<ConversationPrompt> {

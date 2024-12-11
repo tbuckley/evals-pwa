@@ -9,7 +9,8 @@ import {
 import * as yaml from 'yaml';
 import { FileReference } from './FileReference';
 import { CodeReference } from './CodeReference';
-import { MissingFileError, type ReadonlyFileStorage } from '$lib/types';
+import { type ReadonlyFileStorage } from '$lib/types/storage';
+import { MissingFileError } from '$lib/types/errors';
 
 export interface DereferenceOptions {
   storage: ReadonlyFileStorage;

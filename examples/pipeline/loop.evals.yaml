@@ -1,0 +1,26 @@
+description: Pipeline example with a loop
+
+providers:
+  - gemini:gemini-1.5-flash-latest
+
+prompts:
+  - $pipeline:
+      - prompt: 'Write one paragraph about {{topic}}.'
+        outputAs: writing
+      - deps: ['writing']
+        if: | # This checks if we should keep running the loop
+          function execute(vars) {
+            return vars.$history.length < 10;
+          }
+        prompt: |-
+          Rewrite this one paragraph to be more interesting:
+          {{writing}}
+        outputAs: writing # This re-triggers the loop
+
+tests:
+  - vars:
+      topic: French revolution
+  - vars:
+      topic: quantum physics
+  - vars:
+      topic: Kandinsky
