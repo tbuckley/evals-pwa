@@ -478,6 +478,7 @@ async function runTest(
           };
         });
       } else {
+        // FIXME: Check type of next.value, ModelUpdate or PipelineLogUpdate
         const output = next.value.output;
         result.update((state) => ({
           ...state,
