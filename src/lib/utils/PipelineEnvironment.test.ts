@@ -13,7 +13,7 @@ describe('PipelineState', () => {
       [{ id: 'step-0' }, { id: 'step-1' }, { id: 'step-2' }],
       defaultMerge,
     );
-    expect(await pipeline.getStartingSteps({})).toEqual([{ id: 'step-0' }]);
+    expect(await pipeline.getStartingSteps({}, null)).toEqual([{ id: 'step-0' }]);
   });
 
   test('starts with any step with no deps', {}, async function () {
@@ -21,7 +21,15 @@ describe('PipelineState', () => {
     const step1 = { id: 'step-1', outputAs: 'out1', deps: [] };
     const step2 = { id: 'step-2', outputAs: 'out2', deps: [] };
     const pipeline = new PipelineState([step0, step1, step2], defaultMerge);
-    expect(await pipeline.getStartingSteps({})).toEqual([step1, step2]);
+    expect(await pipeline.getStartingSteps({}, null)).toEqual([step1, step2]);
+  });
+
+  test('starts with any step where all deps are satisfied', {}, async function () {
+    const step0 = { id: 'step-0', deps: [] };
+    const step1 = { id: 'step-1', outputAs: 'out1', deps: ['foo'] };
+    const step2 = { id: 'step-2', outputAs: 'out2', deps: ['out1', 'out2'] };
+    const pipeline = new PipelineState([step0, step1, step2], defaultMerge);
+    expect(await pipeline.getStartingSteps({ foo: 'bar' }, null)).toEqual([step0, step1]);
   });
 
   test('starts with any step with no deps and valid if statement', {}, async function () {
@@ -40,8 +48,8 @@ describe('PipelineState', () => {
     const step2 = { id: 'step-2', if: ifFooBaz, outputAs: 'out2', deps: [] };
     const pipeline = new PipelineState([step0, step1, step2], defaultMerge);
 
-    expect(await pipeline.getStartingSteps({ foo: 'bar' })).toEqual([step1]);
-    expect(await pipeline.getStartingSteps({ foo: 'baz' })).toEqual([step2]);
+    expect(await pipeline.getStartingSteps({ foo: 'bar' }, null)).toEqual([step1]);
+    expect(await pipeline.getStartingSteps({ foo: 'baz' }, null)).toEqual([step2]);
   });
 
   test('goes through steps in order if no deps', {}, async function () {
@@ -49,7 +57,7 @@ describe('PipelineState', () => {
       [{ id: 'step-0' }, { id: 'step-1' }, { id: 'step-2' }],
       defaultMerge,
     );
-    expect(await pipeline.getStartingSteps({})).toEqual([{ id: 'step-0' }]);
+    expect(await pipeline.getStartingSteps({}, null)).toEqual([{ id: 'step-0' }]);
     expect(await pipeline.markCompleteAndGetNextSteps({ id: 'step-0' }, {}, null)).toEqual({
       isLeaf: false,
       next: [{ step: { id: 'step-1' }, context: null }],

@@ -149,7 +149,7 @@ export class PipelineEnvironment implements TestEnvironment {
     };
 
     // Get the starting steps
-    const startingSteps = await pipelineState.getStartingSteps(vars);
+    const startingSteps = await pipelineState.getStartingSteps(vars, []);
     if (startingSteps.length === 0) {
       throw new Error('No valid starting steps found');
     }
@@ -232,9 +232,8 @@ export class PipelineState<T extends PipelineStep, S> {
     this.stepIdMap = new Map<string, T>(steps.map((step) => [step.id, step]));
   }
 
-  async getStartingSteps(latestVars: VarSet): Promise<T[]> {
-    // Return any steps that have no dependencies
-    const candidates = [...this.stepIdMap.values()].filter((step) => {
+  private getStepsWithNoDeps(): T[] {
+    return [...this.stepIdMap.values()].filter((step) => {
       const deps = this.stepDepsStatus.get(step.id);
       if (!deps) {
         throw new Error(`Dependencies for step ${step.id} not found`);
@@ -244,45 +243,36 @@ export class PipelineState<T extends PipelineStep, S> {
         deps.outputs.size === deps.originalOutputs.length
       );
     });
-
-    const availableSteps: T[] = [];
-    for (const step of candidates) {
-      if (!step.if) {
-        availableSteps.push(step);
-        continue;
-      }
-
-      // Evaluate the if statement
-      const code = await toCodeReference(step.if);
-      const execute = await code.bind();
-      const result = await execute(latestVars);
-      if (typeof result !== 'boolean') {
-        throw new Error(`Step ${step.id} if statement returned non-boolean`);
-      }
-      if (result) {
-        availableSteps.push(step);
-      }
-    }
-
-    return availableSteps;
   }
 
-  async markCompleteAndGetNextSteps(
-    step: T,
-    latestVars: VarSet,
-    context: S,
-  ): Promise<{ isLeaf: boolean; next: { step: T; context: S }[] }> {
-    const nextSteps: { step: T; context: S }[] = [];
-    let numDeps = 0;
+  private async testStep(step: T, vars: VarSet): Promise<boolean> {
+    if (!step.if) {
+      return true;
+    }
 
-    // Mark any dependencies on this step ID as complete
-    this.stepDepToIds.get(step.id)?.forEach((id) => {
+    // Evaluate the if statement
+    const code = await toCodeReference(step.if);
+    const execute = await code.bind();
+    const result = await execute(vars);
+    if (typeof result !== 'boolean') {
+      throw new Error(`Step ${step.id} if statement returned non-boolean`);
+    }
+    return result;
+  }
+
+  private markStepAsComplete(
+    stepId: string,
+    context: S,
+  ): { next: { step: T; context: S }[]; numDeps: number } {
+    const next: { step: T; context: S }[] = [];
+    let numDeps = 0;
+    this.stepDepToIds.get(stepId)?.forEach((id) => {
       numDeps += 1;
       const stepStatus = this.stepDepsStatus.get(id);
       if (!stepStatus) {
         throw new Error(`Dependencies for step ${id} not found`);
       }
-      stepStatus.steps.set(step.id, context);
+      stepStatus.steps.set(stepId, context);
       if (
         stepStatus.steps.size === stepStatus.originalSteps.length &&
         stepStatus.outputs.size === stepStatus.originalOutputs.length
@@ -294,34 +284,79 @@ export class PipelineState<T extends PipelineStep, S> {
         const context = [...stepStatus.steps.values(), ...stepStatus.outputs.values()].reduce(
           this.contextMerge,
         );
-        nextSteps.push({ step, context });
+        next.push({ step, context });
       }
     });
+    return { next, numDeps };
+  }
+
+  private markOutputAsComplete(
+    outputAs: string,
+    context: S,
+  ): { next: { step: T; context: S }[]; numDeps: number } {
+    const next: { step: T; context: S }[] = [];
+    let numDeps = 0;
+    this.outputDepToIds.get(outputAs)?.forEach((id) => {
+      numDeps += 1;
+      const stepStatus = this.stepDepsStatus.get(id);
+      if (!stepStatus) {
+        throw new Error(`Dependencies for step ${id} not found`);
+      }
+      stepStatus.outputs.set(outputAs, context);
+      if (
+        stepStatus.steps.size === stepStatus.originalSteps.length &&
+        stepStatus.outputs.size === stepStatus.originalOutputs.length
+      ) {
+        const step = this.stepIdMap.get(id);
+        if (!step) {
+          throw new Error(`Step ${id} not found`);
+        }
+        const context = [...stepStatus.steps.values(), ...stepStatus.outputs.values()].reduce(
+          this.contextMerge,
+        );
+        next.push({ step, context });
+      }
+    });
+    return { next, numDeps };
+  }
+
+  async getStartingSteps(latestVars: VarSet, initialContext: S): Promise<T[]> {
+    // Include any steps that have no dependencies
+    const candidates = this.getStepsWithNoDeps();
+
+    // Include any steps triggered by the initial vars
+    for (const varName in latestVars) {
+      const res = this.markOutputAsComplete(varName, initialContext);
+      candidates.push(...res.next.map(({ step }) => step));
+    }
+
+    const validSteps = await Promise.all(
+      candidates.map(async (step) => ({
+        step,
+        valid: await this.testStep(step, latestVars),
+      })),
+    );
+    return validSteps.filter((result) => result.valid).map((result) => result.step);
+  }
+
+  async markCompleteAndGetNextSteps(
+    step: T,
+    latestVars: VarSet,
+    context: S,
+  ): Promise<{ isLeaf: boolean; next: { step: T; context: S }[] }> {
+    const nextSteps: { step: T; context: S }[] = [];
+    let numDeps = 0;
+
+    // Mark any dependencies on this step ID as complete
+    const res = this.markStepAsComplete(step.id, context);
+    nextSteps.push(...res.next);
+    numDeps += res.numDeps;
 
     // Mark any dependencies on this step output as complete
     if (step.outputAs) {
-      const outputAs = step.outputAs;
-      this.outputDepToIds.get(outputAs)?.forEach((id) => {
-        numDeps += 1;
-        const stepStatus = this.stepDepsStatus.get(id);
-        if (!stepStatus) {
-          throw new Error(`Dependencies for step ${id} not found`);
-        }
-        stepStatus.outputs.set(outputAs, context);
-        if (
-          stepStatus.steps.size === stepStatus.originalSteps.length &&
-          stepStatus.outputs.size === stepStatus.originalOutputs.length
-        ) {
-          const step = this.stepIdMap.get(id);
-          if (!step) {
-            throw new Error(`Step ${id} not found`);
-          }
-          const context = [...stepStatus.steps.values(), ...stepStatus.outputs.values()].reduce(
-            this.contextMerge,
-          );
-          nextSteps.push({ step, context });
-        }
-      });
+      const res = this.markOutputAsComplete(step.outputAs, context);
+      nextSteps.push(...res.next);
+      numDeps += res.numDeps;
     }
 
     // Reset the statuses for any steps
@@ -334,24 +369,15 @@ export class PipelineState<T extends PipelineStep, S> {
     });
 
     // Check that all steps are available with if statements
-    const availableSteps: { step: T; context: S }[] = [];
-    for (const step of nextSteps) {
-      if (!step.step.if) {
-        availableSteps.push(step);
-        continue;
-      }
-
-      // Evaluate the if statement
-      const code = await toCodeReference(step.step.if);
-      const execute = await code.bind();
-      const result = await execute(latestVars);
-      if (typeof result !== 'boolean') {
-        throw new Error(`Step ${step.step.id} if statement returned non-boolean`);
-      }
-      if (result) {
-        availableSteps.push(step);
-      }
-    }
+    const nextStepsValid = await Promise.all(
+      nextSteps.map(async (step) => ({
+        step,
+        valid: await this.testStep(step.step, latestVars),
+      })),
+    );
+    const availableSteps = nextStepsValid
+      .filter((result) => result.valid)
+      .map((result) => result.step);
 
     const isLeaf = numDeps === 0 || (numDeps === nextSteps.length && availableSteps.length === 0);
 
