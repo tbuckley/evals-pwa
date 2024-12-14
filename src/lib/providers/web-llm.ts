@@ -76,7 +76,7 @@ export class WebLlm implements ModelProvider {
     return {
       request,
       run: async function* () {
-        const progress = generator<InitProgressReport>();
+        const progress = generator<InitProgressReport, null>();
         let cacheEntry;
         let engine;
         try {
@@ -89,7 +89,7 @@ export class WebLlm implements ModelProvider {
                 progress.yield(report);
               },
             }).then((engine) => {
-              progress.return();
+              progress.return(null);
               return engine;
             });
             cacheEntry = { refCount: 1, load };

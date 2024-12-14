@@ -14,7 +14,7 @@ function lazyInitEsbuild() {
   return esbuildReady;
 }
 
-// FIXME: Should this check if there is an execute function, or if we need to wrap it in one?
+// TODO: Should this check if there is an execute function, or if we need to wrap it in one?
 export async function toCodeReference(code: string | CodeReference): Promise<CodeReference> {
   if (typeof code === 'string') {
     code = `${code}

@@ -13,6 +13,7 @@ import type {
   NormalizedPipelinePrompt,
 } from '$lib/types';
 import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
+import { generator } from './generator';
 import { HandlebarsPromptFormatter } from './HandlebarsPromptFormatter';
 import { ParallelTaskQueue } from './ParallelTaskQueue';
 
@@ -66,14 +67,24 @@ export class PipelineEnvironment implements TestEnvironment {
       $output: null,
       $history: [],
     };
+    const stepCount: Map<string, number> = new Map<string, number>();
+    const modelUpdateGenerator = generator<ModelUpdate, TestOutput>();
 
     // FIXME: Choose a better constant or make it configurable
     const taskQueue = new ParallelTaskQueue(10);
     let result: TestOutput | undefined;
+    const history: TestOutput['history'] = [];
+    const start = Date.now();
 
+    // FIXME: Can this be removed?
     const outputVars: Record<string, unknown> = {};
 
     const runStep = async (step: NormalizedPipelineStep, pipelineVars: PipelineVars) => {
+      // Generate an ID for the step
+      const count = stepCount.get(step.id) ?? 1;
+      stepCount.set(step.id, count + 1);
+      const stepId = step.id + (count > 1 ? ` #${count}` : '');
+
       // Render the prompt
       const promptFormatter = new HandlebarsPromptFormatter(step.prompt);
       const prompt = await promptFormatter.format(
@@ -91,14 +102,19 @@ export class PipelineEnvironment implements TestEnvironment {
         // FIXME: If multiple steps share a prompt, use different cache keys
         // FIXME: If re-running a step with the same prompt, use a different cache key?
       };
-      console.log('step started:', step.id, pipelineVars.$history);
       const generator = maybeUseCache(this.cache, cacheKey, run);
       let nextRes = await generator.next();
       while (!nextRes.done) {
-        // FIXME: Output the in-progress responses somewhere
+        const update = nextRes.value;
+        if (typeof update === 'string') {
+          modelUpdateGenerator.yield({ type: 'append', output: update, internalId: stepId });
+        } else {
+          modelUpdateGenerator.yield({ ...update, internalId: stepId });
+        }
         nextRes = await generator.next();
       }
       const { response, latencyMillis } = nextRes.value;
+      const finished = Date.now();
 
       // Extract the output
       // FIXME: catch any errors extracting output
@@ -116,6 +132,15 @@ export class PipelineEnvironment implements TestEnvironment {
         outputVars[step.outputAs] = output;
       }
 
+      const stepResult: TestOutput = {
+        rawPrompt: prompt,
+        rawOutput: response,
+        output: output,
+        latencyMillis: latencyMillis,
+        tokenUsage: tokenUsage,
+      };
+      history.push({ id: stepId, ...stepResult });
+
       // Mark the step as complete and continue with the next steps
       const { isLeaf, next } = await pipelineState.markCompleteAndGetNextSteps(
         step,
@@ -130,11 +155,15 @@ export class PipelineEnvironment implements TestEnvironment {
         // FIXME: Detect if the pipeline is still being run
         // FIXME: Detect if there is already a result
         result = {
-          rawPrompt: prompt,
-          rawOutput: response,
-          output: output,
-          latencyMillis: latencyMillis,
-          tokenUsage: tokenUsage,
+          ...stepResult,
+          history,
+          latencyMillis: finished - start,
+          tokenUsage: {
+            costDollars: history
+              .map((h) => h.tokenUsage?.costDollars)
+              .filter((c) => c !== undefined)
+              .reduce((a, b) => a + b, 0),
+          },
         };
       }
       for (const { step, context } of next) {
@@ -154,18 +183,27 @@ export class PipelineEnvironment implements TestEnvironment {
       throw new Error('No valid starting steps found');
     }
 
-    yield 'Pipeline started';
     for (const step of startingSteps) {
       taskQueue.enqueue(() => runStep(step, initialPipelineVars));
     }
 
-    await taskQueue.completed();
+    taskQueue
+      .completed()
+      .then(() => {
+        if (!result) {
+          throw new Error('Pipeline ended without returning a result');
+        }
+        modelUpdateGenerator.return(result);
+      })
+      .catch((error: unknown) => {
+        console.error(error);
+        modelUpdateGenerator.return({
+          rawPrompt: '',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      });
 
-    if (!result) {
-      throw new Error('Pipeline ended without returning a result');
-    }
-
-    return result;
+    return yield* modelUpdateGenerator.generator;
   }
 }
 

@@ -39,6 +39,7 @@ import * as CodeSandbox from '$lib/utils/CodeSandbox';
 import { FileSystemCache } from '$lib/storage/FileSystemCache';
 import { useCacheStore } from './settings';
 import { PipelineEnvironment } from '$lib/utils/PipelineEnvironment';
+import type { FileReference } from '$lib/storage/FileReference';
 
 const folder = await idb.get<FileSystemDirectoryHandle>('folder');
 if (folder) {
@@ -445,6 +446,36 @@ function createEnvironments(
   return envs;
 }
 
+function applyModelUpdate(
+  state: LiveResult,
+  historyId: string | undefined,
+  cb: (output: (string | FileReference)[]) => (string | FileReference)[],
+): LiveResult {
+  if (!historyId) {
+    // Apply to output
+    const output = [...(state.output ?? [])]; // Copy so we don't mutate the original
+    return {
+      ...state,
+      state: 'in-progress',
+      output: cb(output),
+    };
+  }
+
+  // Apply to history
+  const history = [...(state.history ?? [])]; // Copy so we don't mutate the original
+  const index = history.findIndex((h) => h.id === historyId);
+  if (index === -1) {
+    history.push({ id: historyId, rawPrompt: null, output: cb([]) });
+  } else {
+    history[index] = { ...history[index], output: cb(history[index].output ?? []) };
+  }
+  return {
+    ...state,
+    state: 'in-progress',
+    history,
+  };
+}
+
 async function runTest(
   test: NormalizedTestCase,
   env: TestEnvironment,
@@ -477,14 +508,26 @@ async function runTest(
             output: [...output, lastOutputString + delta],
           };
         });
+      } else if (next.value.type === 'replace') {
+        const update = next.value;
+        result.update((state) =>
+          applyModelUpdate(state, update.internalId, (_output) => [update.output]),
+        );
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      } else if (next.value.type === 'append') {
+        const update = next.value;
+        result.update((state) =>
+          applyModelUpdate(state, update.internalId, (output) => {
+            output = [...output]; // Copy so we don't mutate the original
+            let lastOutputString = '';
+            if (output.length > 0 && typeof output[output.length - 1] === 'string') {
+              lastOutputString = output.pop() as string;
+            }
+            return [...output, lastOutputString + update.output];
+          }),
+        );
       } else {
-        // FIXME: Check type of next.value, ModelUpdate or PipelineLogUpdate
-        const output = next.value.output;
-        result.update((state) => ({
-          ...state,
-          state: 'in-progress',
-          output: [output],
-        }));
+        throw new Error('Unknown model update type');
       }
     }
   }
@@ -500,6 +543,11 @@ async function runTest(
     result.update((state) => ({
       ...state,
       ...testResult,
+      history: testResult.history?.map((h) => ({
+        ...h,
+        output:
+          h.output === undefined ? undefined : Array.isArray(h.output) ? h.output : [h.output],
+      })),
       output: arrayOutput,
       state: 'error',
       pass: false,
@@ -533,6 +581,10 @@ async function runTest(
   result.update((state) => ({
     ...state,
     ...testResult,
+    history: testResult.history?.map((h) => ({
+      ...h,
+      output: h.output === undefined ? undefined : Array.isArray(h.output) ? h.output : [h.output],
+    })),
     output: arrayOutput,
     state: assertionResults.every((r) => r.pass) ? 'success' : 'error',
     assertionResults,

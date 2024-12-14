@@ -102,7 +102,7 @@ const tokenUsageSchema = z.object({
 });
 export type TokenUsage = z.infer<typeof tokenUsageSchema>;
 
-const testOutputSchema = z.object({
+const baseTestOutputSchema = z.object({
   // Required
   rawPrompt: z.unknown(),
 
@@ -116,6 +116,10 @@ const testOutputSchema = z.object({
 
   // Error
   error: z.string().optional(),
+});
+
+const testOutputSchema = baseTestOutputSchema.extend({
+  history: z.array(baseTestOutputSchema.extend({ id: z.string() })).optional(),
 });
 export type TestOutput = z.infer<typeof testOutputSchema>;
 
@@ -184,8 +188,9 @@ export interface RunContext {
 }
 
 export interface ModelUpdate {
-  type: 'replace';
-  output: string;
+  type: 'replace' | 'append';
+  output: string; // TODO support FileReference too
+  internalId?: string; // Unique ID for the update, used for history
 }
 
 export type ModelGenerator = () => AsyncGenerator<string | ModelUpdate, unknown, void>;
@@ -233,10 +238,11 @@ export interface AssertionProvider {
 
 export interface LiveResult {
   // Required
-  rawPrompt: unknown;
+  rawPrompt?: unknown;
   state: 'waiting' | 'in-progress' | 'success' | 'error';
 
   // Success
+  history?: (Omit<LiveResult, 'state' | 'history' | 'assertionResults'> & { id: string })[];
   output?: (string | FileReference)[];
   rawOutput?: unknown;
   latencyMillis?: number;
