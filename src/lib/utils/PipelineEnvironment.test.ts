@@ -146,6 +146,12 @@ describe('PipelineState', () => {
       });
     },
   );
+
+  test('throws an error if steps have duplicate IDs', {}, function () {
+    expect(function () {
+      return new PipelineState([{ id: 'step-0' }, { id: 'step-0' }], defaultMerge);
+    }).toThrow('Steps have duplicate IDs');
+  });
 });
 
 describe('orderedMerge', () => {

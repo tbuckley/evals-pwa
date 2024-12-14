@@ -405,7 +405,6 @@ function getRunEnvs(providers: NormalizedProvider[], prompts: NormalizedPrompt[]
   const envs: RunEnv[] = [];
   for (const provider of providers) {
     // First use any provider-specific prompts; otherwise, use the global prompts
-    // FIXME: Support pipeline prompts in providers too
     const providerPrompts: NormalizedPrompt[] = provider.prompts ? provider.prompts : prompts;
     for (const prompt of providerPrompts) {
       envs.push({ provider, prompt });

@@ -82,7 +82,13 @@
             </Accordion.Trigger>
             <Accordion.Content>
               <div class="whitespace-pre-wrap break-words">
-                <ResultOutput output={historyItem.output} />
+                {#if historyItem.error}
+                  {historyItem.error}
+                {:else if historyItem.output}
+                  <ResultOutput output={historyItem.output} />
+                {:else}
+                  --no output--
+                {/if}
               </div>
               <ResultUsage result={historyItem} />
             </Accordion.Content>

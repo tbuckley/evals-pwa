@@ -11,6 +11,7 @@ import type {
   NormalizedPipelineStep,
   TestResult,
   NormalizedPipelinePrompt,
+  TokenUsage,
 } from '$lib/types';
 import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
 import { generator } from './generator';
@@ -54,41 +55,55 @@ export class PipelineEnvironment implements TestEnvironment {
     return { id: this.models.default.id };
   }
   get prompt() {
-    // FIXME: Return the normalized prompt
-    return JSON.stringify(this.pipeline);
+    return this.pipeline;
   }
 
   async *run(
     vars: VarSet,
     context: RunContext,
   ): AsyncGenerator<string | ModelUpdate, TestOutput, void> {
-    const pipelineState = new PipelineState(this.pipeline.$pipeline, historyMergeFn);
-    const initialPipelineVars: PipelineVars = {
-      $output: null,
-      $history: [],
-    };
-    const stepCount: Map<string, number> = new Map<string, number>();
+    const pipelineState = new PipelineState(this.pipeline.$pipeline, mergePipelineContext);
+    const stepRunCount: Map<string, number> = new Map<string, number>(); // Track how many times each step has been run
     const modelUpdateGenerator = generator<ModelUpdate, TestOutput>();
 
-    // FIXME: Choose a better constant or make it configurable
-    const taskQueue = new ParallelTaskQueue(10);
+    // FIXME: Rate limit at provider level
+    const taskQueue = new ParallelTaskQueue(6);
     let result: TestOutput | undefined;
     const history: TestOutput['history'] = [];
     const start = Date.now();
 
-    // FIXME: Can this be removed?
-    const outputVars: Record<string, unknown> = {};
+    const safeRunStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
+      // Generate an ID for the step (will increment inside runStep)
+      const count = stepRunCount.get(step.id) ?? 1;
+      const stepId = step.id + (count > 1 ? ` #${count}` : '');
 
-    const runStep = async (step: NormalizedPipelineStep, pipelineVars: PipelineVars) => {
+      try {
+        await runStep(step, pipelineContext);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        result = {
+          error: errorMessage,
+          history: [...history, { id: stepId, error: errorMessage }],
+        };
+        taskQueue.abort();
+      }
+    };
+
+    const runStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
       // Generate an ID for the step
-      const count = stepCount.get(step.id) ?? 1;
-      stepCount.set(step.id, count + 1);
+      const count = stepRunCount.get(step.id) ?? 1;
+      stepRunCount.set(step.id, count + 1);
       const stepId = step.id + (count > 1 ? ` #${count}` : '');
 
       // Render the prompt
       const promptFormatter = new HandlebarsPromptFormatter(step.prompt);
       const prompt = await promptFormatter.format(
-        { ...vars, ...outputVars, ...pipelineVars },
+        {
+          ...vars,
+          ...pipelineContext.vars,
+          $history: pipelineContext.history,
+          $output: pipelineContext.history[history.length - 1]?.output ?? null,
+        },
         this.models.default.mimeTypes,
       );
 
@@ -99,8 +114,9 @@ export class PipelineEnvironment implements TestEnvironment {
         provider: this.provider.id,
         request,
         ...(context.cacheKey ?? {}),
-        // FIXME: If multiple steps share a prompt, use different cache keys
-        // FIXME: If re-running a step with the same prompt, use a different cache key?
+        // If re-running a step with the same prompt, use a different cache key?
+        ...(count > 1 ? { pipelineCount: count } : {}),
+        // TODO: If multiple steps share a prompt, use different cache keys
       };
       const generator = maybeUseCache(this.cache, cacheKey, run);
       let nextRes = await generator.next();
@@ -117,19 +133,31 @@ export class PipelineEnvironment implements TestEnvironment {
       const finished = Date.now();
 
       // Extract the output
-      // FIXME: catch any errors extracting output
-      const rawOutput = await model.extractOutput(response);
-      const output = await modelOutputToTestOutput(rawOutput);
-      const tokenUsage = model.extractTokenUsage(response);
+      let output: NonNullable<TestOutput['output']>;
+      let tokenUsage: TokenUsage;
+      try {
+        const rawOutput = await model.extractOutput(response);
+        output = await modelOutputToTestOutput(rawOutput);
+        tokenUsage = model.extractTokenUsage(response);
+      } catch (e) {
+        if (e instanceof Error) {
+          result = {
+            rawPrompt: prompt,
+            rawOutput: response,
+            error: e.toString(),
+            latencyMillis,
+          };
+          history.push({ id: stepId, ...result });
+          return;
+        }
+        throw e;
+      }
 
       // Add the output to the vars
-      const newPipelineVars: PipelineVars = {
-        ...pipelineVars,
-        $output: output,
-        $history: [...pipelineVars.$history, { prompt, output }],
-      };
+      const newHistory = [...pipelineContext.history, { prompt, output }];
+      const newVars = { ...pipelineContext.vars };
       if (step.outputAs) {
-        outputVars[step.outputAs] = output;
+        newVars[step.outputAs] = output;
       }
 
       const stepResult: TestOutput = {
@@ -146,14 +174,33 @@ export class PipelineEnvironment implements TestEnvironment {
         step,
         {
           ...vars,
-          ...outputVars,
-          ...newPipelineVars,
+          ...newVars,
+          $history: newHistory,
+          $output: newHistory[newHistory.length - 1]?.output ?? null,
         },
-        newPipelineVars.$history,
+        { history: newHistory, vars: newVars },
       );
       if (isLeaf) {
-        // FIXME: Detect if the pipeline is still being run
-        // FIXME: Detect if there is already a result
+        // If this isn't the first result, return an error instead
+        if (result !== undefined) {
+          if (!result.error) {
+            result = {
+              error: 'Pipeline produced multiple results',
+            };
+            taskQueue.abort();
+          }
+          return;
+        }
+
+        // If this isn't the last task, return an error instead
+        if (taskQueue.remaining() !== 1) {
+          result = {
+            error: 'Pipeline produced a result while still running',
+          };
+          taskQueue.abort();
+          return;
+        }
+
         result = {
           ...stepResult,
           history,
@@ -167,24 +214,18 @@ export class PipelineEnvironment implements TestEnvironment {
         };
       }
       for (const { step, context } of next) {
-        taskQueue.enqueue(() =>
-          runStep(step, {
-            ...newPipelineVars,
-            $history: context,
-            $output: context[context.length - 1].output,
-          }),
-        );
+        taskQueue.enqueue(() => safeRunStep(step, context));
       }
     };
 
     // Get the starting steps
-    const startingSteps = await pipelineState.getStartingSteps(vars, []);
+    const startingSteps = await pipelineState.getStartingSteps(vars, { history: [], vars: {} });
     if (startingSteps.length === 0) {
       throw new Error('No valid starting steps found');
     }
 
     for (const step of startingSteps) {
-      taskQueue.enqueue(() => runStep(step, initialPipelineVars));
+      taskQueue.enqueue(() => safeRunStep(step, { history: [], vars: {} }));
     }
 
     taskQueue
@@ -197,10 +238,16 @@ export class PipelineEnvironment implements TestEnvironment {
       })
       .catch((error: unknown) => {
         console.error(error);
-        modelUpdateGenerator.return({
-          rawPrompt: '',
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
+        if (result?.error) {
+          // If we already have an error, return it
+          modelUpdateGenerator.return(result);
+        } else {
+          // Otherwise, return an error
+          modelUpdateGenerator.return({
+            rawPrompt: '',
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
       });
 
     return yield* modelUpdateGenerator.generator;
@@ -256,7 +303,6 @@ export class PipelineState<T extends PipelineStep, S> {
         }
       } else {
         // Register deps as output dependencies
-        // FIXME: Validate that all deps exist as outputs
         this.stepDepsStatus.set(step.id, createStepDepsStatus([], step.deps));
         for (const dep of step.deps) {
           const ids = this.outputDepToIds.get(dep) ?? [];
@@ -266,7 +312,12 @@ export class PipelineState<T extends PipelineStep, S> {
       }
     }
 
-    // FIXME: Validate that all steps have unique IDs
+    // Validate that all steps have unique IDs
+    const uniqueIds = new Set(steps.map((step) => step.id));
+    if (uniqueIds.size !== steps.length) {
+      throw new Error('Steps have duplicate IDs');
+    }
+
     this.stepIdMap = new Map<string, T>(steps.map((step) => [step.id, step]));
   }
 
@@ -536,3 +587,14 @@ const historyMergeFn = makeOrderedMerge<HistoryItem>(function (a, b) {
 
   return 0;
 });
+
+interface PipelineContext {
+  history: HistoryItem[];
+  vars: VarSet;
+}
+function mergePipelineContext(a: PipelineContext, b: PipelineContext): PipelineContext {
+  return {
+    history: historyMergeFn(a.history, b.history),
+    vars: { ...a.vars, ...b.vars },
+  };
+}
