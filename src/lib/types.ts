@@ -1,6 +1,7 @@
 import type { Readable } from 'svelte/store';
 import { z } from 'zod';
 import { FileReference } from './storage/FileReference';
+import { CodeReference } from './storage/CodeReference';
 
 const varSchema = z.any();
 
@@ -25,14 +26,41 @@ const normalizedProviderSchema = z.object({
   prompts: z.array(z.string()).optional(),
 });
 export const providerSchema = z.union([z.string(), normalizedProviderSchema]);
-const promptSchema = z.string();
 
+export interface NormalizedPipelineStep {
+  id: string;
+  prompt: string;
+  outputAs?: string;
+  if?: string | CodeReference;
+  deps?: string[];
+}
+export interface NormalizedPipelinePrompt {
+  $pipeline: NormalizedPipelineStep[];
+}
+const simplePromptSchema = z.string();
+export const pipelinePromptSchema = z.object({
+  $pipeline: z.array(
+    z.union([
+      z.string(),
+      z.object({
+        id: z.string().optional(),
+        prompt: z.string(),
+        outputAs: z.string().optional(),
+        if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
+        deps: z.array(z.string()).optional(),
+      }),
+    ]),
+  ),
+});
+const promptSchema = z.union([simplePromptSchema, pipelinePromptSchema]);
+
+export type PipelinePrompt = z.infer<typeof pipelinePromptSchema>;
 export type Var = z.infer<typeof varSchema>;
 export type VarSet = z.infer<typeof varSetSchema>;
 export type Assertion = z.infer<typeof assertionSchema>;
 export type NormalizedProvider = z.infer<typeof normalizedProviderSchema>;
 export type Provider = z.infer<typeof providerSchema>;
-export type Prompt = z.infer<typeof promptSchema>;
+export type NormalizedPrompt = string | NormalizedPipelinePrompt;
 export type NormalizedAssertion = Assertion & Required<Pick<Assertion, 'vars'>>;
 
 export interface NormalizedTestCase {
@@ -47,7 +75,7 @@ export interface NormalizedTestCase {
 export interface NormalizedConfig {
   description?: string;
   providers: NormalizedProvider[];
-  prompts: Prompt[];
+  prompts: NormalizedPrompt[];
   tests: NormalizedTestCase[];
 }
 
@@ -74,7 +102,7 @@ const tokenUsageSchema = z.object({
 });
 export type TokenUsage = z.infer<typeof tokenUsageSchema>;
 
-const testOutputSchema = z.object({
+const baseTestOutputSchema = z.object({
   // Required
   rawPrompt: z.unknown(),
 
@@ -88,6 +116,10 @@ const testOutputSchema = z.object({
 
   // Error
   error: z.string().optional(),
+});
+
+const testOutputSchema = baseTestOutputSchema.extend({
+  history: z.array(baseTestOutputSchema.extend({ id: z.string() })).optional(),
 });
 export type TestOutput = z.infer<typeof testOutputSchema>;
 
@@ -141,16 +173,6 @@ export interface StorageProvider {
   getConfigNames(): Promise<string[]>;
 }
 
-export interface ReadonlyFileStorage {
-  load(uri: string): Promise<File | { uri: string; file: File }[]>;
-  loadFile(uri: string): Promise<File>;
-}
-
-export interface FileStorage extends ReadonlyFileStorage {
-  getName(): string;
-  writeFile(uri: string, data: string | Blob): Promise<void>;
-}
-
 export type PromptPart = { text: string } | { file: File };
 export type MultiPartPrompt = PromptPart[];
 export interface RolePromptPart {
@@ -166,8 +188,9 @@ export interface RunContext {
 }
 
 export interface ModelUpdate {
-  type: 'replace';
-  output: string;
+  type: 'replace' | 'append';
+  output: string; // TODO support FileReference too
+  internalId?: string; // Unique ID for the update, used for history
 }
 
 export type ModelGenerator = () => AsyncGenerator<string | ModelUpdate, unknown, void>;
@@ -186,7 +209,7 @@ export interface ModelProvider {
 export interface TestEnvironment {
   run(test: TestCase, context: RunContext): AsyncGenerator<string | ModelUpdate, TestOutput, void>;
   provider: Pick<NormalizedProvider, 'id'>;
-  prompt: Prompt;
+  prompt: NormalizedPrompt;
 }
 
 export interface TaskQueue {
@@ -196,7 +219,7 @@ export interface TaskQueue {
 }
 
 export interface PromptFormatter {
-  prompt: Prompt;
+  prompt: string;
   format(vars: VarSet, mimeTypes: string[] | undefined): Promise<ConversationPrompt>;
 }
 
@@ -208,36 +231,18 @@ export type MaybePromise<T> = T | Promise<T>;
 export interface AssertionProvider {
   run(
     output: string | (string | FileReference)[],
-    context: { provider: Pick<NormalizedProvider, 'id'>; prompt: Prompt },
+    context: { provider: Pick<NormalizedProvider, 'id'>; prompt: NormalizedPrompt },
   ): MaybePromise<AssertionResult>;
   destroy?: () => void;
 }
 
-export type ErrorState =
-  | { type: 'missing-config'; path: string }
-  | { type: 'invalid-config'; errors: string[] }
-  | { type: 'missing-config-reference'; path: string };
-
-export class UiError extends Error {
-  constructor(
-    public detail: ErrorState,
-    message?: string,
-  ) {
-    super(message);
-  }
-}
-export class MissingFileError extends Error {
-  constructor(public path: string) {
-    super(`File not found: ${path}`);
-  }
-}
-
 export interface LiveResult {
   // Required
-  rawPrompt: unknown;
+  rawPrompt?: unknown;
   state: 'waiting' | 'in-progress' | 'success' | 'error';
 
   // Success
+  history?: (Omit<LiveResult, 'state' | 'history' | 'assertionResults'> & { id: string })[];
   output?: (string | FileReference)[];
   rawOutput?: unknown;
   latencyMillis?: number;

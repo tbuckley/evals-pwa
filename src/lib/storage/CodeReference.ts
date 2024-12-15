@@ -1,6 +1,6 @@
 import * as esbuild from 'esbuild-wasm';
 import { FileReference } from './FileReference';
-import type { ReadonlyFileStorage } from '$lib/types';
+import type { ReadonlyFileStorage } from '$lib/types/storage';
 import * as CodeSandbox from '$lib/utils/CodeSandbox';
 import { blobToFileReference } from './dereferenceFilePaths';
 
@@ -14,6 +14,7 @@ function lazyInitEsbuild() {
   return esbuildReady;
 }
 
+// TODO: Should this check if there is an execute function, or if we need to wrap it in one?
 export async function toCodeReference(code: string | CodeReference): Promise<CodeReference> {
   if (typeof code === 'string') {
     code = `${code}

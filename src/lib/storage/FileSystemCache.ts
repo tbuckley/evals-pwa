@@ -1,4 +1,5 @@
-import type { FileStorage, ModelCache } from '$lib/types';
+import type { FileStorage } from '$lib/types/storage';
+import { type ModelCache } from '$lib/types';
 import { hashJson } from '$lib/utils/hashJson';
 import { joinPath, pathToFileUri } from '$lib/utils/path';
 

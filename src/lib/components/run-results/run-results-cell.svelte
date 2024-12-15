@@ -6,7 +6,9 @@
   import SquareCode from 'lucide-svelte/icons/square-code';
   import Copy from 'lucide-svelte/icons/copy';
   import { FileReference } from '$lib/storage/FileReference';
-  import { isImageFile } from '$lib/utils/media';
+  import ResultOutput from './ResultOutput.svelte';
+  import * as Accordion from '../ui/accordion';
+  import ResultUsage from './ResultUsage.svelte';
 
   export let testResult: Readable<LiveResult>;
   export let height: Readable<'minimal' | 'collapsed' | 'expanded'>;
@@ -70,27 +72,43 @@
     </div>
   {/if}
   {#if $height !== 'minimal'}
+    <!-- History -->
+    {#if $testResult.history && $height === 'expanded'}
+      <Accordion.Root multiple={true} class="mb-2">
+        {#each $testResult.history as historyItem (historyItem.id)}
+          <Accordion.Item value={historyItem.id}>
+            <Accordion.Trigger class="py-1">
+              {historyItem.id}
+            </Accordion.Trigger>
+            <Accordion.Content>
+              <div class="whitespace-pre-wrap break-words">
+                {#if historyItem.error}
+                  {historyItem.error}
+                {:else if historyItem.output}
+                  <ResultOutput output={historyItem.output} />
+                {:else}
+                  --no output--
+                {/if}
+              </div>
+              <ResultUsage result={historyItem} />
+            </Accordion.Content>
+          </Accordion.Item>
+        {/each}
+      </Accordion.Root>
+    {/if}
+
+    <!-- Output -->
     <div class="whitespace-pre-wrap break-words">
       {#if $testResult.error}
         {$testResult.error}
       {:else if $testResult.output}
-        {#each $testResult.output as output}
-          {#if typeof output === 'string'}
-            {output}
-          {:else if output instanceof FileReference && isImageFile(output)}
-            <img
-              src={URL.createObjectURL(output.file)}
-              alt={output.file.name}
-              class="max-h-[512px] w-full max-w-[512px]"
-            />
-          {:else}
-            {output.uri}
-          {/if}
-        {/each}
+        <ResultOutput output={$testResult.output} />
       {:else}
-        '--no output--'
+        --no output--
       {/if}
     </div>
+
+    <!-- Buttons -->
     <div class="absolute right-0 top-0 flex">
       {#if ['success', 'error'].includes($testResult.state) && $testResult.output && $testResult.output.length === 1 && typeof $testResult.output[0] === 'string'}
         <Button on:click={copy} variant="ghost" size="icon" class="float-right text-gray-500">
@@ -101,6 +119,8 @@
         <SquareCode class="h-5 w-5"></SquareCode>
       </Button>
     </div>
+
+    <!-- Visuals -->
     {#if visuals.length > 0}
       <div class="mt-4">
         <h4 class="mb-2 text-sm font-semibold">Visuals:</h4>
@@ -120,22 +140,6 @@
         </div>
       </div>
     {/if}
-    {#if typeof $testResult.latencyMillis === 'number'}
-      <div class="mt-2 text-xs font-bold text-gray-500">{$testResult.latencyMillis}ms</div>
-    {/if}
-    {#if typeof $testResult.tokenUsage === 'object'}
-      <div class="mt-2 text-xs font-bold text-gray-500">
-        {#if $testResult.tokenUsage.inputTokens && $testResult.tokenUsage.outputTokens}
-          <span>
-            ({$testResult.tokenUsage.inputTokens}+{$testResult.tokenUsage.outputTokens})
-          </span>
-        {/if}
-        {#if $testResult.tokenUsage.costDollars}
-          <span>
-            ${$testResult.tokenUsage.costDollars.toFixed(4)}
-          </span>
-        {/if}
-      </div>
-    {/if}
+    <ResultUsage result={$testResult} />
   {/if}
 </div>

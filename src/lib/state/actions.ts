@@ -9,19 +9,19 @@ import {
   selectedConfigFileStore,
 } from './stores';
 import {
-  UiError,
   type AssertionResult,
-  type FileStorage,
   type LiveResult,
   type LiveRun,
   type ModelCache,
   type NormalizedProvider,
   type NormalizedTestCase,
-  type Prompt,
+  type NormalizedPrompt,
   type Run,
   type RunContext,
   type TestEnvironment,
 } from '$lib/types';
+import { UiError } from '$lib/types/errors';
+import { type FileStorage } from '$lib/types/storage';
 import { ProviderManager } from '$lib/providers/ProviderManager';
 import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
 import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
@@ -38,6 +38,8 @@ import { InMemoryStorage } from '$lib/storage/InMemoryStorage';
 import * as CodeSandbox from '$lib/utils/CodeSandbox';
 import { FileSystemCache } from '$lib/storage/FileSystemCache';
 import { useCacheStore } from './settings';
+import { PipelineEnvironment } from '$lib/utils/PipelineEnvironment';
+import type { FileReference } from '$lib/storage/FileReference';
 
 const folder = await idb.get<FileSystemDirectoryHandle>('folder');
 if (folder) {
@@ -264,7 +266,7 @@ export async function runTests() {
   }
 
   // Get global prompts + tests
-  const globalPrompts: Prompt[] = config.prompts;
+  const globalPrompts: NormalizedPrompt[] = config.prompts;
   const globalProviders: NormalizedProvider[] = config.providers;
   let globalTests: NormalizedTestCase[] = config.tests;
 
@@ -397,13 +399,13 @@ export async function runTests() {
 
 interface RunEnv {
   provider: NormalizedProvider;
-  prompt: Prompt;
+  prompt: NormalizedPrompt;
 }
-function getRunEnvs(providers: NormalizedProvider[], prompts: Prompt[]): RunEnv[] {
+function getRunEnvs(providers: NormalizedProvider[], prompts: NormalizedPrompt[]): RunEnv[] {
   const envs: RunEnv[] = [];
   for (const provider of providers) {
     // First use any provider-specific prompts; otherwise, use the global prompts
-    const providerPrompts: Prompt[] = provider.prompts ? provider.prompts : prompts;
+    const providerPrompts: NormalizedPrompt[] = provider.prompts ? provider.prompts : prompts;
     for (const prompt of providerPrompts) {
       envs.push({ provider, prompt });
     }
@@ -421,15 +423,56 @@ function createEnvironments(
     const { provider, prompt } = env;
 
     const model = providerManager.getProvider(provider.id, provider.config);
-    envs.push(
-      new SimpleEnvironment({
-        model,
-        promptFormatter: new HandlebarsPromptFormatter(prompt),
-        cache,
-      }),
-    );
+    if (typeof prompt === 'string') {
+      envs.push(
+        new SimpleEnvironment({
+          model,
+          promptFormatter: new HandlebarsPromptFormatter(prompt),
+          cache,
+        }),
+      );
+    } else {
+      // Pipeline
+      envs.push(
+        new PipelineEnvironment({
+          models: { default: model, labeled: {} },
+          pipeline: prompt,
+          cache,
+        }),
+      );
+    }
   }
   return envs;
+}
+
+function applyModelUpdate(
+  state: LiveResult,
+  historyId: string | undefined,
+  cb: (output: (string | FileReference)[]) => (string | FileReference)[],
+): LiveResult {
+  if (!historyId) {
+    // Apply to output
+    const output = [...(state.output ?? [])]; // Copy so we don't mutate the original
+    return {
+      ...state,
+      state: 'in-progress',
+      output: cb(output),
+    };
+  }
+
+  // Apply to history
+  const history = [...(state.history ?? [])]; // Copy so we don't mutate the original
+  const index = history.findIndex((h) => h.id === historyId);
+  if (index === -1) {
+    history.push({ id: historyId, rawPrompt: null, output: cb([]) });
+  } else {
+    history[index] = { ...history[index], output: cb(history[index].output ?? []) };
+  }
+  return {
+    ...state,
+    state: 'in-progress',
+    history,
+  };
 }
 
 async function runTest(
@@ -464,13 +507,26 @@ async function runTest(
             output: [...output, lastOutputString + delta],
           };
         });
+      } else if (next.value.type === 'replace') {
+        const update = next.value;
+        result.update((state) =>
+          applyModelUpdate(state, update.internalId, (_output) => [update.output]),
+        );
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      } else if (next.value.type === 'append') {
+        const update = next.value;
+        result.update((state) =>
+          applyModelUpdate(state, update.internalId, (output) => {
+            output = [...output]; // Copy so we don't mutate the original
+            let lastOutputString = '';
+            if (output.length > 0 && typeof output[output.length - 1] === 'string') {
+              lastOutputString = output.pop() as string;
+            }
+            return [...output, lastOutputString + update.output];
+          }),
+        );
       } else {
-        const output = next.value.output;
-        result.update((state) => ({
-          ...state,
-          state: 'in-progress',
-          output: [output],
-        }));
+        throw new Error('Unknown model update type');
       }
     }
   }
@@ -486,6 +542,11 @@ async function runTest(
     result.update((state) => ({
       ...state,
       ...testResult,
+      history: testResult.history?.map((h) => ({
+        ...h,
+        output:
+          h.output === undefined ? undefined : Array.isArray(h.output) ? h.output : [h.output],
+      })),
       output: arrayOutput,
       state: 'error',
       pass: false,
@@ -519,6 +580,10 @@ async function runTest(
   result.update((state) => ({
     ...state,
     ...testResult,
+    history: testResult.history?.map((h) => ({
+      ...h,
+      output: h.output === undefined ? undefined : Array.isArray(h.output) ? h.output : [h.output],
+    })),
     output: arrayOutput,
     state: assertionResults.every((r) => r.pass) ? 'success' : 'error',
     assertionResults,

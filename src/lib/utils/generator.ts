@@ -1,13 +1,13 @@
 import { cast } from './asserts';
 
-export function generator<T>(): {
-  generator: AsyncGenerator<T>;
+export function generator<T, S>(): {
+  generator: AsyncGenerator<T & {}, S>;
   yield: (value: T) => void;
-  return: () => void;
+  return: (value: S) => void;
 } {
   const queue: T[] = [];
-  let finished = false;
-  let update: () => void;
+  let finished: { value: S } | null = null;
+  let update: (() => void) | null = null;
   let ready: Promise<void>;
   return {
     generator: (async function* () {
@@ -17,19 +17,22 @@ export function generator<T>(): {
         while (queue.length) {
           yield cast(queue.shift());
         }
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (finished) {
-          return;
+        if (finished as { value: S } | null) {
+          return (finished as unknown as { value: S }).value;
         }
       }
     })(),
     yield(value) {
       queue.push(value);
-      update();
+      if (update) {
+        update();
+      }
     },
-    return() {
-      finished = true;
-      update();
+    return(value) {
+      finished = { value };
+      if (update) {
+        update();
+      }
     },
   };
 }

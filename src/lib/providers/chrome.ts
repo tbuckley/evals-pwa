@@ -41,7 +41,7 @@ export class ChromeProvider implements ModelProvider {
         if (!window.ai?.languageModel) {
           throw new Error('window.ai.languageModel not supported in this browser');
         }
-        const progress = generator<ProgressEvent>();
+        const progress = generator<ProgressEvent, null>();
         const create = window.ai.languageModel
           .create({
             monitor(m) {
@@ -51,7 +51,7 @@ export class ChromeProvider implements ModelProvider {
             },
           })
           .then((session) => {
-            progress.return();
+            progress.return(null);
             return session;
           });
 

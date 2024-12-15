@@ -67,4 +67,7 @@ export class ParallelTaskQueue implements TaskQueue {
   completed(): Promise<void> {
     return this.completedPromise;
   }
+  remaining(): number {
+    return this.queue.length + this.running;
+  }
 }

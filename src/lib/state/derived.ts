@@ -172,6 +172,11 @@ function runToLiveRun(run: Run): LiveRun {
 
         return readable({
           ...rest,
+          history: rest.history?.map((h) => ({
+            ...h,
+            output:
+              h.output === undefined ? undefined : Array.isArray(h.output) ? h.output : [h.output],
+          })),
           rawPrompt: rawPrompt ?? null,
           output: outputArray,
           state,
