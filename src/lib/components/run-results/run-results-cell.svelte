@@ -73,7 +73,7 @@
   {/if}
   {#if $height !== 'minimal'}
     <!-- History -->
-    {#if $testResult.history}
+    {#if $testResult.history && $height === 'expanded'}
       <Accordion.Root multiple={true} class="mb-2">
         {#each $testResult.history as historyItem (historyItem.id)}
           <Accordion.Item value={historyItem.id}>

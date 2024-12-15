@@ -22,6 +22,6 @@
     class:max-h-48={$height === 'collapsed'}
     class:overflow-y-auto={$height === 'collapsed'}
   >
-    {env.prompt}
+    {typeof env.prompt === 'string' ? env.prompt : JSON.stringify(env.prompt, null, 2)}
   </div>
 </div>
