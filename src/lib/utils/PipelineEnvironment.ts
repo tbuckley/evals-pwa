@@ -19,8 +19,8 @@ import { HandlebarsPromptFormatter } from './HandlebarsPromptFormatter';
 import { ParallelTaskQueue } from './ParallelTaskQueue';
 
 export interface ModelConfig {
-  default: ModelProvider;
-  labeled: Record<string, ModelProvider>;
+  default: ModelProvider | null;
+  labeled?: Record<string, ModelProvider>;
 }
 
 export interface Config {
@@ -52,7 +52,18 @@ export class PipelineEnvironment implements TestEnvironment {
 
   // For passing as context to assertions
   get provider() {
-    return { id: this.models.default.id };
+    const provider: TestEnvironment['provider'] = {
+      id: this.models.default?.id ?? null,
+    };
+    if (this.models.labeled) {
+      provider.labeled = Object.fromEntries(
+        Object.entries(this.models.labeled).map(([label, provider]) => [
+          label,
+          { id: provider.id },
+        ]),
+      );
+    }
+    return provider;
   }
   get prompt() {
     return this.pipeline;
@@ -66,7 +77,7 @@ export class PipelineEnvironment implements TestEnvironment {
     const stepRunCount: Map<string, number> = new Map<string, number>(); // Track how many times each step has been run
     const modelUpdateGenerator = generator<ModelUpdate, TestOutput>();
 
-    // FIXME: Rate limit at provider level
+    // TODO: Rate limit at provider level
     const taskQueue = new ParallelTaskQueue(6);
     let result: TestOutput | undefined;
     const history: TestOutput['history'] = [];
@@ -95,6 +106,13 @@ export class PipelineEnvironment implements TestEnvironment {
       stepRunCount.set(step.id, count + 1);
       const stepId = step.id + (count > 1 ? ` #${count}` : '');
 
+      const model = step.providerLabel
+        ? this.models.labeled?.[step.providerLabel]
+        : this.models.default;
+      if (!model) {
+        throw new Error(`Model for step ${step.id} not found`);
+      }
+
       // Render the prompt
       const promptFormatter = new HandlebarsPromptFormatter(step.prompt);
       const prompt = await promptFormatter.format(
@@ -104,14 +122,13 @@ export class PipelineEnvironment implements TestEnvironment {
           $history: pipelineContext.history,
           $output: pipelineContext.history[history.length - 1]?.output ?? null,
         },
-        this.models.default.mimeTypes,
+        model.mimeTypes,
       );
 
       // Run the prompt (or read from cache)
-      const model = this.models.default;
       const { request, run } = await model.run(prompt, context);
       const cacheKey = {
-        provider: this.provider.id,
+        provider: model.id,
         request,
         ...(context.cacheKey ?? {}),
         // If re-running a step with the same prompt, use a different cache key?

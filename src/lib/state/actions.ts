@@ -40,6 +40,7 @@ import { FileSystemCache } from '$lib/storage/FileSystemCache';
 import { useCacheStore } from './settings';
 import { PipelineEnvironment } from '$lib/utils/PipelineEnvironment';
 import type { FileReference } from '$lib/storage/FileReference';
+import { LabelNotFoundError, permuteLabeled } from '$lib/utils/permuteLabeled';
 
 const folder = await idb.get<FileSystemDirectoryHandle>('folder');
 if (folder) {
@@ -300,7 +301,22 @@ export async function runTests() {
   const providerManager = new ProviderManager(env);
 
   // Create environments
-  const runEnvs: RunEnv[] = getRunEnvs(globalProviders, globalPrompts);
+  let runEnvs: RunEnv[];
+  try {
+    runEnvs = getRunEnvs(globalProviders, globalPrompts);
+  } catch (err) {
+    if (err instanceof LabelNotFoundError) {
+      await showPrompt({
+        title: 'Missing provider for label',
+        description: [
+          `No provider was found for the label '${err.label.toString()}'. Please update your configuration and try again.`,
+        ],
+        cancelText: null,
+      });
+      return;
+    }
+    throw err;
+  }
   const useCache = get(useCacheStore);
   const cache =
     storage instanceof FileSystemEvalsStorage && useCache
@@ -398,16 +414,58 @@ export async function runTests() {
 }
 
 interface RunEnv {
-  provider: NormalizedProvider;
+  provider: NormalizedProvider | null;
+  labeledProviders?: Record<string, NormalizedProvider>;
   prompt: NormalizedPrompt;
 }
 function getRunEnvs(providers: NormalizedProvider[], prompts: NormalizedPrompt[]): RunEnv[] {
   const envs: RunEnv[] = [];
-  for (const provider of providers) {
-    // First use any provider-specific prompts; otherwise, use the global prompts
-    const providerPrompts: NormalizedPrompt[] = provider.prompts ? provider.prompts : prompts;
-    for (const prompt of providerPrompts) {
-      envs.push({ provider, prompt });
+  for (const prompt of prompts) {
+    if (typeof prompt === 'string') {
+      // For a string prompt, add every provider
+      for (const provider of providers) {
+        envs.push({ provider, prompt });
+      }
+    } else if (typeof prompt === 'object' && 'prompt' in prompt) {
+      // For a labeled prompt, add providers with a matching label
+      const matchingProviders = providers.filter((p) => {
+        if (prompt.providerLabel) {
+          return p.labels?.includes(prompt.providerLabel) ?? false;
+        }
+        return true;
+      });
+      for (const provider of matchingProviders) {
+        envs.push({ provider, prompt: prompt.prompt });
+      }
+    } else if (typeof prompt === 'object' && '$pipeline' in prompt) {
+      // Pipeline
+      // Get the provider labels we need
+      const defaultLabel = Symbol('default');
+      function providerHasLabel(provider: NormalizedProvider, label: string | symbol) {
+        if (typeof label === 'string') {
+          return provider.labels?.includes(label) ?? false;
+        }
+        if (label === defaultLabel) {
+          return provider.labels === undefined;
+        }
+        return false;
+      }
+      const providerLabels = prompt.$pipeline.map((s) => s.providerLabel ?? defaultLabel);
+      for (const permutation of permuteLabeled(
+        new Set(providerLabels),
+        providers,
+        providerHasLabel,
+      )) {
+        const defaultProvider =
+          (permutation[defaultLabel] as NormalizedProvider | undefined) ?? null;
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        delete permutation[defaultLabel];
+        envs.push({
+          provider: defaultProvider,
+          labeledProviders: permutation,
+          prompt: prompt,
+        });
+      }
     }
   }
   return envs;
@@ -420,26 +478,42 @@ function createEnvironments(
 ): TestEnvironment[] {
   const envs: TestEnvironment[] = [];
   for (const env of runEnvs) {
-    const { provider, prompt } = env;
+    const { prompt } = env;
 
-    const model = providerManager.getProvider(provider.id, provider.config);
-    if (typeof prompt === 'string') {
+    if (typeof prompt === 'string' || (typeof prompt === 'object' && 'prompt' in prompt)) {
+      const provider = env.provider;
+      if (!provider) {
+        throw new Error('Cannot run test without a provider');
+      }
+      const model = providerManager.getProvider(provider.id, provider.config);
       envs.push(
         new SimpleEnvironment({
           model,
-          promptFormatter: new HandlebarsPromptFormatter(prompt),
+          promptFormatter: new HandlebarsPromptFormatter(
+            typeof prompt === 'string' ? prompt : prompt.prompt,
+          ),
           cache,
         }),
       );
-    } else {
+    } else if (typeof prompt === 'object' && '$pipeline' in prompt) {
       // Pipeline
+      const defaultModel = env.provider
+        ? providerManager.getProvider(env.provider.id, env.provider.config)
+        : null;
+      const labeledModels = Object.fromEntries(
+        Object.entries(env.labeledProviders ?? {}).map(([label, provider]) => {
+          return [label, providerManager.getProvider(provider.id, provider.config)];
+        }),
+      );
       envs.push(
         new PipelineEnvironment({
-          models: { default: model, labeled: {} },
+          models: { default: defaultModel, labeled: labeledModels },
           pipeline: prompt,
           cache,
         }),
       );
+    } else {
+      throw new Error('Unknown prompt type');
     }
   }
   return envs;

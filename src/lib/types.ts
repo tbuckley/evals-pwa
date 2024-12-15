@@ -22,6 +22,7 @@ export const normalizedProviderConfigSchema = z.object({
 export type NormalizedProviderConfig = z.infer<typeof normalizedProviderConfigSchema>;
 const normalizedProviderSchema = z.object({
   id: z.string(),
+  labels: z.array(z.string()).optional(),
   config: normalizedProviderConfigSchema.passthrough().optional(),
   prompts: z.array(z.string()).optional(),
 });
@@ -33,11 +34,16 @@ export interface NormalizedPipelineStep {
   outputAs?: string;
   if?: string | CodeReference;
   deps?: string[];
+  providerLabel?: string;
 }
 export interface NormalizedPipelinePrompt {
   $pipeline: NormalizedPipelineStep[];
 }
 const simplePromptSchema = z.string();
+const objectPromptSchema = z.object({
+  prompt: z.string(),
+  providerLabel: z.string().optional(),
+});
 export const pipelinePromptSchema = z.object({
   $pipeline: z.array(
     z.union([
@@ -45,6 +51,7 @@ export const pipelinePromptSchema = z.object({
       z.object({
         id: z.string().optional(),
         prompt: z.string(),
+        providerLabel: z.string().optional(),
         outputAs: z.string().optional(),
         if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
         deps: z.array(z.string()).optional(),
@@ -52,7 +59,7 @@ export const pipelinePromptSchema = z.object({
     ]),
   ),
 });
-const promptSchema = z.union([simplePromptSchema, pipelinePromptSchema]);
+const promptSchema = z.union([simplePromptSchema, objectPromptSchema, pipelinePromptSchema]);
 
 export type PipelinePrompt = z.infer<typeof pipelinePromptSchema>;
 export type Var = z.infer<typeof varSchema>;
@@ -60,7 +67,10 @@ export type VarSet = z.infer<typeof varSetSchema>;
 export type Assertion = z.infer<typeof assertionSchema>;
 export type NormalizedProvider = z.infer<typeof normalizedProviderSchema>;
 export type Provider = z.infer<typeof providerSchema>;
-export type NormalizedPrompt = string | NormalizedPipelinePrompt;
+export type NormalizedPrompt =
+  | string
+  | { prompt: string; providerLabel?: string }
+  | NormalizedPipelinePrompt;
 export type NormalizedAssertion = Assertion & Required<Pick<Assertion, 'vars'>>;
 
 export interface NormalizedTestCase {
@@ -142,7 +152,8 @@ const testCaseSchema = z.object({
 export type TestCase = z.infer<typeof testCaseSchema>;
 
 export const envSchema = z.object({
-  provider: providerSchema,
+  provider: providerSchema.nullable(),
+  labeledProviders: z.record(z.string(), providerSchema).optional(),
   prompt: promptSchema,
 });
 export type Env = z.infer<typeof envSchema>;
@@ -208,7 +219,7 @@ export interface ModelProvider {
 
 export interface TestEnvironment {
   run(test: TestCase, context: RunContext): AsyncGenerator<string | ModelUpdate, TestOutput, void>;
-  provider: Pick<NormalizedProvider, 'id'>;
+  provider: { id: string | null; labeled?: Record<string, { id: string }> };
   prompt: NormalizedPrompt;
 }
 
@@ -231,7 +242,10 @@ export type MaybePromise<T> = T | Promise<T>;
 export interface AssertionProvider {
   run(
     output: string | (string | FileReference)[],
-    context: { provider: Pick<NormalizedProvider, 'id'>; prompt: NormalizedPrompt },
+    context: {
+      provider: TestEnvironment['provider'];
+      prompt: TestEnvironment['prompt'];
+    },
   ): MaybePromise<AssertionResult>;
   destroy?: () => void;
 }

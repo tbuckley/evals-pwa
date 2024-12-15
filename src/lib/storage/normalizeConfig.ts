@@ -32,6 +32,9 @@ function normalizePrompt(prompt: FsPrompt): NormalizedPrompt {
     // If it's a conversation, encode it as a yaml string
     return yaml.stringify(prompt);
   }
+  if (typeof prompt === 'object' && 'prompt' in prompt) {
+    return prompt;
+  }
   return { $pipeline: prompt.$pipeline.map((step, index) => normalizePipelineStep(step, index)) };
 }
 
