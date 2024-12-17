@@ -1,5 +1,5 @@
-import { pipelinePromptSchema } from '$lib/types';
 import { z } from 'zod';
+import { CodeReference } from './CodeReference';
 
 // Schemas & types for validating files match the expected structure
 
@@ -26,19 +26,36 @@ export const fsExpandedProviderSchema = z.object({
 });
 export const fsProviderSchema = z.union([z.string(), fsExpandedProviderSchema]);
 
+export const fsConvoPromptSchema = z.array(
+  z.union([
+    z.object({ system: z.string() }),
+    z.object({ user: z.string() }),
+    z.object({ assistant: z.string() }),
+  ]),
+);
+export const fsPipelinePromptSchema = z.object({
+  $pipeline: z.array(
+    z.union([
+      z.string(),
+      fsConvoPromptSchema,
+      z.object({
+        id: z.string().optional(),
+        prompt: z.union([z.string(), fsConvoPromptSchema]),
+        providerLabel: z.string().optional(),
+        outputAs: z.string().optional(),
+        if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
+        deps: z.array(z.string()).optional(),
+      }),
+    ]),
+  ),
+});
 export const fsPromptSchema = z.union([
   z.string(),
   z.object({ prompt: z.string(), providerLabel: z.string().optional() }),
-  z.array(
-    z.union([
-      z.object({ system: z.string() }),
-      z.object({ user: z.string() }),
-      z.object({ assistant: z.string() }),
-    ]),
-  ),
-  pipelinePromptSchema,
+  fsConvoPromptSchema,
+  fsPipelinePromptSchema,
 ]);
-export type FsPipelinePrompt = z.infer<typeof pipelinePromptSchema>;
+export type FsPipelinePrompt = z.infer<typeof fsPipelinePromptSchema>;
 export type FsPrompt = z.infer<typeof fsPromptSchema>;
 
 export const fsTestCaseSchema = z.object({

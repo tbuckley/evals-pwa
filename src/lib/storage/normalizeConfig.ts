@@ -48,9 +48,16 @@ function normalizePipelineStep(
       prompt: step,
     };
   }
+  if (Array.isArray(step)) {
+    return {
+      id: `step-${index}`,
+      prompt: yaml.stringify(step),
+    };
+  }
   return {
     id: `step-${index}`, // Provide a default ID
     ...step,
+    prompt: Array.isArray(step.prompt) ? yaml.stringify(step.prompt) : step.prompt,
   };
 }
 
