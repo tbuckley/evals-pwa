@@ -20,6 +20,7 @@ export type FsAssertion = z.infer<typeof fsAssertionSchema>;
 
 export const fsExpandedProviderSchema = z.object({
   id: z.string(),
+  labels: z.array(z.string()).optional(),
   config: z.object({}).passthrough().optional(),
   prompts: z.array(z.string()).optional(),
 });
@@ -27,6 +28,7 @@ export const fsProviderSchema = z.union([z.string(), fsExpandedProviderSchema]);
 
 export const fsPromptSchema = z.union([
   z.string(),
+  z.object({ prompt: z.string(), providerLabel: z.string().optional() }),
   z.array(
     z.union([
       z.object({ system: z.string() }),

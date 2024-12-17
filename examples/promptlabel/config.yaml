@@ -1,0 +1,15 @@
+description: Test of prompt labels
+
+providers:
+  - id: gemini:gemini-1.5-pro-latest
+    labels: ['gemini']
+  - id: gemini:gemini-1.5-flash-latest
+    labels: ['gemini']
+  - id: openai:gpt-4o-mini
+    labels: ['openai']
+
+prompts:
+  - prompt: Say "Hello, Gemini"
+    label: gemini
+  - prompt: Say "Hello, OpenAI"
+    label: openai

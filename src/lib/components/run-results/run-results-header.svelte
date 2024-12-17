@@ -6,13 +6,27 @@
   export let env: Env;
   export let height: Readable<RowHeight>;
 
-  $: providerId = typeof env.provider === 'string' ? env.provider : env.provider.id;
+  $: providerSummary = getProviderSummary(env);
+
+  function getProviderSummary(env: Env): string {
+    const parts: string[] = [];
+    if (env.provider) {
+      parts.push(typeof env.provider === 'string' ? env.provider : env.provider.id);
+    }
+    if (env.labeledProviders) {
+      parts.push(
+        ...Object.entries(env.labeledProviders).map(
+          ([label, provider]) =>
+            `${label}: ${typeof provider === 'string' ? provider : provider.id}`,
+        ),
+      );
+    }
+    return parts.join('\n');
+  }
 </script>
 
 <div class="flex flex-col gap-1">
-  <div class="font-medium">
-    {providerId}
-  </div>
+  <div class="whitespace-pre-wrap font-medium">{providerSummary}</div>
   <div
     class="overflow:hidden whitespace-pre-wrap text-sm text-muted-foreground"
     class:whitespace-nowrap={$height === 'minimal'}

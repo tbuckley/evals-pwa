@@ -53,7 +53,7 @@ interface Config {
   config?: any;
   // ...
 }
-type Provider = string | { id: string; prompts?: Prompt[] };
+type Provider = string | { id: string; config?: any; labels?: string[] };
 ```
 
 Currently supported model providers:
@@ -104,12 +104,18 @@ Any config will be included as additional properties in the API request. See <ht
 
 Equivalent to OpenAI Config.
 
+#### Labels
+
+Labels are used to limit providers to a subset of prompts.
+
+With pipelines, you can specify a `providerLabel` to limit which providers can run that step. Every possible permutation of providers that meets the needs of the pipeline will be run.
+
 ### Prompts
 
 Format:
 
 ```typescript
-type Prompt = string;
+type Prompt = string | { prompt: string; providerLabel?: string };
 interface Config {
   prompts: Prompt[];
   // ...
@@ -237,7 +243,8 @@ execute(output: string | ArrayOutput, context: Context): MaybePromise<AssertionR
 type ArrayOutput = Array<string | { file: File; uri: string }>; // Used for DALL-E
 type Context = {
   vars: Record<string, unknown>; // Test case vars
-  provider: { id: string }; // Provider
+  provider: { id: string | null; labeled?: Record<string, { id: string }> }; // Provider
+  // Labeled providers are only used for pipeline prompts
   prompt: Prompt; // Prompt
 };
 ```

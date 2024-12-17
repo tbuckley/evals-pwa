@@ -1,0 +1,29 @@
+description: Pipeline example with a loop
+
+providers:
+  - id: gemini:gemini-1.5-flash-latest
+    labels: ['a']
+  - id: openai:gpt-4o-mini
+    labels: ['b']
+
+prompts:
+  - $pipeline:
+      - deps: []
+        prompt: "Pick a random name for a person starting with the letter '{{letter}}'. Return the name and nothing else."
+        outputAs: name
+        providerLabel: a
+      - deps: []
+        prompt: "Pick a random job a person might have starting with the letter '{{letter}}'. Return the job and nothing else."
+        outputAs: job
+        providerLabel: b
+      - deps: ['name', 'job']
+        prompt: 'Write a short bio for {{name}} who works as a {{job}}.'
+        providerLabel: a
+
+tests:
+  - vars:
+      letter: B
+  - vars:
+      letter: J
+  - vars:
+      letter: P
