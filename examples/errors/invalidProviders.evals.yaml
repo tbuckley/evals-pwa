@@ -1,0 +1,5 @@
+providers:
+  - unknown:provider
+
+prompts:
+  - What's the capital of France?

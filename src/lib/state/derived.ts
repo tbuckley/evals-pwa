@@ -5,6 +5,7 @@ import { envStore } from './env';
 import type { LiveResult, LiveRun, Run } from '$lib/types';
 import { getVarNamesForTests } from '$lib/utils/testCase';
 import { summarizeResults } from '$lib/utils/summarizeResults';
+import { alertStore } from './ui';
 
 function parseEnvText(env: string): Record<string, string> {
   // Given a series of key=value pairs separated by newlines, create an object
@@ -35,11 +36,24 @@ export const requiredEnvStore = derived(configStore, ($config) => {
   const requiredEnvVars = new Set<string>();
   const providers = $config?.providers ?? [];
   const mgr = new ProviderManager({});
+
   for (const provider of providers) {
     const providerId = typeof provider === 'string' ? provider : provider.id;
-    const envVars = mgr.getRequiredEnvVars(providerId);
-    for (const envVar of envVars) {
-      requiredEnvVars.add(envVar);
+    try {
+      const envVars = mgr.getRequiredEnvVars(providerId);
+      for (const envVar of envVars) {
+        requiredEnvVars.add(envVar);
+      }
+    } catch {
+      alertStore.set({
+        title: 'Invalid provider',
+        description: [`The provider '${providerId}' is not available. Please check your config.`],
+        callback: () => {
+          console.log('closed');
+        },
+        cancelText: null,
+      });
+      return [];
     }
   }
 
