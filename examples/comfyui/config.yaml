@@ -1,0 +1,20 @@
+description: Test ComfyUI integration
+
+providers:
+  - id: comfyui:test
+    config:
+      apiBaseUrl: http://localhost:8188
+
+prompts:
+  =gen: |-
+    function execute({ prompts }) {
+      return prompts.map(p => JSON.stringify(p));
+    }
+  args:
+    prompts:
+      - file:///invert.json
+
+tests:
+  - description: Image file
+    vars:
+      image: file:///puppy.jpg
