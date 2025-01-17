@@ -1,0 +1,31 @@
+{
+  "1": {
+    "inputs": {
+      "image": "{{image}}",
+      "upload": "image"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "2": {
+    "inputs": {
+      "image": ["1", 0]
+    },
+    "class_type": "ImageInvert",
+    "_meta": {
+      "title": "Invert Image"
+    }
+  },
+  "3": {
+    "inputs": {
+      "filename_prefix": "test_workflow",
+      "images": ["2", 0]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  }
+}

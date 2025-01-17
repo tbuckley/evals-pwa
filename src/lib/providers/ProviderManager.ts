@@ -7,6 +7,7 @@ import { OllamaProvider } from './ollama';
 import { WebLlm } from './web-llm';
 import { AnthropicProvider } from './anthropic';
 import { DalleProvider } from './dalle';
+import { ComfyuiProvider } from './comfyui';
 
 export class ProviderManager {
   constructor(public env: Record<string, string>) {}
@@ -54,6 +55,8 @@ export class ProviderManager {
         (config as OpenaiConfig).apiBaseUrl = this.env.OLLAMA_ENDPOINT;
       }
       return new OllamaProvider(modelName, 'no-key', config);
+    } else if (providerId === 'comfyui') {
+      return new ComfyuiProvider(modelName, config);
     }
     throw new Error(`Unknown provider: ${providerId}`);
   }
@@ -78,6 +81,8 @@ export class ProviderManager {
     } else if (providerId === 'ollama') {
       return ['OLLAMA_ENDPOINT'];
     } else if (providerId === 'web-llm') {
+      return [];
+    } else if (providerId === 'comfyui') {
       return [];
     }
     throw new Error(`Unknown provider: ${providerId}`);

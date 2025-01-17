@@ -224,7 +224,7 @@ async function hashBlob(blob: Blob): Promise<string> {
 
 function getFileExtension(blob: Blob): string {
   if (blob instanceof File) {
-    return /[^.]*?$/.exec(blob.name)?.[0] ?? '';
+    return /.*(\.[^.]*?)$/.exec(blob.name)?.[1] ?? '';
   }
   const extensionMap: Record<string, string> = {
     'image/png': '.png',
