@@ -211,9 +211,12 @@ export class AnthropicProvider implements ModelProvider {
 function getCost(model: string, prompt: number, completion: number): number | undefined {
   // As of July 18 2024
   let inputCostPerMillion: number, outputCostPerMillion: number;
-  if (model.startsWith('claude-3-5-sonnet')) {
+  if (model.startsWith('claude-3-5-sonnet') || model.startsWith('claude-3-7-haiku')) {
     inputCostPerMillion = 3;
     outputCostPerMillion = 15;
+  } else if (model.startsWith('claude-3-5-haiku')) {
+    inputCostPerMillion = 0.8;
+    outputCostPerMillion = 4;
   } else if (model.startsWith('claude-3-opus')) {
     inputCostPerMillion = 15;
     outputCostPerMillion = 75;

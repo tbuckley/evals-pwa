@@ -161,15 +161,24 @@ export class OpenaiProvider implements ModelProvider {
 function getCost(model: string, prompt: number, completion: number): number | undefined {
   // As of July 18 2024
   let inputCostPerMillion: number, outputCostPerMillion: number;
-  if (model.startsWith('gpt-4o-mini')) {
+  if (model.startsWith('gpt-4.5')) {
+    inputCostPerMillion = 75;
+    outputCostPerMillion = 150;
+  } else if (model.startsWith('o1-mini') || model.startsWith('o3-mini')) {
+    inputCostPerMillion = 1.1;
+    outputCostPerMillion = 4.4;
+  } else if (model.startsWith('o1') || model.startsWith('o1-preview')) {
+    inputCostPerMillion = 15;
+    outputCostPerMillion = 60;
+  } else if (model.startsWith('gpt-4o-mini')) {
     inputCostPerMillion = 0.15;
     outputCostPerMillion = 0.6;
   } else if (model.startsWith('gpt-4o-2024-08-06')) {
     inputCostPerMillion = 2.5;
     outputCostPerMillion = 10;
   } else if (model.startsWith('gpt-4o')) {
-    inputCostPerMillion = 5;
-    outputCostPerMillion = 15;
+    inputCostPerMillion = 2.5;
+    outputCostPerMillion = 10;
   } else if (model.startsWith('gpt-4-turbo')) {
     inputCostPerMillion = 10;
     outputCostPerMillion = 30;

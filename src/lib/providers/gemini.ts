@@ -228,9 +228,18 @@ function getCost(model: string, prompt: number, completion: number): number | un
   // As of July 13 2024
   // Note that both costs differ if the prompt is >128k tokens
   let inputCostPerMillion: number, outputCostPerMillion: number;
-  if (model.startsWith('gemini-1.5-pro')) {
-    inputCostPerMillion = prompt > 128_000 ? 7 : 3.5;
-    outputCostPerMillion = prompt > 128_000 ? 21 : 10.5;
+  if (model.startsWith('gemini-2.0-flash-lite')) {
+    inputCostPerMillion = 0.075;
+    outputCostPerMillion = 0.03;
+  } else if (model.startsWith('gemini-2.0-flash')) {
+    inputCostPerMillion = 0.1;
+    outputCostPerMillion = 0.4;
+  } else if (model.startsWith('gemini-1.5-pro')) {
+    inputCostPerMillion = prompt > 128_000 ? 2.5 : 1.25;
+    outputCostPerMillion = prompt > 128_000 ? 10 : 5;
+  } else if (model.startsWith('gemini-1.5-flash-8b')) {
+    inputCostPerMillion = prompt > 128_000 ? 0.075 : 0.037;
+    outputCostPerMillion = prompt > 128_000 ? 0.3 : 0.15;
   } else if (model.startsWith('gemini-1.5-flash')) {
     inputCostPerMillion = prompt > 128_000 ? 0.15 : 0.075;
     outputCostPerMillion = prompt > 128_000 ? 0.6 : 0.3;
