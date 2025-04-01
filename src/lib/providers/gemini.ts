@@ -158,6 +158,7 @@ export class GeminiProvider implements ModelProvider {
 
     const { apiKey, model } = this;
     const extractOutput = this.extractOutput.bind(this);
+    const getResponseParts = this.getResponseParts.bind(this);
     return {
       request,
       run: async function* () {
@@ -176,13 +177,29 @@ export class GeminiProvider implements ModelProvider {
           throw new Error(`Failed to run model: ${resp.statusText}`);
         }
         const stream = resp.body;
-        let fullText = '';
+        const fullResponse: Part[] = [];
+
         let lastResponseJson: unknown;
         if (!stream) throw new Error(`Failed to run model: no response`);
         for await (const value of sse(resp)) {
           lastResponseJson = JSON.parse(value);
-          const text = extractOutput(lastResponseJson);
-          fullText += text;
+          const parts = getResponseParts(lastResponseJson);
+          for (const part of parts) {
+            // Try appending text to the last part if it's also text
+            if (
+              'text' in part &&
+              fullResponse.length > 0 &&
+              'text' in fullResponse[fullResponse.length - 1]
+            ) {
+              (fullResponse[fullResponse.length - 1] as { text: string }).text += part.text;
+            } else {
+              fullResponse.push(part);
+            }
+          }
+
+          const output = extractOutput(lastResponseJson);
+          // FIXME: also allow streaming image output
+          const text = output.filter((o): o is string => typeof o === 'string').join('');
           yield text;
         }
 
@@ -190,24 +207,39 @@ export class GeminiProvider implements ModelProvider {
         if (!parsed.candidates[0].content.parts) {
           parsed.candidates[0].content.parts = [];
         }
-        parsed.candidates[0].content.parts[0] = { text: fullText };
+        parsed.candidates[0].content.parts = fullResponse;
         return parsed;
       },
     };
   }
 
-  extractOutput(response: unknown): string {
+  private getResponseParts(response: unknown): Part[] {
     const json = generateContentResponseSchema.parse(response);
     const firstCandidateContent = json.candidates[0].content;
     if (!firstCandidateContent.parts) {
-      return ''; // Sometimes it is empty at the end of the stream
+      return []; // Sometimes it is empty at the end of the stream
     }
+    return firstCandidateContent.parts;
+  }
 
-    const firstCandidatePart = firstCandidateContent.parts[0];
-    if ('text' in firstCandidatePart) {
-      return firstCandidatePart.text;
-    }
-    throw new Error('Unexpected output format');
+  extractOutput(response: unknown): (string | Blob)[] {
+    const parts = this.getResponseParts(response);
+
+    return parts.map((part): string | Blob => {
+      if ('text' in part) {
+        return part.text;
+      }
+      if ('inlineData' in part) {
+        const byteCharacters = atob(part.inlineData.data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        return new Blob([byteArray], { type: part.inlineData.mimeType });
+      }
+      throw new Error('Unexpected output format');
+    });
   }
 
   extractTokenUsage(response: unknown): TokenUsage {
