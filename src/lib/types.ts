@@ -200,7 +200,7 @@ export interface RunContext {
 
 export interface ModelUpdate {
   type: 'replace' | 'append';
-  output: string; // TODO support FileReference too
+  output: string | FileReference;
   internalId?: string; // Unique ID for the update, used for history
 }
 

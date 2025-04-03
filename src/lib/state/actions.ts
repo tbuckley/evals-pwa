@@ -592,11 +592,15 @@ async function runTest(
         result.update((state) =>
           applyModelUpdate(state, update.internalId, (output) => {
             output = [...output]; // Copy so we don't mutate the original
-            let lastOutputString = '';
-            if (output.length > 0 && typeof output[output.length - 1] === 'string') {
-              lastOutputString = output.pop() as string;
+            if (typeof update.output === 'string') {
+              let lastOutputString = '';
+              if (output.length > 0 && typeof output[output.length - 1] === 'string') {
+                lastOutputString = output.pop() as string;
+              }
+              return [...output, lastOutputString + update.output];
+            } else {
+              return [...output, update.output];
             }
-            return [...output, lastOutputString + update.output];
           }),
         );
       } else {

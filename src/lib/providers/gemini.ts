@@ -10,6 +10,7 @@ import type {
 import { sse } from '$lib/utils/sse';
 import { fileToBase64 } from '$lib/utils/media';
 import { z } from 'zod';
+import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 
 export const partSchema = z.union([
   z.object({ text: z.string() }),
@@ -198,9 +199,13 @@ export class GeminiProvider implements ModelProvider {
           }
 
           const output = extractOutput(lastResponseJson);
-          // FIXME: also allow streaming image output
-          const text = output.filter((o): o is string => typeof o === 'string').join('');
-          yield text;
+          for (const part of output) {
+            if (typeof part === 'string') {
+              yield { type: 'append', output: part };
+            } else {
+              yield { type: 'append', output: await blobToFileReference(part) };
+            }
+          }
         }
 
         const parsed = generateContentResponseSchema.parse(lastResponseJson);
