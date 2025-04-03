@@ -96,6 +96,16 @@ providers:
 
 Any config will be included as additional properties in the API request. See <https://ai.google.dev/api/generate-content#request-body>
 
+For Gemini 2.0 Flash image generation (currently experimental as of 2025-04-02), you can enable it with the following config:
+
+```yaml
+providers:
+  - id: gemini:gemini-2.0-flash-exp-image-generation
+    config:
+      generationConfig:
+        responseModalities: ['Text', 'Image']
+```
+
 **OpenAI Config**
 
 - `apiBaseUrl` -- the base for the API endpoint, default: `https://api.openai.com`
