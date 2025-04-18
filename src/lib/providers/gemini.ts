@@ -265,7 +265,15 @@ function getCost(model: string, prompt: number, completion: number): number | un
   // As of July 13 2024
   // Note that both costs differ if the prompt is >128k tokens
   let inputCostPerMillion: number, outputCostPerMillion: number;
-  if (model.startsWith('gemini-2.0-flash-lite')) {
+  if (model.startsWith('gemini-2.5-pro')) {
+    inputCostPerMillion = prompt <= 200_000 ? 1.25 : 2.5;
+    outputCostPerMillion = prompt <= 200_000 ? 10 : 15;
+  } else if (model.startsWith('gemini-2.5-flash')) {
+    // TODO: depends on audio vs other media
+    inputCostPerMillion = 0.15; // Or 1.0 for audio
+    // TODO: depends on thinking vs non-thinking
+    outputCostPerMillion = 0.6; // Or 3.5 for thinking
+  } else if (model.startsWith('gemini-2.0-flash-lite')) {
     inputCostPerMillion = 0.075;
     outputCostPerMillion = 0.03;
   } else if (model.startsWith('gemini-2.0-flash')) {
