@@ -52,7 +52,7 @@ export class SimpleEnvironment implements TestEnvironment {
       throw e;
     }
 
-    const { request, run } = await this.model.run(prompt, context);
+    const { request, runModel } = await this.model.run(prompt, context);
 
     const cacheKey = {
       provider: this.provider.id,
@@ -60,7 +60,12 @@ export class SimpleEnvironment implements TestEnvironment {
       ...(context.cacheKey ?? {}),
     };
 
-    const { response, latencyMillis } = yield* maybeUseCache(this.cache, cacheKey, run);
+    const { response, latencyMillis } = yield* maybeUseCache(
+      this.cache,
+      cacheKey,
+      runModel,
+      this.model.requestSemaphore,
+    );
 
     let output: NonNullable<TestOutput['output']>;
     let tokenUsage: TokenUsage;

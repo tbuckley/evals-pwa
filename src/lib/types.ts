@@ -2,6 +2,7 @@ import type { Readable } from 'svelte/store';
 import { z } from 'zod';
 import { FileReference } from './storage/FileReference';
 import { CodeReference } from './storage/CodeReference';
+import type { Semaphore } from './utils/semaphore';
 
 const varSchema = z.any();
 
@@ -211,10 +212,11 @@ export interface ModelProvider {
   run(
     prompt: ConversationPrompt,
     context: RunContext,
-  ): MaybePromise<{ request: unknown; run: ModelGenerator }>;
+  ): MaybePromise<{ request: unknown; runModel: ModelGenerator }>;
   extractOutput(response: unknown): MaybePromise<string | (string | Blob)[]>;
   extractTokenUsage(response: unknown): TokenUsage;
   mimeTypes?: string[];
+  requestSemaphore?: Semaphore;
 }
 
 export interface TestEnvironment {

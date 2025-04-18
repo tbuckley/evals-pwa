@@ -1,6 +1,7 @@
 import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 import type { ModelCache, ModelUpdate, TestResult } from '$lib/types';
 import { z } from 'zod';
+import type { Semaphore } from './semaphore';
 
 const cacheValueSchema = z.object({
   latencyMillis: z.number(),
@@ -15,7 +16,8 @@ function isValidCacheValue(value: unknown): value is CacheValue {
 export async function* maybeUseCache(
   cache: ModelCache | undefined,
   key: unknown,
-  run: () => AsyncGenerator<string | ModelUpdate, unknown, void>,
+  runModel: () => AsyncGenerator<string | ModelUpdate, unknown, void>,
+  semaphore?: Semaphore,
 ): AsyncGenerator<
   string | ModelUpdate,
   { latencyMillis: number; response: unknown; fromCache: boolean },
@@ -32,10 +34,15 @@ export async function* maybeUseCache(
     };
   }
 
+  // Wait to acquire the semaphore before running the model
+  await semaphore?.acquire();
   const start = Date.now();
-  const response = yield* run();
+  const response = yield* runModel();
 
   const latencyMillis = Date.now() - start;
+
+  // Release the semaphore after running the model
+  semaphore?.release();
 
   await cache?.set(key, {
     latencyMillis,
