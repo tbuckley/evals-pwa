@@ -327,7 +327,7 @@ export async function runTests() {
   // Run tests
   const abortController = new AbortController();
   const results: LiveRun['results'] = [];
-  const runner = new ParallelTaskQueue(5);
+  const runner = new ParallelTaskQueue(config.options?.maxConcurrency ?? Infinity);
   const mgr = new AssertionManager(providerManager, abortController.signal);
   try {
     for (const test of globalTests) {
@@ -556,15 +556,20 @@ async function runTest(
   result: Writable<LiveResult>,
   context: RunContext,
 ): Promise<void> {
-  result.update((state) => ({
-    ...state,
-    state: 'in-progress',
-  }));
   // TODO should this be safeRun if it will catch all errors?
   const generator = env.run(test.vars, context);
   let next;
+  let started = false;
   while (!next?.done) {
     next = await generator.next();
+    if (!started) {
+      // Wait for the model to respond before marking as in-progress
+      result.update((state) => ({
+        ...state,
+        state: 'in-progress',
+      }));
+      started = true;
+    }
     if (!next.done) {
       if (typeof next.value === 'string') {
         const delta = next.value;
@@ -586,7 +591,6 @@ async function runTest(
         result.update((state) =>
           applyModelUpdate(state, update.internalId, (_output) => [update.output]),
         );
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       } else if (next.value.type === 'append') {
         const update = next.value;
         result.update((state) =>
@@ -603,6 +607,9 @@ async function runTest(
             }
           }),
         );
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      } else if (next.value.type === 'begin-stream') {
+        // Do nothing
       } else {
         throw new Error('Unknown model update type');
       }

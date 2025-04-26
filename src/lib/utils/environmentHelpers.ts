@@ -36,6 +36,7 @@ export async function* maybeUseCache(
 
   // Wait to acquire the semaphore before running the model
   await semaphore?.acquire();
+  yield { type: 'begin-stream' }; // Signal that we're starting the request
   const start = Date.now();
   const response = yield* runModel();
 

@@ -141,7 +141,7 @@ export class PipelineEnvironment implements TestEnvironment {
         const update = nextRes.value;
         if (typeof update === 'string') {
           modelUpdateGenerator.yield({ type: 'append', output: update, internalId: stepId });
-        } else {
+        } else if (update.type !== 'begin-stream') {
           modelUpdateGenerator.yield({ ...update, internalId: stepId });
         }
         nextRes = await generator.next();

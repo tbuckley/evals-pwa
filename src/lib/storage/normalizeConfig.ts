@@ -14,6 +14,7 @@ export function normalizeConfig(config: FsConfig): NormalizedConfig {
     providers: normalizeProviders(config.providers),
     prompts: normalizePrompts(config.prompts),
     tests: normalizeTestCases(config.tests, config.defaultTest),
+    options: config.options,
   };
 }
 
