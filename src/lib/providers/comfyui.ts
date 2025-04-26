@@ -3,7 +3,6 @@ import { FileReference } from '$lib/storage/FileReference';
 import {
   normalizedProviderConfigSchema,
   type ConversationPrompt,
-  type ModelGenerator,
   type ModelProvider,
   type RunContext,
   type TokenUsage,
@@ -33,10 +32,7 @@ export class ComfyuiProvider implements ModelProvider {
 
   mimeTypes = ['*/*'];
 
-  run(
-    conversation: ConversationPrompt,
-    context: RunContext,
-  ): { request: unknown; run: ModelGenerator } {
+  run(conversation: ConversationPrompt, context: RunContext) {
     if (conversation.length > 1 || conversation[0].role !== 'user') {
       throw new Error('Invalid ComfyUI prompt, must not be a conversation');
     }
@@ -68,7 +64,7 @@ export class ComfyuiProvider implements ModelProvider {
         prompt,
         files,
       },
-      run: async function* run() {
+      runModel: async function* run() {
         yield '';
 
         // Upload the files

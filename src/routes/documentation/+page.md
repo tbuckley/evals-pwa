@@ -310,6 +310,21 @@ The UI will display the following:
 - **Numbers:** The average value of all outputs with the same key.
 - **Booleans:** The percentage of outputs with the same key that are `true`.
 
+### Options
+
+```typescript
+interface Config {
+  // ...
+  options?: {
+    maxConcurrency?: number;
+  };
+}
+```
+
+Set global options for the configuration:
+
+- `maxConcurrency` -- set the maximum number of tests that can execute in parallel. Defaults to `Infinity`. (Note: each Provider may have its own concurrency limit, e.g. browsers only allow 6 connections in parallel).
+
 ## Run Format
 
 When you run tests, the results will be saved in a `runs/` folder within your selected folder.

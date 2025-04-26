@@ -7,8 +7,12 @@ import {
   type TokenUsage,
 } from '$lib/types';
 import { fileToBase64 } from '$lib/utils/media';
+import { Semaphore } from '$lib/utils/semaphore';
 import { sse } from '$lib/utils/sse';
 import { z } from 'zod';
+import { CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN } from './common';
+
+const OPENAI_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
 
 const generateContentResponseSchema = z.object({
   id: z.string(),
@@ -66,6 +70,10 @@ export class OpenaiProvider implements ModelProvider {
     return `openai:${this.model}`;
   }
 
+  get requestSemaphore(): Semaphore {
+    return OPENAI_SEMAPHORE;
+  }
+
   mimeTypes = [
     // Image
     'image/png',
@@ -91,7 +99,7 @@ export class OpenaiProvider implements ModelProvider {
     const extractDeltaOutput = this.extractDeltaOutput.bind(this);
     return {
       request,
-      run: async function* () {
+      runModel: async function* () {
         yield '';
         const resp = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
           method: 'POST',

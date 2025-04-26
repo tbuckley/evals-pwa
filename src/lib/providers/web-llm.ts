@@ -75,7 +75,7 @@ export class WebLlm implements ModelProvider {
     const { model } = this;
     return {
       request,
-      run: async function* () {
+      runModel: async function* () {
         const progress = generator<InitProgressReport, null>();
         let cacheEntry;
         let engine;

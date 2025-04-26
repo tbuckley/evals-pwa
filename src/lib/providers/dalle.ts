@@ -58,7 +58,7 @@ export class DalleProvider implements ModelProvider {
     const { apiKey } = this;
     return {
       request,
-      run: async function* () {
+      runModel: async function* () {
         yield '';
         const resp = await fetch(`https://api.openai.com/v1/images/generations`, {
           method: 'POST',

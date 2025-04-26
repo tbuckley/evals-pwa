@@ -126,7 +126,7 @@ export class PipelineEnvironment implements TestEnvironment {
       );
 
       // Run the prompt (or read from cache)
-      const { request, run } = await model.run(prompt, context);
+      const { request, runModel } = await model.run(prompt, context);
       const cacheKey = {
         provider: model.id,
         request,
@@ -135,13 +135,13 @@ export class PipelineEnvironment implements TestEnvironment {
         ...(count > 1 ? { pipelineCount: count } : {}),
         // TODO: If multiple steps share a prompt, use different cache keys
       };
-      const generator = maybeUseCache(this.cache, cacheKey, run);
+      const generator = maybeUseCache(this.cache, cacheKey, runModel, model.requestSemaphore);
       let nextRes = await generator.next();
       while (!nextRes.done) {
         const update = nextRes.value;
         if (typeof update === 'string') {
           modelUpdateGenerator.yield({ type: 'append', output: update, internalId: stepId });
-        } else {
+        } else if (update.type !== 'begin-stream') {
           modelUpdateGenerator.yield({ ...update, internalId: stepId });
         }
         nextRes = await generator.next();

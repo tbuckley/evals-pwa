@@ -1,7 +1,7 @@
 import type {
   ConversationPrompt,
-  ModelGenerator,
   ModelProvider,
+  ModelUpdate,
   MultiPartPrompt,
   NormalizedProviderConfig,
   RunContext,
@@ -11,6 +11,10 @@ import { sse } from '$lib/utils/sse';
 import { fileToBase64 } from '$lib/utils/media';
 import { z } from 'zod';
 import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
+import { Semaphore } from '$lib/utils/semaphore';
+import { CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN } from './common';
+
+const GEMINI_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
 
 export const partSchema = z.union([
   z.object({ text: z.string() }),
@@ -109,6 +113,10 @@ export class GeminiProvider implements ModelProvider {
     return `gemini:${this.model}`;
   }
 
+  get requestSemaphore(): Semaphore {
+    return GEMINI_SEMAPHORE;
+  }
+
   mimeTypes = [
     // Image
     'image/png',
@@ -140,10 +148,7 @@ export class GeminiProvider implements ModelProvider {
     'application/pdf',
   ];
 
-  async run(
-    conversation: ConversationPrompt,
-    context: RunContext,
-  ): Promise<{ request: unknown; run: ModelGenerator }> {
+  async run(conversation: ConversationPrompt, context: RunContext) {
     const contents = await conversationToGemini(conversation);
     const systemContent = await conversationToSystemContent(conversation);
     const extensions: { systemInstruction?: Content } = {};
@@ -162,7 +167,7 @@ export class GeminiProvider implements ModelProvider {
     const getResponseParts = this.getResponseParts.bind(this);
     return {
       request,
-      run: async function* () {
+      runModel: async function* () {
         const resp = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
           {
@@ -201,9 +206,9 @@ export class GeminiProvider implements ModelProvider {
           const output = extractOutput(lastResponseJson);
           for (const part of output) {
             if (typeof part === 'string') {
-              yield { type: 'append', output: part };
+              yield { type: 'append', output: part } as ModelUpdate;
             } else {
-              yield { type: 'append', output: await blobToFileReference(part) };
+              yield { type: 'append', output: await blobToFileReference(part) } as ModelUpdate;
             }
           }
         }

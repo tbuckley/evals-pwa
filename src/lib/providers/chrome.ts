@@ -36,7 +36,7 @@ export class ChromeProvider implements ModelProvider {
 
     return {
       request,
-      run: async function* () {
+      runModel: async function* () {
         yield '';
         if (!window.ai?.languageModel) {
           throw new Error('window.ai.languageModel not supported in this browser');

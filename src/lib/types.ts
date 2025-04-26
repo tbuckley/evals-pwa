@@ -2,6 +2,7 @@ import type { Readable } from 'svelte/store';
 import { z } from 'zod';
 import { FileReference } from './storage/FileReference';
 import { CodeReference } from './storage/CodeReference';
+import type { Semaphore } from './utils/semaphore';
 
 const varSchema = z.any();
 
@@ -61,6 +62,11 @@ export const pipelinePromptSchema = z.object({
 });
 const promptSchema = z.union([simplePromptSchema, objectPromptSchema, pipelinePromptSchema]);
 
+export const globalOptionsSchema = z.object({
+  maxConcurrency: z.number().int().positive().optional(),
+});
+export type GlobalOptions = z.infer<typeof globalOptionsSchema>;
+
 export type PipelinePrompt = z.infer<typeof pipelinePromptSchema>;
 export type Var = z.infer<typeof varSchema>;
 export type VarSet = z.infer<typeof varSetSchema>;
@@ -87,6 +93,7 @@ export interface NormalizedConfig {
   providers: NormalizedProvider[];
   prompts: NormalizedPrompt[];
   tests: NormalizedTestCase[];
+  options?: GlobalOptions;
 }
 
 // Output
@@ -198,11 +205,13 @@ export interface RunContext {
   cacheKey?: Record<string, unknown>;
 }
 
-export interface ModelUpdate {
-  type: 'replace' | 'append';
-  output: string | FileReference;
-  internalId?: string; // Unique ID for the update, used for history
-}
+export type ModelUpdate =
+  | {
+      type: 'replace' | 'append';
+      output: string | FileReference;
+      internalId?: string; // Unique ID for the update, used for history
+    }
+  | { type: 'begin-stream' };
 
 export type ModelGenerator = () => AsyncGenerator<string | ModelUpdate, unknown, void>;
 
@@ -211,10 +220,11 @@ export interface ModelProvider {
   run(
     prompt: ConversationPrompt,
     context: RunContext,
-  ): MaybePromise<{ request: unknown; run: ModelGenerator }>;
+  ): MaybePromise<{ request: unknown; runModel: ModelGenerator }>;
   extractOutput(response: unknown): MaybePromise<string | (string | Blob)[]>;
   extractTokenUsage(response: unknown): TokenUsage;
   mimeTypes?: string[];
+  requestSemaphore?: Semaphore;
 }
 
 export interface TestEnvironment {

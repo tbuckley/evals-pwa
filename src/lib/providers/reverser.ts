@@ -16,7 +16,7 @@ export class ReverserProvider implements ModelProvider {
     return {
       request: { input: text },
       // eslint-disable-next-line @typescript-eslint/require-await
-      run: async function* () {
+      runModel: async function* () {
         yield '';
         return { reversed: reverseString(text) };
       },

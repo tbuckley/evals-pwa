@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CodeReference } from './CodeReference';
+import { globalOptionsSchema } from '$lib/types';
 
 // Schemas & types for validating files match the expected structure
 
@@ -68,6 +69,9 @@ export const fsTestCaseSchema = z.object({
 });
 export type FsTestCase = z.infer<typeof fsTestCaseSchema>;
 
+export const fsGlobalOptionsSchema = globalOptionsSchema;
+export type FsGlobalOptions = z.infer<typeof fsGlobalOptionsSchema>;
+
 export const fsConfigSchema = z.object({
   description: z.string().optional(),
 
@@ -75,5 +79,6 @@ export const fsConfigSchema = z.object({
   prompts: z.array(fsPromptSchema).optional(),
   tests: z.array(fsTestCaseSchema).optional(),
   defaultTest: fsTestCaseSchema.optional(),
+  options: fsGlobalOptionsSchema.optional(),
 });
 export type FsConfig = z.infer<typeof fsConfigSchema>;
