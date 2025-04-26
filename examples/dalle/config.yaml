@@ -2,7 +2,7 @@ description: Fake test suite
 
 providers:
   - dalle:dall-e-3
-  # - gemini:gemini-1.5-flash-002
+  - dalle:gpt-image-1
 
 prompts:
   - A flat illustration of {{subject}} in vibrant colors

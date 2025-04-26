@@ -64,7 +64,7 @@ Currently supported model providers:
 - [x] Ollama -- prefix with `ollama:`, e.g. `ollama:gemma-2:2b`. Requires `OLLAMA_ENDPOINT` (e.g. `http://localhost:11434`) in your environment, or the `apiBaseUrl` config option.
 - [x] [WebLLM](https://github.com/mlc-ai/web-llm) -- prefix with `web-llm:`, e.g. `web-llm:gemma-2-2b-it-q4f32_1-MLC`. See [here](https://github.com/mlc-ai/web-llm/blob/main/src/config.ts#L309) for a list of supported model IDs. Requires [WebGPU](https://caniuse.com/webgpu).
 - [x] Anthropic -- prefix with `anthropic:`, e.g. `anthropic:claude-3-5-sonnet-latest`. Requires `ANTHROPIC_API_KEY` in your environment.
-- [x] DALL-E -- prefix with `dalle:`, e.g. `dalle:dall-e-3`. Requires `OPENAI_API_KEY` in your environment. Output is an array containing an image. View a result's details to see the revised prompt DALL-E creates.
+- [x] DALL-E -- prefix with `dalle:`, e.g. `dalle:dall-e-3`. Requires `OPENAI_API_KEY` in your environment. Output is an array containing an image. View a result's details to see the revised prompt DALL-E creates. Also supports the new `gpt-image-1` model. If images are included in the prompt, it will edit them; though note that while `gpt-image-*` supports multiple images, `dall-e-2` only supports 1.
 - [x] ComfyUI -- prefix with `comfyui:`, e.g. `comfyui:comfyui`. Requires `config.apiBaseUrl` with URL to the ComfyUI server. Run the server with `python main.py --enable-cors-header` for access from any origin, see [Github PR](https://github.com/comfyanonymous/ComfyUI/pull/413). From ComfyUI, choose "Workflow > Export (API)" to get a version that works with this tool.
 
 #### Provider Config

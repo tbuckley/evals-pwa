@@ -1,0 +1,13 @@
+description: Fake test suite
+
+providers:
+  - id: dalle:gpt-image-1
+    config:
+      quality: low
+
+prompts:
+  - 'Convert this into a Studio Ghibli style illustration: {{image}}'
+
+tests:
+  - vars:
+      image: file:///puppy.jpg
