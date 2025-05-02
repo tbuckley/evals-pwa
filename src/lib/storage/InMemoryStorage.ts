@@ -35,6 +35,7 @@ export class InMemoryStorage implements FileStorage {
           });
         }
       }
+      files.sort((a, b) => a.uri.localeCompare(b.uri));
       return files;
     }
 
