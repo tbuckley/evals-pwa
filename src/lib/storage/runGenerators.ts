@@ -13,7 +13,7 @@ function isGenerator(target: unknown): target is Generator {
   return typeof target === 'object' && target != null && '=gen' in target;
 }
 
-function hasKey(target: unknown, key: string): target is { [K in string]: unknown } {
+function hasKey(target: unknown, key: string): target is Record<string, unknown> {
   return typeof target === 'object' && target !== null && key in target;
 }
 

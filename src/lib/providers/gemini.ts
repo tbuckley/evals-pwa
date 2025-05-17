@@ -214,9 +214,8 @@ export class GeminiProvider implements ModelProvider {
         }
 
         const parsed = generateContentResponseSchema.parse(lastResponseJson);
-        if (!parsed.candidates[0].content.parts) {
-          parsed.candidates[0].content.parts = [];
-        }
+        parsed.candidates[0].content.parts ??= [];
+
         parsed.candidates[0].content.parts = fullResponse;
         return parsed;
       },

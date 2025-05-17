@@ -80,7 +80,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
 
     let result = raw;
     try {
-      let changed;
+      let changed: boolean;
       const cache = new Map<string, WeakRef<FileReference>>();
       do {
         changed = false;
