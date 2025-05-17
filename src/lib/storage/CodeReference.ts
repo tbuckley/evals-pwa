@@ -6,11 +6,10 @@ import { blobToFileReference } from './dereferenceFilePaths';
 
 let esbuildReady: Promise<void> | undefined;
 function lazyInitEsbuild() {
-  if (!esbuildReady) {
-    esbuildReady = esbuild.initialize({
-      wasmURL: new URL('../../../node_modules/esbuild-wasm/esbuild.wasm', import.meta.url).href,
-    });
-  }
+  esbuildReady ??= esbuild.initialize({
+    wasmURL: new URL('../../../node_modules/esbuild-wasm/esbuild.wasm', import.meta.url).href,
+  });
+
   return esbuildReady;
 }
 
