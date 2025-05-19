@@ -62,7 +62,7 @@
     "remark-toc": "^9.0.0",
     "svelte-headless-table": "^0.18.2",
     "svelte-radix": "^1.1.0",
-    "svelte-sonner": "^0.3.28",
+    "svelte-sonner": "^1.0.1",
     "tailwind-merge": "^2.5.2",
     "tailwind-variants": "^0.2.1",
     "yaml": "^2.5.1",
