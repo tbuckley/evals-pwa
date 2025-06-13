@@ -29,6 +29,23 @@ describe('dereferenceFilePaths', () => {
         `);
   });
 
+  test('supports files with parentheses', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile('file:///a (1).txt', 'hello world!');
+
+    const input = { a: 1, b: 'file:///a \\(1\\).txt' };
+    const ouput = await dereferenceFilePaths(input, { storage });
+    expect(ouput).toMatchInlineSnapshot(`
+            {
+              "changed": true,
+              "result": {
+                "a": 1,
+                "b": "hello world!",
+              },
+            }
+        `);
+  });
+
   test('inserts yaml files', async () => {
     const storage = new InMemoryStorage();
     await storage.writeFile('file:///a.yaml', 'c: 3\nd:\n  - 5\n  - 6\n');

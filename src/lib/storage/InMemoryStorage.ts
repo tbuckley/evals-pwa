@@ -39,7 +39,10 @@ export class InMemoryStorage implements FileStorage {
       return files;
     }
 
-    return this.loadFile(uri);
+    // Remove backslashes from path before these picomatch special characters: $^*+?()[]
+    const picomatchSpecialChars = /\\([\^$()*?[\]])/g;
+    const escapedPath = path.replace(picomatchSpecialChars, '$1');
+    return this.loadFile(pathToFileUri(escapedPath));
   }
 
   writeFile(uri: string, data: string | Blob): Promise<void> {

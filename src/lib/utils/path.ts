@@ -1,11 +1,18 @@
 import { cast } from './asserts';
 
 export function fileUriToPath(uri: string): string {
-  const url = new URL(uri);
-  if (url.protocol !== 'file:' || (url.host !== '' && url.host !== '.' && url.host !== '..')) {
-    throw new Error(`Invalid file URI: ${uri}`);
+  if (!uri.startsWith('file://')) {
+    throw new Error(`Invalid file URI, must start with "file://": ${uri}`);
   }
-  const path = url.host + decodeURIComponent(url.pathname);
+
+  let path = uri.substring('file://'.length);
+  if (path === '') {
+    path = '/';
+  }
+  if (!path.startsWith('/') && !path.startsWith('./') && !path.startsWith('../')) {
+    throw new Error(`Invalid file URI, path must start with "/", "./", or "../": ${uri}`);
+  }
+
   if (pathIsDirectory(path)) {
     return path;
   }
