@@ -73,6 +73,13 @@ const streamedResponseSchema = z.union([
 ]);
 type StreamedResponse = z.infer<typeof streamedResponseSchema>;
 
+const errorSchema = z.object({
+  error: z.object({
+    message: z.string(),
+    type: z.string(),
+  }),
+});
+
 export class AnthropicProvider implements ModelProvider {
   private request: object;
   constructor(
@@ -139,7 +146,14 @@ export class AnthropicProvider implements ModelProvider {
           signal: context.abortSignal,
         });
         if (!resp.ok) {
-          throw new Error(`Failed to run model: ${resp.statusText}`);
+          let error;
+          try {
+            const json: unknown = await resp.json();
+            error = errorSchema.parse(json);
+          } catch {
+            throw new Error(`Failed to run model: ${resp.statusText} ${resp.status}`);
+          }
+          throw new Error(`Failed to run model: ${error.error.type}: ${error.error.message}`);
         }
         const stream = resp.body;
         let message: AnthropicMessage | null = null;

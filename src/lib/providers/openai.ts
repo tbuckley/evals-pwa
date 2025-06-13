@@ -49,6 +49,13 @@ const configSchema = normalizedProviderConfigSchema
 
 export type OpenaiConfig = z.infer<typeof configSchema>;
 
+const errorSchema = z.object({
+  error: z.object({
+    message: z.string(),
+    type: z.string(),
+  }),
+});
+
 export class OpenaiProvider implements ModelProvider {
   private apiBaseUrl: string;
   private request: object;
@@ -111,7 +118,14 @@ export class OpenaiProvider implements ModelProvider {
           signal: context.abortSignal,
         });
         if (!resp.ok) {
-          throw new Error(`Failed to run model: ${resp.statusText}`);
+          let error;
+          try {
+            const json: unknown = await resp.json();
+            error = errorSchema.parse(json);
+          } catch {
+            throw new Error(`Failed to run model: ${resp.statusText} ${resp.status}`);
+          }
+          throw new Error(`Failed to run model: ${error.error.type}: ${error.error.message}`);
         }
         const stream = resp.body;
         let fullText = '';
