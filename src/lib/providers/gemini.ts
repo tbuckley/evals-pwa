@@ -97,6 +97,12 @@ export const generateContentResponseSchema = z.object({
 
 export type Request = z.infer<typeof requestSchema>;
 
+const errorSchema = z.object({
+  error: z.object({
+    message: z.string(),
+  }),
+});
+
 export class GeminiProvider implements ModelProvider {
   constructor(
     public model: string,
@@ -180,7 +186,15 @@ export class GeminiProvider implements ModelProvider {
           },
         );
         if (!resp.ok) {
-          throw new Error(`Failed to run model: ${resp.statusText}`);
+          let error;
+          try {
+            const json: unknown = await resp.json();
+            console.log('json', json);
+            error = errorSchema.parse(json);
+          } catch {
+            throw new Error(`Failed to run model: ${resp.statusText} ${resp.status}`);
+          }
+          throw new Error(`Failed to run model: ${error.error.message}`);
         }
         const stream = resp.body;
         const fullResponse: Part[] = [];
