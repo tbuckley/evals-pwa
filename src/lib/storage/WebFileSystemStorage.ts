@@ -26,7 +26,9 @@ export class WebFileSystemStorage implements FileStorage {
 
     const { base: picoDirname, glob, isGlob } = picomatch.scan(path);
     if (!isGlob) {
-      return this.loadFile(uri);
+      const picomatchSpecialChars = /\\([\^$()*?[\]])/g;
+      const escapedPath = path.replace(picomatchSpecialChars, '$1');
+      return this.loadFile(pathToFileUri(escapedPath));
     }
     const base = picoDirname + '/';
     if (!pathIsAbsolute(base) || !pathIsDirectory(base)) {
