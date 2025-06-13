@@ -126,7 +126,11 @@ With pipelines, you can specify a `providerLabel` to limit which providers can r
 Format:
 
 ```typescript
-type Prompt = string | { prompt: string; providerLabel?: string };
+type Prompt =
+  | string
+  | ConversationPrompt[]
+  | { prompt: string | ConversationPrompt[]; providerLabel?: string };
+type ConversationPrompt = { system: string } | { user: string } | { assistant: string };
 interface Config {
   prompts: Prompt[];
   // ...
@@ -145,7 +149,7 @@ prompts:
     - user: What is your name?
     - assistant: I am {{name}}.
     - user: Where do you live?
-  - |- # The pipe makes this a string, so we can include handlebars at the top level
+  - |- # We use the yaml pipe to make this a string, so we can use the handlebars `#each` at the top level
     - system: You are {{persona}} named {{name}}.
     {{#each messages}}
     - user: {{this.prompt}}
@@ -155,6 +159,94 @@ prompts:
 ```
 
 Multi-role prompts are currently only supported for Gemini, OpenAI, and Anthropic models.
+
+#### Pipelines (Advanced)
+
+A prompt can alternatively be a pipeline, running multiple prompts together with a single output. This is an advanced feature that unlocks a lot of capabilities.
+
+```typescript
+interface Pipeline {
+  $pipeline: (string | PipelinePrompt)[];
+}
+interface PipelinePrompt {
+  prompt: string;
+  providerLabel?: string;
+  // New for pipelines
+  id?: string; // Just for display
+  outputAs?: string; // Assign the output to a var
+  deps?: string[]; // Dependencies (var names)
+  if?: string | CodeReference; // Test if this step should run
+}
+```
+
+The most basic version of a pipeline is a set of prompts that run one after another:
+
+```yaml
+prompts:
+  - $pipeline:
+      - What is the capital city of {{country}}?
+      - How many people live in the city {{$output}}?
+```
+
+This will run each prompt one after the other. Each prompt will get access to the previous prompt's output as the `$output` variable as well as the full history of prompts and their outputs as the `$history` variable. You will be able to see the output of each step in the runs table.
+
+```typescript
+type Output = string | (string | File)[];
+type History = { prompt: ConversationPrompt; output: Output }[];
+```
+
+You can alternatively use an object for pipeline steps (see `PipelinePrompt` above). As with normal prompts, this object lets you indicate which provider labels can run it; unlike normal prompts, a pipeline may use labels to specify multiple models that should be used. The pipeline will be tested against every valid combination of providers.
+
+Pipeline prompt objects have additional options that let you create more complex workflows. The simplest of these options are `id`, which lets you provide a descriptive name for the step in the table, and `outputAs`, which lets you assign the output to a specific variable name.
+
+```yaml
+prompts:
+  - $pipeline:
+      - prompt: What is the capital city of {{country}}?
+        outputAs: city
+      - How many people live in the city {{city}}?
+```
+
+Now that we can name outputs with `outputAs`, you can also specify dependencies for your prompt as a list of var names using `deps: string[]`. Your prompt will run whenever those vars are updated. Picture this as a graph, with prompts as nodes and `deps` specifying the edges.
+
+If a prompt has no dependencies (or all its dependencies are specified by a test), it will run immediately. Prompts with dependencies run once all of them are generated; and they only re-run if all of the deps are updated again. One use case for this is running multiple steps in parallel, then having one prompt depend on all of them. For example, a judge that chooses the best of multiple options. _Note: it's important that your graph always end up with all paths leading to a single result._
+
+```yaml
+prompts:
+  - $pipeline:
+      - deps: []
+        prompt: Write a haiku.
+        providerLabel: provider-a
+        outputAs: aHaiku
+      - deps: []
+        prompt: Write a haiku.
+        providerLabel: provider-b
+        outputAs: bHaiku
+      - deps: ['aHaiku', 'bHaiku']
+        prompt: |
+          Which of these haikus is better?
+          Option A:
+          {{aHaiku}}
+          Option B:
+          {{bHaiku}}
+        providerLabel: provider-judge
+```
+
+Finally, you can also create loops by having a prompt depend on a variable that is output later. But in order to exit the loop, you need a way to run conditions. The `if` option lets you specify JavaScript code to run when the dependencies are ready, and the prompt is only run if the code returns true.
+
+```yaml
+prompts:
+  - $pipeline:
+      - prompt: Write a haiku about {{topic}}.
+        outputAs: haiku
+      - deps: ['haiku'] # By depending on the variable `haiku` and outputing a variable `haiku`, we create a loop
+        if: | # It's necessary to have an if-statement that breaks us out of the loop
+          function execute(vars) {
+            return vars.$history.length < 10; // Exit after 10 prompts
+          }
+        prompt: Here is a haiku about {{topic}}, make it better:\n{{haiku}}
+        outputAs: haiku
+```
 
 ### Tests
 
