@@ -248,6 +248,22 @@ prompts:
         outputAs: haiku
 ```
 
+#### JS Prompts (Advanced)
+
+When Handlebars isn't sufficient, you can alternatively have custom JavaScript/Typescript code generate the prompt.
+
+```typescript
+function execute(vars: Record<string, unknown>, providerMimeType?: string[]): Promise<Prompt> {
+  // Generate the prompt here
+}
+type Prompt = BasicPrompt | ConversationPrompt;
+type BasicPrompt = string | (string | Blob)[];
+type ConversationPrompt =
+  | { system: BasicPrompt }
+  | { user: BasicPrompt }
+  | { asssistant: BasicPrompt };
+```
+
 ### Tests
 
 Format:

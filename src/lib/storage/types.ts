@@ -38,10 +38,11 @@ export const fsPipelinePromptSchema = z.object({
   $pipeline: z.array(
     z.union([
       z.string(),
+      z.instanceof(CodeReference),
       fsConvoPromptSchema,
       z.object({
         id: z.string().optional(),
-        prompt: z.union([z.string(), fsConvoPromptSchema]),
+        prompt: z.union([z.string(), z.instanceof(CodeReference), fsConvoPromptSchema]),
         providerLabel: z.string().optional(),
         outputAs: z.string().optional(),
         if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
@@ -52,7 +53,11 @@ export const fsPipelinePromptSchema = z.object({
 });
 export const fsPromptSchema = z.union([
   z.string(),
-  z.object({ prompt: z.string(), providerLabel: z.string().optional() }),
+  z.instanceof(CodeReference),
+  z.object({
+    prompt: z.union([z.string(), z.instanceof(CodeReference)]),
+    providerLabel: z.string().optional(),
+  }),
   fsConvoPromptSchema,
   fsPipelinePromptSchema,
 ]);

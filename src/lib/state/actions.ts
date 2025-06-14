@@ -41,6 +41,8 @@ import { useCacheStore } from './settings';
 import { PipelineEnvironment } from '$lib/utils/PipelineEnvironment';
 import type { FileReference } from '$lib/storage/FileReference';
 import { LabelNotFoundError, permuteLabeled } from '$lib/utils/permuteLabeled';
+import { CodeReference } from '$lib/storage/CodeReference';
+import { CodePromptFormatter } from '$lib/utils/CodePromptFormatter';
 
 const folder = await idb.get<FileSystemDirectoryHandle>('folder');
 if (folder) {
@@ -421,12 +423,7 @@ interface RunEnv {
 function getRunEnvs(providers: NormalizedProvider[], prompts: NormalizedPrompt[]): RunEnv[] {
   const envs: RunEnv[] = [];
   for (const prompt of prompts) {
-    if (typeof prompt === 'string') {
-      // For a string prompt, add every provider
-      for (const provider of providers) {
-        envs.push({ provider, prompt });
-      }
-    } else if (typeof prompt === 'object' && 'prompt' in prompt) {
+    if (typeof prompt === 'object' && 'prompt' in prompt) {
       // For a labeled prompt, add providers with a matching label
       const matchingProviders = providers.filter((p) => {
         if (prompt.providerLabel) {
@@ -435,7 +432,7 @@ function getRunEnvs(providers: NormalizedProvider[], prompts: NormalizedPrompt[]
         return true;
       });
       for (const provider of matchingProviders) {
-        envs.push({ provider, prompt: prompt.prompt });
+        envs.push({ provider, prompt: prompt });
       }
     } else if (typeof prompt === 'object' && '$pipeline' in prompt) {
       // Pipeline
@@ -480,7 +477,7 @@ function createEnvironments(
   for (const env of runEnvs) {
     const { prompt } = env;
 
-    if (typeof prompt === 'string' || (typeof prompt === 'object' && 'prompt' in prompt)) {
+    if (typeof prompt === 'object' && 'prompt' in prompt && typeof prompt.prompt === 'string') {
       const provider = env.provider;
       if (!provider) {
         throw new Error('Cannot run test without a provider');
@@ -489,9 +486,24 @@ function createEnvironments(
       envs.push(
         new SimpleEnvironment({
           model,
-          promptFormatter: new HandlebarsPromptFormatter(
-            typeof prompt === 'string' ? prompt : prompt.prompt,
-          ),
+          promptFormatter: new HandlebarsPromptFormatter(prompt.prompt),
+          cache,
+        }),
+      );
+    } else if (
+      typeof prompt === 'object' &&
+      'prompt' in prompt &&
+      prompt.prompt instanceof CodeReference
+    ) {
+      const provider = env.provider;
+      if (!provider) {
+        throw new Error('Cannot run test without a provider');
+      }
+      const model = providerManager.getProvider(provider.id, provider.config);
+      envs.push(
+        new SimpleEnvironment({
+          model,
+          promptFormatter: new CodePromptFormatter(prompt.prompt),
           cache,
         }),
       );

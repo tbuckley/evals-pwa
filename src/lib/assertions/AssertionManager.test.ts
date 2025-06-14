@@ -2,7 +2,10 @@ import { describe, test, expect } from 'vitest';
 import { AssertionManager } from './AssertionManager';
 import { ProviderManager } from '$lib/providers/ProviderManager';
 
-const DEFAULT_CONTEXT = { provider: { id: 'reverser:whatever' }, prompt: '{{ output }}' };
+const DEFAULT_CONTEXT = {
+  provider: { id: 'reverser:whatever' },
+  prompt: { prompt: '{{ output }}' },
+};
 
 describe('AssertionManager', () => {
   test('substitutes variables', async function () {

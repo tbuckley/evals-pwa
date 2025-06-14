@@ -187,17 +187,21 @@ async function handleBlob(
   return handleFile('file://./' + filename, file, options, state);
 }
 
+export async function blobToFile(blob: Blob): Promise<File> {
+  const hash = await hashBlob(blob);
+  const ext = getFileExtension(blob);
+  const filename = hash + ext;
+  return new File([blob], filename, { type: blob.type });
+}
+
 /**
  * Converts a blob to a FileReference, but does *not* recursively expand
  * .yaml or .json, or return a .txt file as a string.
  */
 export async function blobToFileReference(blob: Blob | File) {
-  const hash = await hashBlob(blob);
-  const ext = getFileExtension(blob);
-  const filename = hash + ext;
-  const file = new File([blob], filename, { type: blob.type });
+  const file = await blobToFile(blob);
   // Use relative path, in case it needs to be saved
-  return new FileReference('file://./' + filename, file);
+  return new FileReference('file://./' + file.name, file);
 }
 
 async function hashBlob(blob: Blob): Promise<string> {

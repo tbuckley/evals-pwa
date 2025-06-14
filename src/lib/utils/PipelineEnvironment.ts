@@ -12,7 +12,9 @@ import type {
   TestResult,
   NormalizedPipelinePrompt,
   TokenUsage,
+  PromptFormatter,
 } from '$lib/types';
+import { CodePromptFormatter } from './CodePromptFormatter';
 import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
 import { generator } from './generator';
 import { HandlebarsPromptFormatter } from './HandlebarsPromptFormatter';
@@ -27,6 +29,26 @@ export interface Config {
   models: ModelConfig;
   pipeline: NormalizedPipelinePrompt;
   cache?: ModelCache;
+}
+
+export type SimplifiedConversationPromptPart =
+  | { system: (string | Blob)[] }
+  | { user: (string | Blob)[] }
+  | { assistant: (string | Blob)[] };
+export type SimplifiedConversationPrompt = SimplifiedConversationPromptPart[];
+export function simplifyConversationPrompt(
+  prompt: ConversationPrompt,
+): SimplifiedConversationPrompt {
+  return prompt.map((message) => {
+    return {
+      [message.role]: message.content.map((part) => {
+        if ('text' in part) {
+          return part.text;
+        }
+        return part.file;
+      }),
+    } as SimplifiedConversationPromptPart;
+  });
 }
 
 export interface HistoryItem {
@@ -114,12 +136,15 @@ export class PipelineEnvironment implements TestEnvironment {
       }
 
       // Render the prompt
-      const promptFormatter = new HandlebarsPromptFormatter(step.prompt);
+      const promptFormatter = createFormatter(step.prompt);
       const prompt = await promptFormatter.format(
         {
           ...vars,
           ...pipelineContext.vars,
-          $history: pipelineContext.history,
+          $history: pipelineContext.history.map((item) => ({
+            ...item,
+            prompt: simplifyConversationPrompt(item.prompt),
+          })),
           $output: pipelineContext.history[history.length - 1]?.output ?? null,
         },
         model.mimeTypes,
@@ -269,6 +294,13 @@ export class PipelineEnvironment implements TestEnvironment {
 
     return yield* modelUpdateGenerator.generator;
   }
+}
+
+function createFormatter(prompt: NormalizedPipelineStep['prompt']): PromptFormatter {
+  if (typeof prompt === 'string') {
+    return new HandlebarsPromptFormatter(prompt);
+  }
+  return new CodePromptFormatter(prompt);
 }
 
 export interface PipelineStep {

@@ -1,0 +1,10 @@
+providers:
+  - gemini:gemini-2.0-flash
+
+prompts:
+  - file:///prompt.js
+  - file:///prompt_fetch.js
+
+tests:
+  - vars:
+      number: 4

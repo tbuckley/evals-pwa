@@ -1,0 +1,23 @@
+providers:
+  - gemini:gemini-2.0-flash
+
+prompts:
+  - $pipeline:
+      - deps: []
+        prompt:
+          - system: '{{ systemA }}'
+          - user: '{{ seed }}'
+        outputAs: chat
+      - deps: [chat]
+        if: |
+          function execute(vars) {
+            return vars.$history.length < 10;
+          }
+        prompt: file:///chat.js
+        outputAs: chat
+
+tests:
+  - vars:
+      seed: Are boats better than spaceships?
+      systemA: You are a pirate talking to an astronaut. Respond in 2 sentences at most.
+      systemB: You are an astronaut talking to a pirate. Respond in 2 sentences at most.

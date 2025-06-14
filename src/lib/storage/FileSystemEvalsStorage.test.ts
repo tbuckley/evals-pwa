@@ -78,12 +78,15 @@ describe('FileSystemEvalsStorage', () => {
     const fs = new FileSystemEvalsStorage(storage);
     const config = await fs.getConfig();
     expect(config.prompts).toEqual([
-      dedent`
+      {
+        prompt:
+          dedent`
         - system: A system prompt.
         - user: A user prompt.
         - assistant: An assistant response.
         - user: A final user prompt.
       ` + '\n', // Annoyingly, yaml.stringify() adds a newline...
+      },
     ]);
   });
 });
