@@ -5,6 +5,7 @@ import type {
   NormalizedProvider,
   NormalizedTestCase,
 } from '$lib/types';
+import { CodeReference } from './CodeReference';
 import type { FsConfig, FsPipelinePrompt, FsPrompt, FsTestCase } from './types';
 import yaml from 'yaml';
 
@@ -26,15 +27,15 @@ function normalizePrompts(prompts: FsConfig['prompts']): NormalizedPrompt[] {
 }
 
 function normalizePrompt(prompt: FsPrompt): NormalizedPrompt {
-  if (typeof prompt === 'string') {
-    return prompt;
+  if (typeof prompt === 'string' || prompt instanceof CodeReference) {
+    return { prompt };
   }
   if (Array.isArray(prompt)) {
     // If it's a conversation, encode it as a yaml string
-    return yaml.stringify(prompt);
+    return { prompt: yaml.stringify(prompt) };
   }
   if (typeof prompt === 'object' && 'prompt' in prompt) {
-    return prompt;
+    return { prompt: prompt.prompt };
   }
   return { $pipeline: prompt.$pipeline.map((step, index) => normalizePipelineStep(step, index)) };
 }
@@ -43,7 +44,7 @@ function normalizePipelineStep(
   step: FsPipelinePrompt['$pipeline'][number],
   index: number,
 ): NormalizedPipelineStep {
-  if (typeof step === 'string') {
+  if (typeof step === 'string' || step instanceof CodeReference) {
     return {
       id: `step-${index}`,
       prompt: step,

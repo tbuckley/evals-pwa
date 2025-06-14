@@ -31,7 +31,7 @@ export const providerSchema = z.union([z.string(), normalizedProviderSchema]);
 
 export interface NormalizedPipelineStep {
   id: string;
-  prompt: string;
+  prompt: string | CodeReference;
   outputAs?: string;
   if?: string | CodeReference;
   deps?: string[];
@@ -40,9 +40,9 @@ export interface NormalizedPipelineStep {
 export interface NormalizedPipelinePrompt {
   $pipeline: NormalizedPipelineStep[];
 }
-const simplePromptSchema = z.string();
+const simplePromptSchema = z.string(); // This is for legacy, where we didn't normalize prompts to objects
 const objectPromptSchema = z.object({
-  prompt: z.string(),
+  prompt: z.union([z.string(), z.instanceof(CodeReference)]),
   providerLabel: z.string().optional(),
 });
 export const pipelinePromptSchema = z.object({
@@ -51,7 +51,7 @@ export const pipelinePromptSchema = z.object({
       z.string(),
       z.object({
         id: z.string().optional(),
-        prompt: z.string(),
+        prompt: z.union([z.string(), z.instanceof(CodeReference)]),
         providerLabel: z.string().optional(),
         outputAs: z.string().optional(),
         if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
@@ -74,8 +74,7 @@ export type Assertion = z.infer<typeof assertionSchema>;
 export type NormalizedProvider = z.infer<typeof normalizedProviderSchema>;
 export type Provider = z.infer<typeof providerSchema>;
 export type NormalizedPrompt =
-  | string
-  | { prompt: string; providerLabel?: string }
+  | { prompt: string | CodeReference; providerLabel?: string }
   | NormalizedPipelinePrompt;
 export type NormalizedAssertion = Assertion & Required<Pick<Assertion, 'vars'>>;
 
@@ -191,13 +190,21 @@ export interface StorageProvider {
   getConfigNames(): Promise<string[]>;
 }
 
-export type PromptPart = { text: string } | { file: File };
-export type MultiPartPrompt = PromptPart[];
-export interface RolePromptPart {
-  role: 'user' | 'assistant' | 'system';
-  content: MultiPartPrompt;
-}
-export type ConversationPrompt = RolePromptPart[];
+export const promptPartSchema = z.union([
+  z.object({ text: z.string() }),
+  z.object({ file: z.instanceof(File) }),
+]);
+export const multiPartPromptSchema = z.array(promptPartSchema);
+export const rolePromptPartSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: multiPartPromptSchema,
+});
+export const conversationPromptSchema = z.array(rolePromptPartSchema);
+
+export type PromptPart = z.infer<typeof promptPartSchema>;
+export type MultiPartPrompt = z.infer<typeof multiPartPromptSchema>;
+export type RolePromptPart = z.infer<typeof rolePromptPartSchema>;
+export type ConversationPrompt = z.infer<typeof conversationPromptSchema>;
 
 export interface RunContext {
   abortSignal: AbortSignal;

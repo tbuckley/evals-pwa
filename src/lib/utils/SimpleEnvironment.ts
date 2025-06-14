@@ -33,7 +33,7 @@ export class SimpleEnvironment implements TestEnvironment {
     return { id: this.model.id };
   }
   get prompt() {
-    return this.promptFormatter.prompt;
+    return { prompt: this.promptFormatter.prompt };
   }
 
   async *run(

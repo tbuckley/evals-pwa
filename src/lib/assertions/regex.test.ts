@@ -1,7 +1,10 @@
 import { describe, test, expect } from 'vitest';
 import { createRegexAssertion } from './regex';
 
-const DEFAULT_CONTEXT = { provider: { id: 'reverser:whatever' }, prompt: '{{ output }}' };
+const DEFAULT_CONTEXT = {
+  provider: { id: 'reverser:whatever' },
+  prompt: { prompt: '{{ output }}' },
+};
 
 describe('createRegexAssertion', () => {
   test('tests against a regex pattern', async function () {
