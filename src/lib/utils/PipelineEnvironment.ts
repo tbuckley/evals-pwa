@@ -30,6 +30,7 @@ export interface Config {
 }
 
 export interface HistoryItem {
+  id: string;
   prompt: ConversationPrompt;
   output: NonNullable<TestResult['output']>;
 }
@@ -171,7 +172,7 @@ export class PipelineEnvironment implements TestEnvironment {
       }
 
       // Add the output to the vars
-      const newHistory = [...pipelineContext.history, { prompt, output }];
+      const newHistory = [...pipelineContext.history, { id: step.id, prompt, output }];
       const newVars = { ...pipelineContext.vars };
       if (step.outputAs) {
         newVars[step.outputAs] = output;
@@ -530,7 +531,14 @@ export function orderedMerge<T>(a: T[], b: T[], cmp: (a: T, b: T) => number): T[
 }
 
 const historyMergeFn = makeOrderedMerge<HistoryItem>(function (a, b) {
-  // First, by prompt length
+  // By step ID
+  if (a.id < b.id) {
+    return -1;
+  } else if (a.id > b.id) {
+    return 1;
+  }
+
+  // Then, by prompt length
   if (a.prompt.length < b.prompt.length) {
     return -1;
   } else if (a.prompt.length > b.prompt.length) {
