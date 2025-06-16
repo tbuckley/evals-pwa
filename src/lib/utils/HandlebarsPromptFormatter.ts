@@ -12,6 +12,11 @@ import { matchesMimeType } from './media';
 import * as yaml from 'yaml';
 import { z } from 'zod';
 
+Handlebars.registerHelper('eq', (a, b) => a === b);
+Handlebars.registerHelper('not', (a) => !a);
+Handlebars.registerHelper('and', (a: boolean, b: boolean) => a && b);
+Handlebars.registerHelper('or', (a: boolean, b: boolean) => a || b);
+
 export class HandlebarsPromptFormatter implements PromptFormatter {
   template: HandlebarsTemplateDelegate;
 
@@ -41,12 +46,14 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
           }
         }
       }
-      if (typeof val === 'string') {
+      // If it's a string that contains newlines, use a placeholder
+      if (typeof val === 'string' && val.includes('\n')) {
         stringVars[path] = val;
         return `__STRING_PLACEHOLDER_${path}__`;
       }
       return val;
     });
+    console.log('placeholderVars', placeholderVars);
 
     const rendered = this.template(placeholderVars);
     const conversation = getAsConversation(rendered);
@@ -79,8 +86,10 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
 function getAsConversation(rendered: string): Conversation {
   try {
     const parsed: unknown = yaml.parse(rendered);
+    console.log('parsed', parsed);
     return conversationSchema.parse(parsed);
-  } catch {
+  } catch (e) {
+    console.error('Error parsing conversation:', e);
     return [{ user: rendered }];
   }
 }
