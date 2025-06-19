@@ -1,4 +1,4 @@
-import type { AssertionProvider, AssertionResult } from '$lib/types';
+import type { CellAssertionProvider, AssertionResult } from '$lib/types';
 import { z } from 'zod';
 import { wrapLegacyAssertion } from './legacyAssertion';
 
@@ -7,7 +7,7 @@ const argsSchema = z.object({
   flags: z.string().optional(),
 });
 
-export function createRegexAssertion(args: unknown): AssertionProvider {
+export function createRegexAssertion(args: unknown): CellAssertionProvider {
   const parsedArgs = argsSchema.safeParse(args);
   if (!parsedArgs.success) {
     throw new Error('Invalid regex arguments');

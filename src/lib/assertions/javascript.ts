@@ -2,7 +2,7 @@ import { CodeReference, toCodeReference, type Executable } from '$lib/storage/Co
 import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 import {
   assertionResultSchema,
-  type AssertionProvider,
+  type CellAssertionProvider,
   type AssertionResult,
   type NormalizedTestCase,
 } from '$lib/types';
@@ -20,7 +20,7 @@ const jsResultSchema = assertionResultSchema.extend({
 export function createJavascriptAssertion(
   args: unknown,
   testVars: NormalizedTestCase['vars'],
-): AssertionProvider {
+): CellAssertionProvider {
   const parsedArgs = argsSchema.safeParse(args);
   if (!parsedArgs.success) {
     throw new Error('Invalid javascript arguments');

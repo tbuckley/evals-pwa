@@ -1,4 +1,4 @@
-import type { AssertionProvider, AssertionResult } from '$lib/types';
+import type { CellAssertionProvider, AssertionResult } from '$lib/types';
 import { z } from 'zod';
 import { wrapLegacyAssertion } from './legacyAssertion';
 
@@ -7,7 +7,7 @@ const argsSchema = z.object({
   ignoreCase: z.boolean().optional(),
 });
 
-export function createContainsAssertion(args: unknown): AssertionProvider {
+export function createContainsAssertion(args: unknown): CellAssertionProvider {
   const parsedArgs = argsSchema.safeParse(args);
   if (!parsedArgs.success) {
     throw new Error('Invalid contains arguments');

@@ -3,8 +3,8 @@ import type { ProviderManager } from '$lib/providers/ProviderManager';
 import {
   assertionResultSchema,
   providerSchema,
-  type AssertionProvider,
   type AssertionResult,
+  type CellAssertionProvider,
   type NormalizedTestCase,
   type TestOutput,
   type TestResult,
@@ -27,7 +27,7 @@ export function createLlmRubricAssertion(
   testVars: NormalizedTestCase['vars'],
   providerManager: ProviderManager,
   abortSignal: AbortSignal,
-): AssertionProvider {
+): CellAssertionProvider {
   const parsedArgs = argsSchema.safeParse(args);
   if (!parsedArgs.success) {
     throw new Error('Invalid LLM Rubric arguments');

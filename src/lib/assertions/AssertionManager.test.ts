@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { AssertionManager } from './AssertionManager';
 import { ProviderManager } from '$lib/providers/ProviderManager';
+import type { CellAssertionProvider } from '$lib/types';
 
 const DEFAULT_CONTEXT = { provider: { id: 'reverser:whatever' }, prompt: '{{ output }}' };
 
@@ -10,7 +11,7 @@ describe('AssertionManager', () => {
     const assertion = mgr.getAssertion(
       { type: 'contains', vars: { needle: '{{ target }}' } },
       { target: 'world' },
-    );
+    ) as CellAssertionProvider;
     const res = await assertion.run(['Hello, world!'], DEFAULT_CONTEXT);
     expect(res.pass).toBe(true);
 
@@ -22,7 +23,7 @@ describe('AssertionManager', () => {
     const assertion = mgr.getAssertion(
       { type: 'contains', vars: { needle: '{{ target }}' } },
       { target: "all the world's people" },
-    );
+    ) as CellAssertionProvider;
     const res = await assertion.run(["Hello, all the world's people!"], DEFAULT_CONTEXT);
     expect(res.pass).toBe(true);
   });
@@ -32,13 +33,16 @@ describe('AssertionManager', () => {
     const assertion = mgr.getAssertion(
       { type: 'contains', vars: { needle: 'THE WORLD', ignoreCase: true } },
       {},
-    );
+    ) as CellAssertionProvider;
     const res = await assertion.run(["Hello, all the world's people!"], DEFAULT_CONTEXT);
     expect(res.pass).toBe(true);
   });
   test('supports equals with a string', async function () {
     const mgr = createAssertionManager();
-    const assertion = mgr.getAssertion({ type: 'equals', vars: { value: 'Hello, world!' } }, {});
+    const assertion = mgr.getAssertion(
+      { type: 'equals', vars: { value: 'Hello, world!' } },
+      {},
+    ) as CellAssertionProvider;
     const res1 = await assertion.run(['Hello, world!'], DEFAULT_CONTEXT);
     expect(res1.pass).toBe(true);
 
@@ -50,7 +54,7 @@ describe('AssertionManager', () => {
     const assertion = mgr.getAssertion(
       { type: 'equals', vars: { value: 'Hello, world!', ignoreCase: true } },
       {},
-    );
+    ) as CellAssertionProvider;
     const res1 = await assertion.run(['hello, world!'], DEFAULT_CONTEXT);
     expect(res1.pass).toBe(true);
 
@@ -70,7 +74,7 @@ describe('AssertionManager', () => {
         },
       },
       {},
-    );
+    ) as CellAssertionProvider;
     const res = await assertion.run(['olleh'], DEFAULT_CONTEXT);
     // expect(res.pass).toBe(true);
     expect(res.message).toBe('Output: hello');
@@ -87,7 +91,7 @@ describe('AssertionManager', () => {
         },
       },
       { first: 'ho' },
-    );
+    ) as CellAssertionProvider;
     const res = await assertion.run(['olleh'], DEFAULT_CONTEXT);
     // expect(res.pass).toBe(true);
     expect(res.message).toBe('Output: oh hello');

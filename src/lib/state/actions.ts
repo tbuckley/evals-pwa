@@ -19,6 +19,7 @@ import {
   type Run,
   type RunContext,
   type TestEnvironment,
+  type TestOutput,
 } from '$lib/types';
 import { UiError } from '$lib/types/errors';
 import { type FileStorage } from '$lib/types/storage';
@@ -337,8 +338,45 @@ export async function runTests() {
         testResults.push(result);
         runner.enqueue(async ({ abortSignal }) => {
           await runTest(test, env, mgr, result, { abortSignal, cacheKey: test.cacheKey });
+
+          // Wait for testResults to be finished, then run any row-level assertions
+          // This should only run at most once per test
+          const testResultsSnapshot = testResults.map((r) => get(r));
+          if (testResultsSnapshot.every((r) => r.state === 'success')) {
+            const testOutputs: TestOutput[] = testResultsSnapshot.map((r) => {
+              const { state: _s, assertionResults: _ar, ...rest } = r;
+              return rest;
+            });
+            // Run row-level assertions
+            const assertions = test.assert.map((a) => ({
+              id: a.id,
+              assert: mgr.getAssertion(a, test.vars),
+            }));
+            for (const assertion of assertions) {
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+              if ('type' in assertion.assert && assertion.assert.type === 'row') {
+                // TODO: Run in parallel
+                const results = await assertion.assert.run(testOutputs, {
+                  prompt: env.prompt,
+                });
+                results.forEach((result) => (result.id = assertion.id));
+                if (results.length !== testResults.length) {
+                  throw new Error(
+                    'Assertion runRow returned a different number of results than the number of tests',
+                  );
+                }
+                testResults.forEach((r, index) => {
+                  r.update((state) => ({
+                    ...state,
+                    assertionResults: [...(state.assertionResults ?? []), results[index]],
+                  }));
+                });
+              }
+            }
+          }
         });
       }
+
       results.push(testResults);
     }
   } finally {
@@ -655,12 +693,15 @@ async function runTest(
   }));
   const assertionResults: AssertionResult[] = [];
   for (const assertion of assertions) {
-    const result = await assertion.assert.run(testResult.output, {
-      provider: env.provider,
-      prompt: env.prompt,
-    });
-    result.id = assertion.id;
-    assertionResults.push(result);
+    if (!('type' in assertion.assert)) {
+      // TODO: Run in parallel
+      const result = await assertion.assert.run(testResult.output, {
+        provider: env.provider,
+        prompt: env.prompt,
+      });
+      result.id = assertion.id;
+      assertionResults.push(result);
+    }
   }
   result.update((state) => ({
     ...state,
