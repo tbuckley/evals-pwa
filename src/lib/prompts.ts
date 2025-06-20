@@ -26,3 +26,17 @@ Does not speak like a pirate
 {{ rubric }}
 </Rubric>
 `.trim();
+
+export const SELECT_BEST_PROMPT = `
+You are comparing multiple documents to see which best fits the following criteria: {{criteria}}
+
+Here are the pieces of text:
+
+{{#each output}}
+<Document index="{{ @index }}">
+{{#each this}}{{ this }}{{/each}}
+</Document>
+{{/each}}
+
+Output the index of the document that best fits the criteria. You must output a single integer.
+`.trim();

@@ -333,16 +333,19 @@ export async function runTests() {
   try {
     for (const test of globalTests) {
       const testResults: Writable<LiveResult>[] = [];
+      let finished = 0;
       for (const env of envs) {
         const result = writable<LiveResult>({ rawPrompt: null, state: 'waiting' });
         testResults.push(result);
         runner.enqueue(async ({ abortSignal }) => {
           await runTest(test, env, mgr, result, { abortSignal, cacheKey: test.cacheKey });
+          finished += 1;
 
           // Wait for testResults to be finished, then run any row-level assertions
           // This should only run at most once per test
-          const testResultsSnapshot = testResults.map((r) => get(r));
-          if (testResultsSnapshot.every((r) => r.state === 'success')) {
+          // FIXME: Catch errors in assertions
+          if (finished === testResults.length) {
+            const testResultsSnapshot = testResults.map((r) => get(r));
             const testOutputs: TestOutput[] = testResultsSnapshot.map((r) => {
               const { state: _s, assertionResults: _ar, ...rest } = r;
               return rest;
@@ -366,10 +369,21 @@ export async function runTests() {
                   );
                 }
                 testResults.forEach((r, index) => {
-                  r.update((state) => ({
-                    ...state,
-                    assertionResults: [...(state.assertionResults ?? []), results[index]],
-                  }));
+                  r.update((state) => {
+                    const assertionResults = [...(state.assertionResults ?? []), results[index]];
+
+                    // Only update resultState if this is the last assertion result
+                    let resultState = state.state;
+                    if (assertionResults.length === assertions.length) {
+                      resultState = assertionResults.every((r) => r.pass) ? 'success' : 'error';
+                    }
+
+                    return {
+                      ...state,
+                      assertionResults: assertionResults,
+                      state: resultState,
+                    };
+                  });
                 });
               }
             }
@@ -703,6 +717,11 @@ async function runTest(
       assertionResults.push(result);
     }
   }
+  const hasAssertionsPending = assertions.some(
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    (a) => 'type' in a.assert && a.assert.type === 'row',
+  );
+
   result.update((state) => ({
     ...state,
     ...testResult,
@@ -711,7 +730,11 @@ async function runTest(
       output: h.output === undefined ? undefined : Array.isArray(h.output) ? h.output : [h.output],
     })),
     output: arrayOutput,
-    state: assertionResults.every((r) => r.pass) ? 'success' : 'error',
+    state: hasAssertionsPending
+      ? 'in-progress'
+      : assertionResults.every((r) => r.pass)
+        ? 'success'
+        : 'error',
     assertionResults,
   }));
 }
