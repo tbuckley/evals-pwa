@@ -1,4 +1,4 @@
-import { SELECT_BEST_PROMPT } from '$lib/prompts';
+import { DEFAULT_LLM_ASSERTION_PROVIDER, SELECT_BEST_PROMPT } from '$lib/prompts';
 import type { ProviderManager } from '$lib/providers/ProviderManager';
 import {
   providerSchema,
@@ -10,8 +10,6 @@ import {
 import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
 import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
 import { z } from 'zod';
-
-export const DEFAULT_LLM_RUBRIC_PROVIDER = 'gemini:gemini-2.0-flash';
 
 const argsSchema = z.object({
   criteria: z.string(),
@@ -34,7 +32,7 @@ export function createSelectBestAssertion(
   const provider =
     typeof providerOptions === 'string'
       ? { id: providerOptions, config: {} }
-      : (providerOptions ?? { id: DEFAULT_LLM_RUBRIC_PROVIDER, config: {} });
+      : (providerOptions ?? { id: DEFAULT_LLM_ASSERTION_PROVIDER, config: {} });
   const model = providerManager.getProvider(provider.id, provider.config);
   const env = new SimpleEnvironment({
     model,

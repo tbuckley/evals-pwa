@@ -14,6 +14,18 @@ tests:
         vars:
           criteria: 'The best haiku about New York City'
   - vars:
+      topic: San Francisco
+    assert:
+      - type: consistency
+        vars:
+          criteria: 'all haikus would apply to San Francisco'
+  - vars:
+      topic: San Francisco
+    assert:
+      - type: consistency
+        vars:
+          criteria: 'all haikus have the same exact wording'
+  - vars:
       topic: spreadsheets
     assert:
       - type: javascript
