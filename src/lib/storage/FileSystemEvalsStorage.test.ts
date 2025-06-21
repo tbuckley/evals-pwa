@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { InMemoryStorage } from './InMemoryStorage';
 import dedent from 'dedent';
 import { FileSystemEvalsStorage } from './FileSystemEvalsStorage';
+import { UiError } from '$lib/types/errors';
 
 describe('FileSystemEvalsStorage', () => {
   test('adds a default test', async () => {
@@ -85,5 +86,43 @@ describe('FileSystemEvalsStorage', () => {
         - user: A final user prompt.
       ` + '\n', // Annoyingly, yaml.stringify() adds a newline...
     ]);
+  });
+
+  test('throws an error if you use an unsupported property', async () => {
+    const storage = new InMemoryStorage();
+    await storage.writeFile(
+      'file:///config.yaml',
+      dedent`
+        prompts:
+          - "hello world"
+        providers:
+          - gemini:gemini-1.5-flash-latest
+        tests:
+          - vars:
+              foo: bar
+            assertions: # Not supported!
+              - type: equals
+                vars:
+                  value: "hello world"
+        `,
+    );
+    const fs = new FileSystemEvalsStorage(storage);
+    // Expect a UiError with type 'invalid-config'
+    await expect(fs.getConfig()).rejects.toThrow();
+
+    // To inspect the error details, you can also do:
+    try {
+      await fs.getConfig();
+    } catch (error) {
+      expect(error).toBeInstanceOf(UiError);
+      if (error instanceof UiError) {
+        expect(error.detail.type).toBe('invalid-config');
+        if (error.detail.type === 'invalid-config') {
+          expect(error.detail.errors).toBeInstanceOf(Array);
+          expect(error.detail.errors).toHaveLength(1);
+          expect(error.detail.errors[0]).toContain('assertions');
+        }
+      }
+    }
   });
 });
