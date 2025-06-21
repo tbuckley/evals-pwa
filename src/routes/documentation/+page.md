@@ -293,7 +293,7 @@ You may also limit which tests will be run by marking some as `only: true`. If a
 
 A test may include a list of assertions to check whether the output meets certain criteria. Evals supports the following:
 
-- [x] javascript -- run Javascript code on output, see below. Vars: `{ code: string }`
+- [x] javascript (optionally **row-level**) -- run Javascript code on output, see below. Vars: `{ code: string; row?: boolean }`
 - [x] equals -- compare against a string, optionally ignoring case. Vars: `{ value: string, ignoreCase?: boolean, trim?: boolean }`
 - [x] contains -- check if the output contains a string, optionally ignoring case. Vars: `{ needle: string, ignoreCase?: boolean }`
 - [x] regex -- test against a regex pattern, with optional flags (e.g. "i" for case-insensitive, see [docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions#advanced_searching_with_flags)). Vars: `{ pattern: string, flags?: string }`
@@ -301,6 +301,8 @@ A test may include a list of assertions to check whether the output meets certai
 - [ ] cost
 - [ ] latency
 - [x] llm-rubric -- ask an LLM to validate the output. Provider defaults to `gemini-1.5-pro-latest`. If you override `prompt`, it should be a template containing both `{{#each output}}{{this}}{{/each}}` and `{{rubric}}`. Vars: `{ rubric: string; prompt?: string; provider?: string}`. Note that output is an array to support cases like DALL-E.
+- [x] select-best (**row-level**) -- ask an LLM to pick the best output. Only one will pass! Vars: `{ criteria: string, prompt?: string, provider: Provider }`
+- [x] consistency (**row-level**) -- ask an LLM to evaluate all of the outputs and decide if they all pass or not. Vars: `{ criteria: string, prompt?: string, provider: Provider }`
 
 Any assertion vars that are strings will be treated as Handlebars templates, and the test case's vars will be populated. (Note: this does not apply to `javascript` assertions, which receive the test case's vars directly.)
 
@@ -336,9 +338,11 @@ tests:
           needle: washington
 ```
 
-#### Javascript Assertions
+#### Javascript Assertions=
 
 For `javascript` assertions, your code must provide a function with this signature:
+
+_Note: row-level assertions are also supported, see further down_
 
 ```typescript
 execute(output: string | ArrayOutput, context: Context): MaybePromise<AssertionResult>
@@ -374,6 +378,31 @@ function execute(output, context) {
 ```
 
 The code is run inside a sandboxed iframe with `<script type="module">`. It is only instantiated once for the entire run, so avoid side effects or global state. You can reference other files in your directory and import libraries from a CDN, but npm packages are not supported. Errors running the code will be shown in the UI.
+
+For a row-level Javascript assertion, return a function with this signature:
+
+```typescript
+execute(outputs: TestOutput[], context: Context): MaybePromise<AssertionResult[]>
+
+interface TestOutput {
+  rawPrompt: unknown;
+
+  // Success
+  rawOutput?: unknown;
+  output?: string | (string|FileReference)[];
+  latencyMillis?: number;
+  tokenUsage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    costDollars?: number;
+  };
+  history?: (TestOutput & {id: string})[]; // For pipelines
+
+  // Error
+  error?: string;
+}
+```
 
 #### Visuals
 
@@ -565,4 +594,6 @@ For legacy reasons, `config.yaml` is also supported.
 
 ### Development
 
-For testing, there is a `reverser:` provider (suffix is ignored). It will concatenate any text messages with newlines and output the reversed value.
+For testing, there is an `echo:` provider (suffix is ignored). It will output an array of any strings/blobs it is given.
+
+There is also a `reverser:` provider (suffix is ignored). It will concatenate any text messages with newlines and output the reversed value.

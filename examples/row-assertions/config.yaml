@@ -1,0 +1,80 @@
+providers:
+  - gemini:gemini-2.0-flash-lite
+  - openai:gpt-4.1-nano
+  - anthropic:claude-3-5-haiku-latest
+
+prompts:
+  - 'Write a haiku about {{topic}}. Respond with the haiku and nothing else.'
+
+tests:
+  - vars:
+      topic: New York City
+    assert:
+      - type: select-best
+        vars:
+          criteria: 'The best haiku about New York City'
+  - vars:
+      topic: San Francisco
+    assert:
+      - type: consistency
+        vars:
+          criteria: 'all haikus would apply to San Francisco'
+  - vars:
+      topic: San Francisco
+    assert:
+      - type: consistency
+        vars:
+          criteria: 'all haikus have the same exact wording'
+  - vars:
+      topic: spreadsheets
+    assert:
+      - type: javascript
+        vars:
+          code: |
+            function execute(results, context) {
+              console.log(results);
+              // Return the result with the lowest cost
+              const lowestCost = results
+                .map((result) => result?.tokenUsage?.costDollars)
+                .filter((cost) => cost !== undefined)
+                .reduce((min, cost) => {
+                  return cost < min ? cost : min;
+                }, Infinity);
+
+              console.log(lowestCost);
+              
+              // If there were no costs, pass every cell
+              if(!isFinite(lowestCost)) {
+                console.log("No cost data available");
+                return Array(results.length).fill({
+                  pass: true,
+                  message: "No cost data available",
+                });
+              }
+
+              // Otherwise, pass only the cell with the lowest cost
+              const ret = results.map((result) => {
+                if(result.tokenUsage.costDollars === lowestCost) {
+                  return {
+                    pass: true,
+                  }
+                }
+
+                if(!result?.tokenUsage?.costDollars) {
+                  return {
+                    pass: false,
+                    message: "No cost data available",
+                  }
+                }
+
+                const multiplier = (result.tokenUsage.costDollars / lowestCost);
+                return {
+                  pass: false,
+                  message: `Cost ${multiplier.toFixed(2)}x compared to lowest cost`,
+                }
+              });
+
+              console.log(ret);
+              return ret;
+            }
+          row: true

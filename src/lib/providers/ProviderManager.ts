@@ -8,6 +8,7 @@ import { WebLlm } from './web-llm';
 import { AnthropicProvider } from './anthropic';
 import { DalleProvider } from './dalle';
 import { ComfyuiProvider } from './comfyui';
+import { EchoProvider } from './echo';
 
 export class ProviderManager {
   constructor(public env: Record<string, string>) {}
@@ -43,6 +44,8 @@ export class ProviderManager {
       return new AnthropicProvider(modelName, this.env.ANTHROPIC_API_KEY, config);
     } else if (providerId === 'reverser') {
       return new ReverserProvider(modelName);
+    } else if (providerId === 'echo') {
+      return new EchoProvider(modelName);
     } else if (providerId === 'chrome' && modelName === 'ai') {
       return new ChromeProvider();
     } else if (providerId === 'web-llm') {

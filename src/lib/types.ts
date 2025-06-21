@@ -249,16 +249,27 @@ export interface FileLoader {
 }
 
 export type MaybePromise<T> = T | Promise<T>;
-export interface AssertionProvider {
-  run(
+export interface CellAssertionProvider {
+  run: (
     output: string | (string | FileReference)[],
     context: {
       provider: TestEnvironment['provider'];
       prompt: TestEnvironment['prompt'];
     },
-  ): MaybePromise<AssertionResult>;
+  ) => MaybePromise<AssertionResult>;
   destroy?: () => void;
 }
+export interface RowAssertionProvider {
+  type: 'row';
+  run: (
+    results: TestOutput[],
+    context: {
+      prompts: TestEnvironment['prompt'][];
+    },
+  ) => MaybePromise<AssertionResult[]>;
+  destroy?: () => void;
+}
+export type AssertionProvider = CellAssertionProvider | RowAssertionProvider;
 
 export interface LiveResult {
   // Required

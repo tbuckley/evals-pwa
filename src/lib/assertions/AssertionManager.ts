@@ -7,6 +7,8 @@ import { createEqualsAssertion } from './equals';
 import { createLlmRubricAssertion } from './llmRubric';
 import type { ProviderManager } from '$lib/providers/ProviderManager';
 import { objectDfsMap } from '$lib/utils/objectDFS';
+import { createSelectBestAssertion } from './selectBest';
+import { createConsistencyAssertion } from './consistency';
 
 export class AssertionManager {
   assertions: AssertionProvider[] = [];
@@ -45,6 +47,10 @@ export class AssertionManager {
       return createJavascriptAssertion(vars, testVars);
     } else if (type === 'llm-rubric') {
       return createLlmRubricAssertion(vars, testVars, this.providerManager, this.abortSignal);
+    } else if (type === 'select-best') {
+      return createSelectBestAssertion(vars, testVars, this.providerManager, this.abortSignal);
+    } else if (type === 'consistency') {
+      return createConsistencyAssertion(vars, testVars, this.providerManager, this.abortSignal);
     } else {
       throw new Error(`Unknown assertion type: ${type}`);
     }
