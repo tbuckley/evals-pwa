@@ -42,21 +42,30 @@ import { useCacheStore } from './settings';
 import { PipelineEnvironment } from '$lib/utils/PipelineEnvironment';
 import type { FileReference } from '$lib/storage/FileReference';
 import { LabelNotFoundError, permuteLabeled } from '$lib/utils/permuteLabeled';
+import { toast } from 'svelte-sonner';
 
 const folder = await idb.get<FileSystemDirectoryHandle>('folder');
 if (folder) {
   const permission = await folder.queryPermission({ mode: 'readwrite' });
   if (permission === 'granted') {
-    await setStorageDirectory(folder);
-
-    // Remember config, if one was set
-    const configName = await idb.get<string>('config');
-    const configs = get(configFilesStore);
-    if (configName && configs.includes(configName)) {
-      selectedConfigFileStore.set(configName);
+    let loaded = false;
+    try {
+      await setStorageDirectory(folder);
+      loaded = true;
+    } catch (err) {
+      console.error('Unable to open previous folder', err);
     }
 
-    void loadStateFromStorage();
+    if (loaded) {
+      // Remember config, if one was set
+      const configName = await idb.get<string>('config');
+      const configs = get(configFilesStore);
+      if (configName && configs.includes(configName)) {
+        selectedConfigFileStore.set(configName);
+      }
+
+      void loadStateFromStorage();
+    }
   }
 }
 
@@ -89,8 +98,16 @@ export async function chooseFolder() {
   }
 
   // TODO don't allow the user to select a directory if it is invalid
-  await setStorageDirectory(dir);
-  await loadStateFromStorage();
+  try {
+    await setStorageDirectory(dir);
+    await loadStateFromStorage();
+  } catch (e) {
+    if (e instanceof Error) {
+      toast(`Unable to open folder: ${e.message}`);
+    } else {
+      toast('Unable to open folder, unknown error');
+    }
+  }
 }
 
 export async function setStorageDirectory(dir: FileSystemDirectoryHandle) {
