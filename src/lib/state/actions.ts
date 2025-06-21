@@ -343,50 +343,8 @@ export async function runTests() {
 
           // Wait for testResults to be finished, then run any row-level assertions
           // This should only run at most once per test
-          // FIXME: Catch errors in assertions
           if (finished === testResults.length) {
-            const testResultsSnapshot = testResults.map((r) => get(r));
-            const testOutputs: TestOutput[] = testResultsSnapshot.map((r) => {
-              const { state: _s, assertionResults: _ar, ...rest } = r;
-              return rest;
-            });
-            // Run row-level assertions
-            const assertions = test.assert.map((a) => ({
-              id: a.id,
-              assert: mgr.getAssertion(a, test.vars),
-            }));
-            for (const assertion of assertions) {
-              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-              if ('type' in assertion.assert && assertion.assert.type === 'row') {
-                // TODO: Run in parallel
-                const results = await assertion.assert.run(testOutputs, {
-                  prompt: env.prompt,
-                });
-                results.forEach((result) => (result.id = assertion.id));
-                if (results.length !== testResults.length) {
-                  throw new Error(
-                    'Assertion runRow returned a different number of results than the number of tests',
-                  );
-                }
-                testResults.forEach((r, index) => {
-                  r.update((state) => {
-                    const assertionResults = [...(state.assertionResults ?? []), results[index]];
-
-                    // Only update resultState if this is the last assertion result
-                    let resultState = state.state;
-                    if (assertionResults.length === assertions.length) {
-                      resultState = assertionResults.every((r) => r.pass) ? 'success' : 'error';
-                    }
-
-                    return {
-                      ...state,
-                      assertionResults: assertionResults,
-                      state: resultState,
-                    };
-                  });
-                });
-              }
-            }
+            await runRowAssertions(test, envs, testResults, mgr);
           }
         });
       }
@@ -737,6 +695,57 @@ async function runTest(
         : 'error',
     assertionResults,
   }));
+}
+
+async function runRowAssertions(
+  test: NormalizedTestCase,
+  envs: TestEnvironment[],
+  testResults: Writable<LiveResult>[],
+  mgr: AssertionManager,
+): Promise<void> {
+  const testResultsSnapshot = testResults.map((r) => get(r));
+  const testOutputs: TestOutput[] = testResultsSnapshot.map((r) => {
+    const { state: _s, assertionResults: _ar, ...rest } = r;
+    return rest;
+  });
+  // Run row-level assertions
+  const assertions = test.assert.map((a) => ({
+    id: a.id,
+    assert: mgr.getAssertion(a, test.vars),
+  }));
+  for (const assertion of assertions) {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if ('type' in assertion.assert && assertion.assert.type === 'row') {
+      // TODO: Run in parallel
+      // FIXME: Don't pick an env at random
+      const results = await assertion.assert.run(testOutputs, {
+        prompts: envs.map((e) => e.prompt),
+      });
+      results.forEach((result) => (result.id = assertion.id));
+      if (results.length !== testResults.length) {
+        throw new Error(
+          'Assertion runRow returned a different number of results than the number of tests',
+        );
+      }
+      testResults.forEach((r, index) => {
+        r.update((state) => {
+          const assertionResults = [...(state.assertionResults ?? []), results[index]];
+
+          // Only update resultState if this is the last assertion result
+          let resultState = state.state;
+          if (assertionResults.length === assertions.length) {
+            resultState = assertionResults.every((r) => r.pass) ? 'success' : 'error';
+          }
+
+          return {
+            ...state,
+            assertionResults: assertionResults,
+            state: resultState,
+          };
+        });
+      });
+    }
+  }
 }
 
 function liveRunToRun(liveRun: LiveRun): Run {

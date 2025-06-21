@@ -264,7 +264,7 @@ export interface RowAssertionProvider {
   run: (
     results: TestOutput[],
     context: {
-      prompt: TestEnvironment['prompt'];
+      prompts: TestEnvironment['prompt'][];
     },
   ) => MaybePromise<AssertionResult[]>;
   destroy?: () => void;

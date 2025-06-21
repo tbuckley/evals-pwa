@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { AssertionManager } from './AssertionManager';
 import { ProviderManager } from '$lib/providers/ProviderManager';
-import type { CellAssertionProvider } from '$lib/types';
+import type { CellAssertionProvider, RowAssertionProvider } from '$lib/types';
 
 const DEFAULT_CONTEXT = { provider: { id: 'reverser:whatever' }, prompt: '{{ output }}' };
 
@@ -95,6 +95,62 @@ describe('AssertionManager', () => {
     const res = await assertion.run(['olleh'], DEFAULT_CONTEXT);
     // expect(res.pass).toBe(true);
     expect(res.message).toBe('Output: oh hello');
+  });
+
+  test('supports select-best', async function () {
+    const mgr = createAssertionManager();
+    const assertion = mgr.getAssertion(
+      {
+        type: 'select-best',
+        vars: {
+          prompt: '2',
+          criteria: 'DOES NOT MATTER',
+          provider: 'echo:whatever',
+        },
+      },
+      {},
+    ) as RowAssertionProvider;
+    const res = await assertion.run([{ output: 'The first' }, { output: 'The second' }], {
+      prompts: ['', ''],
+    });
+    expect(res).toMatchInlineSnapshot(`
+      [
+        {
+          "pass": false,
+        },
+        {
+          "pass": false,
+        },
+        {
+          "pass": true,
+        },
+      ]
+    `);
+  });
+
+  test('supports consistency', async function () {
+    const mgr = createAssertionManager();
+    const assertion = mgr.getAssertion(
+      {
+        type: 'consistency',
+        vars: {
+          prompt:
+            '{ "pass": true, "message": "{{criteria}} :: {{#each output}}{{ this }}{{/each}}" }',
+          criteria: 'The best haiku about New York City',
+          provider: 'echo:whatever',
+        },
+      },
+      {},
+    ) as RowAssertionProvider;
+    const res = await assertion.run([{ output: ['Hello, world!'] }], { prompts: [''] });
+    expect(res).toMatchInlineSnapshot(`
+      [
+        {
+          "message": "The best haiku about New York City :: Hello, world!",
+          "pass": true,
+        },
+      ]
+    `);
   });
 });
 

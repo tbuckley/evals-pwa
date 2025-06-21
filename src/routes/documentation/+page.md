@@ -293,7 +293,7 @@ You may also limit which tests will be run by marking some as `only: true`. If a
 
 A test may include a list of assertions to check whether the output meets certain criteria. Evals supports the following:
 
-- [x] javascript -- run Javascript code on output, see below. Vars: `{ code: string; row?: boolean }`
+- [x] javascript (optionally **row-level**) -- run Javascript code on output, see below. Vars: `{ code: string; row?: boolean }`
 - [x] equals -- compare against a string, optionally ignoring case. Vars: `{ value: string, ignoreCase?: boolean, trim?: boolean }`
 - [x] contains -- check if the output contains a string, optionally ignoring case. Vars: `{ needle: string, ignoreCase?: boolean }`
 - [x] regex -- test against a regex pattern, with optional flags (e.g. "i" for case-insensitive, see [docs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions#advanced_searching_with_flags)). Vars: `{ pattern: string, flags?: string }`
@@ -594,4 +594,6 @@ For legacy reasons, `config.yaml` is also supported.
 
 ### Development
 
-For testing, there is a `reverser:` provider (suffix is ignored). It will concatenate any text messages with newlines and output the reversed value.
+For testing, there is an `echo:` provider (suffix is ignored). It will output an array of any strings/blobs it is given.
+
+There is also a `reverser:` provider (suffix is ignored). It will concatenate any text messages with newlines and output the reversed value.
