@@ -21,7 +21,7 @@ prompts:
 
 # One or more LLMs you want to use for running the prompts
 providers:
-  - gemini:gemini-2.5-pro-latest
+  - gemini:gemini-2.5-pro
   - openai:gpt-4o
 
 # Tests provide values to feed into the prompts, and
