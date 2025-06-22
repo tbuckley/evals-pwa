@@ -97,7 +97,7 @@
 
   const SAMPLE_CONFIG = dedent`
 		providers:
-		  - gemini:gemini-1.5-pro-latest
+		  - gemini:gemini-2.5-pro
 
 		prompts:
 		  - "write a couplet about {{topic}}"
