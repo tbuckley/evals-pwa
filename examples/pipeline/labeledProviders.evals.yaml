@@ -1,7 +1,7 @@
 description: Pipeline example with a loop
 
 providers:
-  - id: gemini:gemini-1.5-flash-latest
+  - id: gemini:gemini-2.5-flash
     labels: ['a']
   - id: openai:gpt-4o-mini
     labels: ['b']

@@ -15,7 +15,7 @@ describe('FileSystemEvalsStorage', () => {
               - "another"
             
             providers:
-              - gemini:gemini-1.5-flash-latest
+              - gemini:gemini-2.5-flash
         `,
     );
     const fs = new FileSystemEvalsStorage(storage);
@@ -72,7 +72,7 @@ describe('FileSystemEvalsStorage', () => {
                 - assistant: An assistant response.
                 - user: A final user prompt.
             providers:
-              - gemini:gemini-1.5-flash-latest
+              - gemini:gemini-2.5-flash
         `,
     );
 
@@ -96,7 +96,7 @@ describe('FileSystemEvalsStorage', () => {
         prompts:
           - "hello world"
         providers:
-          - gemini:gemini-1.5-flash-latest
+          - gemini:gemini-2.5-flash
         tests:
           - vars:
               foo: bar

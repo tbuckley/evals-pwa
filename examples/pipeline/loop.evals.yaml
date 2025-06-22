@@ -1,7 +1,7 @@
 description: Pipeline example with a loop
 
 providers:
-  - gemini:gemini-1.5-flash-latest
+  - gemini:gemini-2.5-flash
 
 prompts:
   - $pipeline:

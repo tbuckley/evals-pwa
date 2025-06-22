@@ -1,7 +1,7 @@
 description: Test of chat in pipeline
 
 providers:
-  - gemini:gemini-1.5-flash-latest
+  - gemini:gemini-2.5-flash
   - openai:gpt-4o-mini
 
 prompts:

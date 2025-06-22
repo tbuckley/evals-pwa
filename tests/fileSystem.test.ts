@@ -79,7 +79,7 @@ test.describe('File System', () => {
     await page.waitForLoadState('networkidle');
 
     const lines = [
-      'gemini:gemini-1.5-flash-latest',
+      'gemini:gemini-2.5-flash',
       'openai:gpt-4o-mini',
 
       "You only speak about puppies. Respond to the user's request: {{ request }}",
@@ -109,7 +109,7 @@ test.describe('File System', () => {
     await page.waitForLoadState('networkidle');
 
     const lines = [
-      'gemini:gemini-1.5-flash-latest',
+      'gemini:gemini-2.5-flash',
       'openai:gpt-4o-mini',
 
       'Write a {{ type }} about {{ topic }}',

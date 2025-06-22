@@ -1,9 +1,9 @@
 description: Test of prompt labels
 
 providers:
-  - id: gemini:gemini-1.5-pro-latest
+  - id: gemini:gemini-2.5-pro
     labels: ['gemini']
-  - id: gemini:gemini-1.5-flash-latest
+  - id: gemini:gemini-2.5-flash
     labels: ['gemini']
   - id: openai:gpt-4o-mini
     labels: ['openai']

@@ -50,7 +50,7 @@ prompts:
 
 # One or more providers you want to use for running the prompts
 providers:
-  - gemini:gemini-1.5-pro-latest
+  - gemini:gemini-2.5-pro
   - openai:gpt-4o
 
 # Tests provide values to feed into the prompts, and

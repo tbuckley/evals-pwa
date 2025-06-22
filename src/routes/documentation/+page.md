@@ -6,6 +6,8 @@ A [Promptfoo](https://www.promptfoo.dev/docs/intro)-inspired evaluation framewor
 
 ## Getting Started
 
+_**Want AI to write your evals?** Check out [our llms.txt](/llms.txt). You can copy it into your favorite chatbot to have it generate new evals, answer questions about how it works, or help debug an issue._
+
 First, create a folder where your evaluation data and output will be stored. Create an `evals.yaml` file inside it and add the following:
 
 ```yaml
@@ -19,7 +21,7 @@ prompts:
 
 # One or more LLMs you want to use for running the prompts
 providers:
-  - gemini:gemini-1.5-pro-latest
+  - gemini:gemini-2.5-pro-latest
   - openai:gpt-4o
 
 # Tests provide values to feed into the prompts, and
@@ -58,7 +60,7 @@ type Provider = string | { id: string; config?: any; labels?: string[] };
 
 Currently supported model providers:
 
-- [x] Gemini -- prefix with `gemini:`, e.g. `gemini:gemini-1.5-pro-latest`. Requires `GEMINI_API_KEY` in your environment.
+- [x] Gemini -- prefix with `gemini:`, e.g. `gemini:gemini-2.5-pro`. Requires `GEMINI_API_KEY` in your environment.
 - [x] OpenAI -- prefix with `openai:`, e.g. `openai:gpt-4o`. Requires `OPENAI_API_KEY` in your environment.
 - [x] [Chrome](https://goo.gle/chrome-ai-dev-preview) -- use `chrome:ai`.
 - [x] Ollama -- prefix with `ollama:`, e.g. `ollama:gemma-2:2b`. Requires `OLLAMA_ENDPOINT` (e.g. `http://localhost:11434`) in your environment, or the `apiBaseUrl` config option.
@@ -77,7 +79,7 @@ providers:
     config:
       apiBaseUrl: http://localhost:11434
       response_format: { type: 'json_object' }
-  - id: gemini:gemini-1.5-flash-latest
+  - id: gemini:gemini-2.5-flash
     config:
       generationConfig:
         responseMimeType: application/json
@@ -300,7 +302,7 @@ A test may include a list of assertions to check whether the output meets certai
 - [ ] is-json
 - [ ] cost
 - [ ] latency
-- [x] llm-rubric -- ask an LLM to validate the output. Provider defaults to `gemini-1.5-pro-latest`. If you override `prompt`, it should be a template containing both `{{#each output}}{{this}}{{/each}}` and `{{rubric}}`. Vars: `{ rubric: string; prompt?: string; provider?: string}`. Note that output is an array to support cases like DALL-E.
+- [x] llm-rubric -- ask an LLM to validate the output. Provider defaults to `gemini-2.5-pro`. If you override `prompt`, it should be a template containing both `{{#each output}}{{this}}{{/each}}` and `{{rubric}}`. Vars: `{ rubric: string; prompt?: string; provider?: string}`. Note that output is an array to support cases like DALL-E.
 - [x] select-best (**row-level**) -- ask an LLM to pick the best output. Only one will pass! Vars: `{ criteria: string, prompt?: string, provider: Provider }`
 - [x] consistency (**row-level**) -- ask an LLM to evaluate all of the outputs and decide if they all pass or not. Vars: `{ criteria: string, prompt?: string, provider: Provider }`
 
@@ -572,7 +574,7 @@ tests:
   - =gen: file:///make-more-tests.ts
 
 providers:
-  - gemini:gemini-1.5-pro-latest
+  - gemini:gemini-2.5-pro
     config:
       generationConfig:
         temperature: 0.1

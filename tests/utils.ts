@@ -6,12 +6,20 @@ import { promises as fs } from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export async function chooseDirectory(page: Page, relpath: string) {
+export async function chooseDirectory(page: Page, relpath: string | string[]) {
   await page.goto('/__playwright');
   await page.waitForLoadState('networkidle');
 
   const fs = new FileSystem(page);
-  await fs.mirrorFolder(path.join(__dirname, relpath));
+  await fs.clear();
+
+  // Copy over paths
+  if (!Array.isArray(relpath)) {
+    relpath = [relpath];
+  }
+  for (const p of relpath) {
+    await fs.mirrorFolder(path.join(__dirname, p));
+  }
 
   await page.getByText('Use OPFS').click();
 }
@@ -29,9 +37,6 @@ export class FileSystem {
     });
   }
   async mirrorFolder(relpath: string) {
-    // Clear any existing data
-    await this.clear();
-
     const page = this.page;
     async function copyFile(dirs: string[], filename: string, contents: string): Promise<void> {
       return page.evaluate(
