@@ -3,7 +3,7 @@ import { chooseDirectory } from './utils';
 
 test.describe('UI', () => {
   test('can switch between runs', async ({ page }) => {
-    await chooseDirectory(page, '../examples/fake');
+    await chooseDirectory(page, ['../examples/fake', './data/ui']);
 
     // Ensure no error dialog is visible
     await expect(page.locator('#alert-dialog')).toHaveCount(0);
