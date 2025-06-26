@@ -263,7 +263,7 @@ interface Config {
 interface TestCase {
   description?: string;
   vars?: Record<string, unknown>;
-  asserts?: Assertion[];
+  assert?: Assertion[];
   only?: boolean;
 }
 interface Assertion {
@@ -313,7 +313,7 @@ This makes it easy to define assertions inside defaultTest, using variables to t
 ```yaml
 # ...
 defaultTest:
-  asserts:
+  assert:
     - type: contains
       vars:
         needle: '{{translation}}'
@@ -333,7 +333,7 @@ You can give an assertion an `id` to track its pass/fail rate across all tests. 
 
 ```yaml
 tests:
-  - asserts:
+  - assert:
       - type: contains
         id: has-washington
         vars:
