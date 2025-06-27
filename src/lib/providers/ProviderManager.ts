@@ -1,6 +1,6 @@
 import type { ModelProvider } from '$lib/types';
 import { GeminiProvider } from './gemini';
-import { OpenaiProvider, type OpenaiConfig } from './openai';
+import { OpenaiResponsesProvider, type OpenaiConfig } from './openai-responses';
 import { ReverserProvider } from './reverser';
 import { ChromeProvider } from './chrome';
 import { OllamaProvider } from './ollama';
@@ -31,7 +31,7 @@ export class ProviderManager {
       if (typeof this.env.OPENAI_API_KEY !== 'string') {
         throw new Error('OPENAI_API_KEY not found');
       }
-      return new OpenaiProvider(modelName, this.env.OPENAI_API_KEY, config);
+      return new OpenaiResponsesProvider(modelName, this.env.OPENAI_API_KEY, config);
     } else if (providerId === 'dalle') {
       if (typeof this.env.OPENAI_API_KEY !== 'string') {
         throw new Error('OPENAI_API_KEY not found');
