@@ -15,9 +15,9 @@ import type {
   TokenUsage,
 } from '$lib/types';
 import { cast } from '$lib/utils/asserts';
-import { multiPartPromptToOpenAI } from './openai';
 import { generator } from '$lib/utils/generator';
 import { conversationToSinglePrompt } from './legacyProvider';
+import { multiPartPromptToOpenAICompletionsAPI } from './openai-completions';
 
 interface Response {
   reply: string;
@@ -59,7 +59,7 @@ export class WebLlm implements ModelProvider {
     const content =
       // eslint-disable-next-line -- ModelType can't be imported...
       this.#modelRecord.model_type === 2 /* VLM */
-        ? await Promise.all(prompt.map(multiPartPromptToOpenAI))
+        ? await Promise.all(prompt.map(multiPartPromptToOpenAICompletionsAPI))
         : prompt.map((part) => ('text' in part ? part.text : '')).join('\n');
     const messages: ChatCompletionMessageParam[] = [
       // { role: 'system', content: 'You are a helpful AI assistant.' },

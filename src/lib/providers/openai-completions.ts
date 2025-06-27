@@ -56,7 +56,7 @@ const errorSchema = z.object({
   }),
 });
 
-export class OpenaiProvider implements ModelProvider {
+export class OpenaiCompletionsProvider implements ModelProvider {
   private apiBaseUrl: string;
   private request: object;
   constructor(
@@ -236,7 +236,7 @@ type Part =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string; detail?: 'auto' | 'low' | 'high' } };
 
-export async function multiPartPromptToOpenAI(part: PromptPart): Promise<Part> {
+export async function multiPartPromptToOpenAICompletionsAPI(part: PromptPart): Promise<Part> {
   if ('text' in part) {
     return { type: 'text', text: part.text };
   } else if ('file' in part) {
@@ -263,7 +263,7 @@ async function conversationToOpenAI(conversation: ConversationPrompt): Promise<M
     conversation.map(
       async (part): Promise<Message> => ({
         role: part.role,
-        content: await Promise.all(part.content.map(multiPartPromptToOpenAI)),
+        content: await Promise.all(part.content.map(multiPartPromptToOpenAICompletionsAPI)),
       }),
     ),
   );
