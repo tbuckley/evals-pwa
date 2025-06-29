@@ -1,4 +1,11 @@
-import { runSchema, type NormalizedConfig, type Run, type StorageProvider } from '$lib/types';
+import {
+  annotationLogEntrySchema,
+  runSchema,
+  type AnnotationLogEntry,
+  type NormalizedConfig,
+  type Run,
+  type StorageProvider,
+} from '$lib/types';
 import { type FileStorage } from '$lib/types/storage';
 import { MissingFileError, UiError } from '$lib/types/errors';
 import { dereferenceFilePaths } from './dereferenceFilePaths';
@@ -196,6 +203,51 @@ export class FileSystemEvalsStorage implements StorageProvider {
 
   loadFile(uri: string): Promise<File> {
     return this.fs.loadFile(uri);
+  }
+
+  async getAnnotations(configName: string, runTimestamp: number): Promise<AnnotationLogEntry[]> {
+    const baseDir = getRunsDir(configName);
+    let files;
+
+    // Try loading, return empty array if no files found
+    try {
+      files = (await this.fs.load(`${baseDir}${runTimestamp}-annotations*.log`)) as {
+        uri: string;
+        file: File;
+      }[];
+    } catch {
+      return [];
+    }
+
+    const logs = await Promise.allSettled(
+      files.map(async (f) => {
+        const text = await f.file.text();
+        return text.split('\n').map((line) => {
+          // Use {type: 'unknown'} to handle invalid JSON
+          try {
+            const parsed = JSON.parse(line) as unknown;
+            return annotationLogEntrySchema.parse(parsed);
+          } catch {
+            return { type: 'unknown' } satisfies AnnotationLogEntry;
+          }
+        });
+      }),
+    );
+    const entries = logs.filter((l) => l.status === 'fulfilled').flatMap((l) => l.value);
+    return entries;
+  }
+
+  async logAnnotation(
+    configName: string,
+    runTimestamp: number,
+    annotation: AnnotationLogEntry,
+  ): Promise<void> {
+    const baseDir = getRunsDir(configName);
+    await this.fs.appendFile(
+      `${baseDir}${runTimestamp}-annotations.log`,
+      // Include a newline so each annotation is on its own line
+      JSON.stringify(annotation) + '\n',
+    );
   }
 }
 

@@ -13,8 +13,11 @@ import {
   pathToFileUri,
 } from '$lib/utils/path';
 import picomatch from 'picomatch';
+import { Semaphore } from '$lib/utils/semaphore';
 
 export class WebFileSystemStorage implements FileStorage {
+  private globalAppendLock = new Semaphore(1);
+
   constructor(public dir: FileSystemDirectoryHandle) {}
 
   getName(): string {
@@ -65,6 +68,29 @@ export class WebFileSystemStorage implements FileStorage {
     const writable = await handle.createWritable();
     await writable.write(data);
     await writable.close();
+  }
+
+  async appendFile(uri: string, data: string | Blob): Promise<void> {
+    const filepath = fileUriToPath(uri);
+    if (!pathIsFile(filepath)) {
+      throw new Error(`Cannot append to a directory: ${uri}`);
+    }
+    const dirname = getDirname(filepath);
+    const filename = cast(getFilename(filepath));
+
+    await this.globalAppendLock.acquire();
+    try {
+      const dir = await this.getSubdirHandle(dirname, true);
+      const handle = await dir.getFileHandle(filename, { create: true });
+
+      const writable = await handle.createWritable({ keepExistingData: true });
+      const offset = (await handle.getFile()).size;
+      await writable.seek(offset);
+      await writable.write(data);
+      await writable.close();
+    } finally {
+      this.globalAppendLock.release();
+    }
   }
 
   async loadFile(uri: string): Promise<File> {

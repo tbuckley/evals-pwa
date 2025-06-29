@@ -6,4 +6,5 @@ export interface ReadonlyFileStorage {
 export interface FileStorage extends ReadonlyFileStorage {
   getName(): string;
   writeFile(uri: string, data: string | Blob): Promise<void>;
+  appendFile(uri: string, data: string | Blob): Promise<void>;
 }

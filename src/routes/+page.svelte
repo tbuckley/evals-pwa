@@ -25,12 +25,15 @@
     selectedRunIdStore.set(id);
   }
 
-  function handleSubmitNotes(e: SubmitEvent) {
+  async function handleSubmitNotes(e: SubmitEvent) {
+    e.preventDefault();
+
+    // TODO disable while saving
     const state = $resultNotesDialogStore;
     const formData = new FormData(e.target as HTMLFormElement);
     const notes = formData.get('notes') as string;
     if (state) {
-      state.onSave(notes);
+      await state.onSave(notes);
     }
     resultNotesDialogStore.set(null);
   }

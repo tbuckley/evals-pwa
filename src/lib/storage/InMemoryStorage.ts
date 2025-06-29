@@ -55,4 +55,22 @@ export class InMemoryStorage implements FileStorage {
     this.files.set(path, file);
     return Promise.resolve();
   }
+
+  appendFile(uri: string, data: string | Blob): Promise<void> {
+    const path = fileUriToPath(uri);
+    const filename = getFilename(path);
+    if (!filename) {
+      throw new Error(`Cannot append to file: ${uri}`);
+    }
+
+    const existingFile = this.files.get(path);
+    if (!existingFile) {
+      // Just create the file
+      return this.writeFile(uri, data);
+    }
+
+    const file = new File([existingFile, data], filename);
+    this.files.set(path, file);
+    return Promise.resolve();
+  }
 }
