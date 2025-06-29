@@ -11,6 +11,7 @@ import { Semaphore } from '$lib/utils/semaphore';
 import { sse } from '$lib/utils/sse';
 import { z } from 'zod';
 import { CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN } from './common';
+import { exponentialBackoff } from '$lib/utils/exponentialBackoff';
 
 const OPENAI_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
 
@@ -108,25 +109,28 @@ export class OpenaiProvider implements ModelProvider {
       request,
       runModel: async function* () {
         yield '';
-        const resp = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify(request),
-          signal: context.abortSignal,
-        });
-        if (!resp.ok) {
-          let error;
-          try {
-            const json: unknown = await resp.json();
-            error = errorSchema.parse(json);
-          } catch {
-            throw new Error(`Failed to run model: ${resp.statusText} ${resp.status}`);
+        const resp = await exponentialBackoff(async () => {
+          const resp = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(request),
+            signal: context.abortSignal,
+          });
+          if (!resp.ok) {
+            let error;
+            try {
+              const json: unknown = await resp.json();
+              error = errorSchema.parse(json);
+            } catch {
+              throw new Error(`Failed to run model: ${resp.statusText} ${resp.status}`);
+            }
+            throw new Error(`Failed to run model: ${error.error.type}: ${error.error.message}`);
           }
-          throw new Error(`Failed to run model: ${error.error.type}: ${error.error.message}`);
-        }
+          return resp;
+        });
         const stream = resp.body;
         let fullText = '';
         let lastResponseJson: unknown;
