@@ -52,20 +52,33 @@ export class SimpleEnvironment implements TestEnvironment {
       throw e;
     }
 
-    const { request, runModel } = await this.model.run(prompt, context);
+    let response: unknown;
+    let latencyMillis: number;
+    try {
+      const { request, runModel } = await this.model.run(prompt, context);
 
-    const cacheKey = {
-      provider: this.provider.id,
-      request,
-      ...(context.cacheKey ?? {}),
-    };
+      const cacheKey = {
+        provider: this.provider.id,
+        request,
+        ...(context.cacheKey ?? {}),
+      };
 
-    const { response, latencyMillis } = yield* maybeUseCache(
-      this.cache,
-      cacheKey,
-      runModel,
-      this.model.requestSemaphore,
-    );
+      const { response: cachedResponse, latencyMillis: cachedLatencyMillis } = yield* maybeUseCache(
+        this.cache,
+        cacheKey,
+        runModel,
+        this.model.requestSemaphore,
+      );
+      response = cachedResponse;
+      latencyMillis = cachedLatencyMillis;
+    } catch (e) {
+      if (e instanceof Error) {
+        return {
+          error: e.toString(),
+        };
+      }
+      throw e;
+    }
 
     let output: NonNullable<TestOutput['output']>;
     let tokenUsage: TokenUsage;
