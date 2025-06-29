@@ -11,17 +11,31 @@
     selectedRunTitle,
   } from '$lib/state/derived';
   import { configStore, selectedRunIdStore } from '$lib/state/stores';
-  import { resultDialogStore } from '$lib/state/ui';
+  import { resultDialogStore, resultNotesDialogStore } from '$lib/state/ui';
   import * as Dialog from '$lib/components/ui/dialog';
   import CancelIcon from 'lucide-svelte/icons/ban';
   import * as Alert from '$lib/components/ui/alert';
   import Filter from 'lucide-svelte/icons/filter';
+  import { Textarea } from '$lib/components/ui/textarea';
 
   function setSelectedRunId(id: unknown) {
     if (id !== null && typeof id !== 'string') {
       throw new Error('Invalid id for selectedRunIdStore');
     }
     selectedRunIdStore.set(id);
+  }
+
+  async function handleSubmitNotes(e: SubmitEvent) {
+    e.preventDefault();
+
+    // TODO disable while saving
+    const state = $resultNotesDialogStore;
+    const formData = new FormData(e.target as HTMLFormElement);
+    const notes = formData.get('notes') as string;
+    if (state) {
+      await state.onSave(notes);
+    }
+    resultNotesDialogStore.set(null);
   }
 </script>
 
@@ -148,5 +162,35 @@ tests:
           2,
         )}</pre>
     </div>
+  </Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root
+  open={$resultNotesDialogStore !== null}
+  onOpenChange={(open) => {
+    if (!open) {
+      resultNotesDialogStore.set(null);
+    }
+  }}
+>
+  <Dialog.Content>
+    <Dialog.Header>
+      <Dialog.Title>Edit notes</Dialog.Title>
+      <Dialog.Description>Save notes for this result.</Dialog.Description>
+    </Dialog.Header>
+    <form on:submit={handleSubmitNotes}>
+      {#if $resultNotesDialogStore !== null}
+        <div class="max-h-[50vh] overflow-y-scroll">
+          <h3 class="my-2 font-bold">Notes</h3>
+          <Textarea name="notes" value={$resultNotesDialogStore.notes}></Textarea>
+        </div>
+        <div class="mt-2 flex flex-row-reverse justify-start gap-2">
+          <Button type="submit">Save</Button>
+          <Dialog.Close asChild let:builder>
+            <Button variant="secondary" builders={[builder]}>Cancel</Button>
+          </Dialog.Close>
+        </div>
+      {/if}
+    </form>
   </Dialog.Content>
 </Dialog.Root>

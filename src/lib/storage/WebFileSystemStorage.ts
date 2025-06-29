@@ -67,6 +67,26 @@ export class WebFileSystemStorage implements FileStorage {
     await writable.close();
   }
 
+  async appendFile(uri: string, data: string | Blob): Promise<void> {
+    const filepath = fileUriToPath(uri);
+    if (!pathIsFile(filepath)) {
+      throw new Error(`Cannot append to a directory: ${uri}`);
+    }
+    const dirname = getDirname(filepath);
+    const filename = cast(getFilename(filepath));
+
+    await navigator.locks.request(uri, { mode: 'exclusive' }, async () => {
+      const dir = await this.getSubdirHandle(dirname, true);
+      const handle = await dir.getFileHandle(filename, { create: true });
+
+      const writable = await handle.createWritable({ keepExistingData: true });
+      const offset = (await handle.getFile()).size;
+      await writable.seek(offset);
+      await writable.write(data);
+      await writable.close();
+    });
+  }
+
   async loadFile(uri: string): Promise<File> {
     const filepath = fileUriToPath(uri);
     if (!pathIsFile(filepath)) {

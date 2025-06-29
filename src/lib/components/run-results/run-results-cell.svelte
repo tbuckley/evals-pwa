@@ -1,17 +1,21 @@
 <script lang="ts">
   import type { LiveResult } from '$lib/types';
   import type { Readable } from 'svelte/store';
-  import { resultDialogStore } from '$lib/state/ui';
+  import { resultDialogStore, resultNotesDialogStore } from '$lib/state/ui';
   import Button from '../ui/button/button.svelte';
   import SquareCode from 'lucide-svelte/icons/square-code';
+  import PencilIcon from 'lucide-svelte/icons/pencil';
   import Copy from 'lucide-svelte/icons/copy';
   import { FileReference } from '$lib/storage/FileReference';
   import ResultOutput from './ResultOutput.svelte';
   import * as Accordion from '../ui/accordion';
   import ResultUsage from './ResultUsage.svelte';
+  import { selectedRunAnnotationStore } from '$lib/state/derived';
+  import { showPrompt } from '$lib/state/actions';
 
   export let testResult: Readable<LiveResult>;
   export let height: Readable<'minimal' | 'collapsed' | 'expanded'>;
+  export let index: [number, number];
 
   $: errorMessage = getErrorMessage($testResult);
   function getErrorMessage(result: LiveResult): string | null {
@@ -25,10 +29,30 @@
     return failureMessages[0]?.message ?? null;
   }
 
+  $: annotations = $selectedRunAnnotationStore?.getCellAnnotation(index);
+
   function openRawPromptDialog() {
     resultDialogStore.set({
       title: `Raw Prompt`,
       result: $testResult,
+    });
+  }
+
+  function openNotesDialog() {
+    resultNotesDialogStore.set({
+      index,
+      notes: $annotations?.notes?.value ?? '',
+      onSave: async (notes) => {
+        const store = $selectedRunAnnotationStore;
+        if (store) {
+          await store.setCellNotes(index, notes);
+        } else {
+          await showPrompt({
+            title: 'Error saving notes',
+            description: ['Please refresh the page and try again.'],
+          });
+        }
+      },
     });
   }
 
@@ -117,6 +141,14 @@
       {/if}
       <Button on:click={openRawPromptDialog} variant="ghost" size="icon" class="text-gray-500">
         <SquareCode class="h-5 w-5"></SquareCode>
+      </Button>
+      <Button
+        on:click={openNotesDialog}
+        variant="ghost"
+        size="icon"
+        class={$annotations?.notes?.value ? 'text-blue-500' : 'text-gray-500'}
+      >
+        <PencilIcon class="h-5 w-5"></PencilIcon>
       </Button>
     </div>
 

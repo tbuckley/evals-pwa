@@ -1,11 +1,19 @@
-import { derived, readable } from 'svelte/store';
-import { configStore, liveRunStore, runStore, selectedRunIdStore } from './stores';
+import { derived, get, readable } from 'svelte/store';
+import {
+  configStore,
+  liveRunStore,
+  runStore,
+  selectedConfigFileStore,
+  selectedRunIdStore,
+  storageStore,
+} from './stores';
 import { ProviderManager } from '$lib/providers/ProviderManager';
 import { envStore } from './env';
 import type { LiveResult, LiveRun, Run } from '$lib/types';
 import { getVarNamesForTests } from '$lib/utils/testCase';
 import { summarizeResults } from '$lib/utils/summarizeResults';
 import { alertStore } from './ui';
+import { AnnotationManager } from './annotations';
 
 function parseEnvText(env: string): Record<string, string> {
   // Given a series of key=value pairs separated by newlines, create an object
@@ -108,6 +116,36 @@ export const selectedRunStore = derived(
     // TODO throw error?
     return null;
   },
+);
+
+export const selectedRunAnnotationStore = derived(
+  [liveRunStore, runStore, selectedRunIdStore],
+  ([_liveRuns, $runs, $selectedId], set, _update) => {
+    set(null);
+    if ($selectedId && $selectedId in $runs) {
+      // Fetch the annotations
+      const $storage = get(storageStore);
+      const $selectedConfigFile = get(selectedConfigFileStore);
+      if ($storage && $selectedConfigFile) {
+        $storage
+          .getAnnotations($selectedConfigFile, $runs[$selectedId].timestamp)
+          .then((annotations) => {
+            const mgr = new AnnotationManager(annotations, async (annotation) => {
+              await $storage.logAnnotation(
+                $selectedConfigFile,
+                $runs[$selectedId].timestamp,
+                annotation,
+              );
+            });
+            set(mgr);
+          })
+          .catch((err: unknown) => {
+            console.error('Error fetching annotations', err);
+          });
+      }
+    }
+  },
+  null as AnnotationManager | null,
 );
 
 export const abortRunStore = derived(

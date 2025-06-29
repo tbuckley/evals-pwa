@@ -189,6 +189,13 @@ export interface StorageProvider {
   getAllRuns(configName: string): Promise<Run[]>;
   addRun(configName: string, run: Run): Promise<void>;
   getConfigNames(): Promise<string[]>;
+
+  getAnnotations(configName: string, runTimestamp: number): Promise<AnnotationLogEntry[]>;
+  logAnnotation(
+    configName: string,
+    runTimestamp: number,
+    annotation: AnnotationLogEntry,
+  ): Promise<void>;
 }
 
 export type PromptPart = { text: string } | { file: File };
@@ -327,3 +334,25 @@ export interface ModelCache {
   set(key: unknown, value: unknown): Promise<void>;
   get(key: unknown): Promise<unknown>;
 }
+
+// Annotations
+
+// TODO: hybrid logical clock
+export const clockSchema = z.number().int().positive();
+export type Clock = z.infer<typeof clockSchema>;
+
+export const annotationLogEntrySchema = z
+  .discriminatedUnion('type', [
+    z.object({
+      type: z.literal('set-cell-notes'),
+      clock: clockSchema,
+      index: z.tuple([z.number(), z.number()]),
+      notes: z.string(),
+    }),
+    z.object({
+      type: z.literal('unknown'),
+    }),
+  ])
+  .catch({ type: 'unknown' });
+
+export type AnnotationLogEntry = z.infer<typeof annotationLogEntrySchema>;

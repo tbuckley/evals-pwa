@@ -49,6 +49,7 @@
 
   interface ResultCell {
     type: 'result';
+    index: [number, number];
     env: LiveRun['envs'][number];
     result: LiveRun['results'][number][number];
   }
@@ -105,7 +106,8 @@
         (env, e) =>
           ({
             type: 'result',
-            result: run.results[i][e++],
+            index: [i, e],
+            result: run.results[i][e],
             env,
           }) as ResultCell,
       ),
@@ -314,7 +316,11 @@
                   {:else if cell.type === 'var'}
                     <RunResultsVar value={cell.var} height={row.rowHeight} />
                   {:else if cell.type === 'result'}
-                    <RunResultsCell testResult={cell.result} height={row.rowHeight} />
+                    <RunResultsCell
+                      testResult={cell.result}
+                      index={cell.index}
+                      height={row.rowHeight}
+                    />
                   {/if}
                 </RunResultsSized>
               </td>
