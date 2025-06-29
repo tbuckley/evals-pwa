@@ -13,11 +13,8 @@ import {
   pathToFileUri,
 } from '$lib/utils/path';
 import picomatch from 'picomatch';
-import { Semaphore } from '$lib/utils/semaphore';
 
 export class WebFileSystemStorage implements FileStorage {
-  private globalAppendLock = new Semaphore(1);
-
   constructor(public dir: FileSystemDirectoryHandle) {}
 
   getName(): string {
@@ -78,8 +75,7 @@ export class WebFileSystemStorage implements FileStorage {
     const dirname = getDirname(filepath);
     const filename = cast(getFilename(filepath));
 
-    await this.globalAppendLock.acquire();
-    try {
+    await navigator.locks.request(uri, { mode: 'exclusive' }, async () => {
       const dir = await this.getSubdirHandle(dirname, true);
       const handle = await dir.getFileHandle(filename, { create: true });
 
@@ -88,9 +84,7 @@ export class WebFileSystemStorage implements FileStorage {
       await writable.seek(offset);
       await writable.write(data);
       await writable.close();
-    } finally {
-      this.globalAppendLock.release();
-    }
+    });
   }
 
   async loadFile(uri: string): Promise<File> {
