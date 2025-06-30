@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { LiveResult } from '$lib/types';
   import type { Readable } from 'svelte/store';
-  import { resultDialogStore, resultNotesDialogStore } from '$lib/state/ui';
+  import { resultDialogStore } from '$lib/state/ui';
   import Button from '../ui/button/button.svelte';
   import SquareCode from 'lucide-svelte/icons/square-code';
   import PencilIcon from 'lucide-svelte/icons/pencil';
@@ -11,11 +11,13 @@
   import * as Accordion from '../ui/accordion';
   import ResultUsage from './ResultUsage.svelte';
   import { selectedRunAnnotationStore } from '$lib/state/derived';
-  import { showPrompt } from '$lib/state/actions';
+  import { createEventDispatcher } from 'svelte';
 
   export let testResult: Readable<LiveResult>;
   export let height: Readable<'minimal' | 'collapsed' | 'expanded'>;
   export let index: [number, number];
+
+  const dispatch = createEventDispatcher();
 
   $: errorMessage = getErrorMessage($testResult);
   function getErrorMessage(result: LiveResult): string | null {
@@ -38,24 +40,6 @@
     });
   }
 
-  function openNotesDialog() {
-    resultNotesDialogStore.set({
-      index,
-      notes: $annotations?.notes?.value ?? '',
-      onSave: async (notes) => {
-        const store = $selectedRunAnnotationStore;
-        if (store) {
-          await store.setCellNotes(index, notes);
-        } else {
-          await showPrompt({
-            title: 'Error saving notes',
-            description: ['Please refresh the page and try again.'],
-          });
-        }
-      },
-    });
-  }
-
   $: visuals = ($testResult.assertionResults ?? []).flatMap((a) => a.visuals ?? []);
 
   // FIXME we need to free these URLs when the component is destroyed
@@ -72,6 +56,10 @@
     ) {
       await navigator.clipboard.writeText($testResult.output[0]);
     }
+  }
+
+  function openNotesDialog() {
+    dispatch('open-notes', { index });
   }
 </script>
 

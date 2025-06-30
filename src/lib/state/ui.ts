@@ -26,6 +26,7 @@ export interface ResultNotesDialogState {
   index: [number, number];
   notes: string;
   onSave: (notes: string) => Promise<void>;
+  callback?: () => void;
 }
 
 export const resultNotesDialogStore = writable<ResultNotesDialogState | null>(null);
