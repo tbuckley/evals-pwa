@@ -34,6 +34,7 @@
     const notes = formData.get('notes') as string;
     if (state) {
       await state.onSave(notes);
+      state.callback?.();
     }
     resultNotesDialogStore.set(null);
   }
@@ -169,6 +170,7 @@ tests:
   open={$resultNotesDialogStore !== null}
   onOpenChange={(open) => {
     if (!open) {
+      $resultNotesDialogStore?.callback?.();
       resultNotesDialogStore.set(null);
     }
   }}
