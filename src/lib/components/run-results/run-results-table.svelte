@@ -19,6 +19,8 @@
   import RunResultsSized from './RunResultsSized.svelte';
   import GripVertical from 'lucide-svelte/icons/grip-vertical';
   import { Button } from '../ui/button';
+  import { selectedRunAnnotationStore } from '$lib/state/derived';
+  import { generateCsvContent, downloadCsv as downloadCsvFile } from '$lib/utils/csvExport';
 
   export let run: LiveRun;
 
@@ -162,52 +164,12 @@
   $: columnWidths = header.map(() => writable<number | undefined>(undefined));
 
   function downloadCsv() {
-    const providerHeaders = run.envs.map((env) => {
-      if (typeof env.provider === 'string') {
-        return env.provider;
-      } else if (env.provider !== null) {
-        return env.provider.id;
-      } else {
-        return 'unknown';
-      }
+    const annotations = $selectedRunAnnotationStore;
+    const content = generateCsvContent(run, {
+      includeNotes: annotations?.hasNotes ?? false,
+      annotations,
     });
-    const promptHeaders = run.envs.map((env) =>
-      typeof env.prompt === 'string' ? env.prompt : JSON.stringify(env.prompt, null, 2),
-    );
-    const rows = [];
-    for (let i = 0; i < run.results.length; i++) {
-      const test = run.tests[i];
-      const testResults = run.results[i].map((col) => {
-        const result = get(col);
-        if (result.error) {
-          return result.error;
-        }
-        if (typeof result.output === 'string') {
-          return result.output;
-        }
-        if (Array.isArray(result.output)) {
-          return result.output
-            .map((item) => (typeof item === 'string' ? item : `![](${item.uri})`))
-            .join('');
-        }
-        return '--no output--';
-      });
-      rows.push([test.description ?? 'Test', ...testResults]);
-    }
-    const csv = [['Provider', ...providerHeaders], ['Prompt', ...promptHeaders], ...rows]
-      .map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(','))
-      .join('\n');
-
-    // Create blob and download link
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `eval-results-${run.id}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadCsvFile(content, `eval-results-${run.id}.csv`);
   }
 </script>
 
