@@ -98,9 +98,7 @@ export function generateCsvContent(run: LiveRun, options: CsvExportOptions = {})
         resultText = result.output;
       } else if (Array.isArray(result.output)) {
         resultText = result.output
-          .map((item: unknown) =>
-            typeof item === 'string' ? item : `![](${(item as { uri: string }).uri})`,
-          )
+          .map((item) => (typeof item === 'string' ? item : `![](${item.uri})`))
           .join('');
       }
       row.push(resultText);
