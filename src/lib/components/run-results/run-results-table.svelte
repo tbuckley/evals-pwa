@@ -166,7 +166,7 @@
   function downloadCsv() {
     const annotations = $selectedRunAnnotationStore;
     const content = generateCsvContent(run, {
-      includeNotes: annotations !== null,
+      includeNotes: annotations?.hasNotes ?? false,
       annotations,
     });
     downloadCsvFile(content, `eval-results-${run.id}.csv`);
