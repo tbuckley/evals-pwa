@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 import { Semaphore } from '$lib/utils/semaphore';
 import { CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN } from './common';
-import { exponentialBackoff } from '$lib/utils/exponentialBackoff';
+import { exponentialBackoff, shouldRetryHttpError } from '$lib/utils/exponentialBackoff';
 
 const GEMINI_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
 
@@ -198,7 +198,7 @@ export class GeminiProvider implements ModelProvider {
             throw new Error(`Failed to run model: ${error.error.message}`);
           }
           return resp;
-        });
+        }, { shouldRetry: shouldRetryHttpError });
         const stream = resp.body;
         const fullResponse: Part[] = [];
 

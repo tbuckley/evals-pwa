@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { exponentialBackoff } from './exponentialBackoff';
+import { exponentialBackoff, shouldRetryHttpError } from './exponentialBackoff';
 
 describe('exponentialBackoff', () => {
   afterEach(() => {
@@ -132,5 +132,135 @@ describe('exponentialBackoff', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith('Error in onRetry callback:', expect.any(Error));
 
     consoleErrorSpy.mockRestore();
+  });
+
+  it('should respect shouldRetry function to skip retries for non-retryable errors', async () => {
+    const fn = vi.fn().mockRejectedValue(new Error('Bad Request 400'));
+    const shouldRetry = vi.fn().mockReturnValue(false);
+
+    await expect(exponentialBackoff(fn, { shouldRetry, maxRetries: 3 })).rejects.toThrow('Bad Request 400');
+    
+    expect(fn).toHaveBeenCalledTimes(1); // Should not retry
+    expect(shouldRetry).toHaveBeenCalledTimes(1);
+    expect(shouldRetry).toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  it('should retry when shouldRetry function returns true', async () => {
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Server Error 500'))
+      .mockResolvedValue('success');
+    const shouldRetry = vi.fn().mockReturnValue(true);
+
+    const result = await exponentialBackoff(fn, { shouldRetry, initialDelay: 1, maxRetries: 3 });
+    
+    expect(result).toBe('success');
+    expect(fn).toHaveBeenCalledTimes(2); // Initial call + 1 retry
+    expect(shouldRetry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('shouldRetryHttpError', () => {
+  it('should return true for 429 Too Many Requests', () => {
+    const error = new Error('Failed to run model: Too Many Requests 429');
+    expect(shouldRetryHttpError(error)).toBe(true);
+  });
+
+  it('should return true for 5xx server errors', () => {
+    const errors = [
+      new Error('Failed to run model: Internal Server Error 500'),
+      new Error('Failed to run model: Bad Gateway 502'),
+      new Error('Failed to run model: Service Unavailable 503'),
+      new Error('Failed to run model: Gateway Timeout 504'),
+      new Error('Failed to run model: HTTP Version Not Supported 505'),
+      new Error('Failed to run model: Variant Also Negotiates 506'),
+      new Error('Failed to run model: Insufficient Storage 507'),
+      new Error('Failed to run model: Loop Detected 508'),
+      new Error('Failed to run model: Not Extended 510'),
+      new Error('Failed to run model: Network Authentication Required 511'),
+    ];
+
+    errors.forEach(error => {
+      expect(shouldRetryHttpError(error)).toBe(true);
+    });
+  });
+
+  it('should return false for 4xx client errors (except 429)', () => {
+    const errors = [
+      new Error('Failed to run model: Bad Request 400'),
+      new Error('Failed to run model: Unauthorized 401'),
+      new Error('Failed to run model: Payment Required 402'),
+      new Error('Failed to run model: Forbidden 403'),
+      new Error('Failed to run model: Not Found 404'),
+      new Error('Failed to run model: Method Not Allowed 405'),
+      new Error('Failed to run model: Not Acceptable 406'),
+      new Error('Failed to run model: Proxy Authentication Required 407'),
+      new Error('Failed to run model: Request Timeout 408'),
+      new Error('Failed to run model: Conflict 409'),
+      new Error('Failed to run model: Gone 410'),
+      new Error('Failed to run model: Length Required 411'),
+      new Error('Failed to run model: Precondition Failed 412'),
+      new Error('Failed to run model: Payload Too Large 413'),
+      new Error('Failed to run model: URI Too Long 414'),
+      new Error('Failed to run model: Unsupported Media Type 415'),
+      new Error('Failed to run model: Range Not Satisfiable 416'),
+      new Error('Failed to run model: Expectation Failed 417'),
+      new Error('Failed to run model: I\'m a teapot 418'),
+      new Error('Failed to run model: Misdirected Request 421'),
+      new Error('Failed to run model: Unprocessable Entity 422'),
+      new Error('Failed to run model: Locked 423'),
+      new Error('Failed to run model: Failed Dependency 424'),
+      new Error('Failed to run model: Too Early 425'),
+      new Error('Failed to run model: Upgrade Required 426'),
+      new Error('Failed to run model: Precondition Required 428'),
+      new Error('Failed to run model: Request Header Fields Too Large 431'),
+      new Error('Failed to run model: Unavailable For Legal Reasons 451'),
+    ];
+
+    errors.forEach(error => {
+      expect(shouldRetryHttpError(error)).toBe(false);
+    });
+  });
+
+  it('should return true for common retryable error patterns', () => {
+    const errors = [
+      new Error('Network error occurred'),
+      new Error('Connection timeout'),
+      new Error('Request timeout'),
+      new Error('Socket timeout'),
+      new Error('Temporary failure'),
+      new Error('Service unavailable'),
+      new Error('Internal server error'),
+      new Error('Bad gateway'),
+      new Error('Gateway timeout'),
+    ];
+
+    errors.forEach(error => {
+      expect(shouldRetryHttpError(error)).toBe(true);
+    });
+  });
+
+  it('should return false for errors without recognizable patterns', () => {
+    const errors = [
+      new Error('Invalid API key'),
+      new Error('Model not found'),
+      new Error('Insufficient credits'),
+      new Error('Validation error'),
+      'not an error object',
+      null,
+      undefined,
+    ];
+
+    errors.forEach(error => {
+      expect(shouldRetryHttpError(error)).toBe(false);
+    });
+  });
+
+  it('should return false for non-Error objects', () => {
+    expect(shouldRetryHttpError('string error')).toBe(false);
+    expect(shouldRetryHttpError(null)).toBe(false);
+    expect(shouldRetryHttpError(undefined)).toBe(false);
+    expect(shouldRetryHttpError(123)).toBe(false);
+    expect(shouldRetryHttpError({})).toBe(false);
   });
 });

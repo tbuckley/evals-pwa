@@ -11,7 +11,7 @@ import { Semaphore } from '$lib/utils/semaphore';
 import { sse } from '$lib/utils/sse';
 import { z } from 'zod';
 import { CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN } from './common';
-import { exponentialBackoff } from '$lib/utils/exponentialBackoff';
+import { exponentialBackoff, shouldRetryHttpError } from '$lib/utils/exponentialBackoff';
 
 const ANTHROPIC_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
 
@@ -158,7 +158,7 @@ export class AnthropicProvider implements ModelProvider {
             throw new Error(`Failed to run model: ${error.error.type}: ${error.error.message}`);
           }
           return resp;
-        });
+        }, { shouldRetry: shouldRetryHttpError });
 
         const stream = resp.body;
         let message: AnthropicMessage | null = null;
