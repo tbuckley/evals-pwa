@@ -13,27 +13,27 @@ function createTestLiveRun(): LiveRun {
     envs: [
       {
         provider: 'openai:gpt-3.5-turbo',
-        prompt: 'Test prompt 1'
+        prompt: 'Test prompt 1',
       },
       {
         provider: { id: 'anthropic:claude-3', labels: ['test'] },
-        prompt: 'Test prompt 2'
-      }
+        prompt: 'Test prompt 2',
+      },
     ],
     tests: [
       {
         description: 'Test case 1',
-        vars: { var1: 'value1', var2: 'value2' }
+        vars: { var1: 'value1', var2: 'value2' },
       },
       {
         description: 'Test case 2',
-        vars: { var1: 'value3', var2: 42 }
-      }
+        vars: { var1: 'value3', var2: 42 },
+      },
     ],
     varNames: ['var1', 'var2'],
     summaries: [
       readable({ total: 2, passed: 1, failed: 1, assertions: [] }),
-      readable({ total: 2, passed: 2, failed: 0, assertions: [] })
+      readable({ total: 2, passed: 2, failed: 0, assertions: [] }),
     ],
     results: [
       [
@@ -42,14 +42,14 @@ function createTestLiveRun(): LiveRun {
           output: ['Result 1 for env 1'],
           rawPrompt: 'Raw prompt 1',
           latencyMillis: 100,
-          assertionResults: []
+          assertionResults: [],
         }),
         readable({
           state: 'error' as const,
           error: 'Error in env 2',
           rawPrompt: 'Raw prompt 2',
-          assertionResults: []
-        })
+          assertionResults: [],
+        }),
       ],
       [
         readable({
@@ -57,16 +57,16 @@ function createTestLiveRun(): LiveRun {
           output: ['Result 2 for env 1'],
           rawPrompt: 'Raw prompt 3',
           latencyMillis: 150,
-          assertionResults: []
+          assertionResults: [],
         }),
         readable({
           state: 'success' as const,
           output: ['![](file://test.jpg)'],
           rawPrompt: 'Raw prompt 4',
-          assertionResults: []
-        })
-      ]
-    ]
+          assertionResults: [],
+        }),
+      ],
+    ],
   };
 }
 
@@ -78,13 +78,13 @@ describe('csvExport', () => {
 
     // Should have 5 lines: header, provider, prompt, and 2 data rows
     expect(lines).toHaveLength(5);
-    
+
     // Check header structure
     expect(lines[0]).toBe('"Test","var1","var2","openai:gpt-3.5-turbo","anthropic:claude-3"');
-    
+
     // Check provider row
     expect(lines[1]).toBe('"Provider","","","openai:gpt-3.5-turbo","anthropic:claude-3"');
-    
+
     // Check prompt row
     expect(lines[2]).toBe('"Prompt","","","Test prompt 1","Test prompt 2"');
   });
@@ -96,9 +96,11 @@ describe('csvExport', () => {
 
     // Check first data row
     expect(lines[3]).toBe('"Test case 1","value1","value2","Result 1 for env 1","Error in env 2"');
-    
+
     // Check second data row - number should be stringified
-    expect(lines[4]).toBe('"Test case 2","value3","42","Result 2 for env 1","![](file://test.jpg)"');
+    expect(lines[4]).toBe(
+      '"Test case 2","value3","42","Result 2 for env 1","![](file://test.jpg)"',
+    );
   });
 
   test('handles different output types correctly', () => {
@@ -108,7 +110,7 @@ describe('csvExport', () => {
       [
         readable({ state: 'success' as const, output: undefined }),
         readable({ state: 'success' as const, output: ['String output'] }),
-      ]
+      ],
     ];
     run.tests = [{ description: 'Output test' }];
 
@@ -123,14 +125,14 @@ describe('csvExport', () => {
     run.tests = [
       {
         description: 'Test with null/undefined vars',
-        vars: { var1: null, var2: undefined }
-      }
+        vars: { var1: null, var2: undefined },
+      },
     ];
     run.results = [
       [
         readable({ state: 'success' as const, output: ['test'] }),
-        readable({ state: 'success' as const, output: ['test'] })
-      ]
+        readable({ state: 'success' as const, output: ['test'] }),
+      ],
     ];
 
     const csv = generateCsvContent(run);
@@ -145,20 +147,22 @@ describe('csvExport', () => {
     run.tests = [
       {
         description: 'Test with object var',
-        vars: { var1: { nested: { value: 'test' } }, var2: [1, 2, 3] }
-      }
+        vars: { var1: { nested: { value: 'test' } }, var2: [1, 2, 3] },
+      },
     ];
     run.results = [
       [
         readable({ state: 'success' as const, output: ['test'] }),
-        readable({ state: 'success' as const, output: ['test'] })
-      ]
+        readable({ state: 'success' as const, output: ['test'] }),
+      ],
     ];
 
     const csv = generateCsvContent(run);
     const lines = csv.split('\n');
 
-    expect(lines[3]).toBe('"Test with object var","{""nested"":{""value"":""test""}}","[1,2,3]","test","test"');
+    expect(lines[3]).toBe(
+      '"Test with object var","{""nested"":{""value"":""test""}}","[1,2,3]","test","test"',
+    );
   });
 
   test('properly escapes quotes in CSV content', () => {
@@ -166,31 +170,29 @@ describe('csvExport', () => {
     run.tests = [
       {
         description: 'Test with "quotes"',
-        vars: { var1: 'Value with "quotes"', var2: 'normal' }
-      }
+        vars: { var1: 'Value with "quotes"', var2: 'normal' },
+      },
     ];
     run.results = [
       [
         readable({ state: 'success' as const, output: ['Output with "quotes"'] }),
-        readable({ state: 'success' as const, output: ['Normal output'] })
-      ]
+        readable({ state: 'success' as const, output: ['Normal output'] }),
+      ],
     ];
 
     const csv = generateCsvContent(run);
     const lines = csv.split('\n');
 
-    expect(lines[3]).toBe('"Test with ""quotes""","Value with ""quotes""","normal","Output with ""quotes""","Normal output"');
+    expect(lines[3]).toBe(
+      '"Test with ""quotes""","Value with ""quotes""","normal","Output with ""quotes""","Normal output"',
+    );
   });
 
   test('handles unknown provider types', () => {
     const run = createTestLiveRun();
-    run.envs = [
-      { provider: null, prompt: 'test prompt' }
-    ];
+    run.envs = [{ provider: null, prompt: 'test prompt' }];
     run.tests = [{ description: 'Test' }];
-    run.results = [
-      [readable({ state: 'success' as const, output: ['test'] })]
-    ];
+    run.results = [[readable({ state: 'success' as const, output: ['test'] })]];
 
     const csv = generateCsvContent(run);
     const lines = csv.split('\n');
@@ -199,14 +201,12 @@ describe('csvExport', () => {
     expect(lines[1]).toBe('"Provider","","","unknown"');
   });
 
-
-
   test('does not include notes columns when includeNotes is false', () => {
     const run = createTestLiveRun();
-    
+
     const csv = generateCsvContent(run, {
       includeNotes: false,
-      annotations: null
+      annotations: null,
     });
     const lines = csv.split('\n');
 
@@ -217,10 +217,7 @@ describe('csvExport', () => {
   test('handles empty variable names array', () => {
     const run = createTestLiveRun();
     run.varNames = [];
-    run.tests = [
-      { description: 'Simple test' },
-      { description: 'Another test' }
-    ];
+    run.tests = [{ description: 'Simple test' }, { description: 'Another test' }];
 
     const csv = generateCsvContent(run);
     const lines = csv.split('\n');

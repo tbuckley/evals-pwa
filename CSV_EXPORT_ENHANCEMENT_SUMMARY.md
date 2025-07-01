@@ -1,11 +1,13 @@
 # CSV Export Enhancement Summary
 
 ## Overview
+
 Enhanced the CSV export functionality in the run results table to include more comprehensive data with improved column organization and support for notes annotations.
 
 ## Changes Made
 
 ### 1. Enhanced CSV Export Functionality (`src/lib/utils/csvExport.ts`)
+
 Created a new utility module with the following features:
 
 - **Variable Columns**: Added support for including variable columns in the leftmost positions (after the Test column)
@@ -15,15 +17,18 @@ Created a new utility module with the following features:
 - **CSV Formatting**: Proper quote escaping and formatting for CSV compliance
 
 #### Key Functions:
+
 - `generateCsvContent(run: LiveRun, options: CsvExportOptions): string` - Generates CSV content from run data
 - `downloadCsv(content: string, filename: string): void` - Handles file download
 
 ### 2. Updated Run Results Table Component (`src/lib/components/run-results/run-results-table.svelte`)
+
 - Refactored the `downloadCsv()` function to use the new utility
 - Added support for annotations detection and inclusion
 - Simplified the component logic by extracting CSV generation to utility
 
 ### 3. CSV Structure
+
 The enhanced CSV export now includes:
 
 ```
@@ -37,18 +42,21 @@ The enhanced CSV export now includes:
 ### 4. Features Implemented
 
 #### Variable Columns
+
 - Variables are displayed in the same order as in the Results Table
 - Supports all data types (strings, numbers, objects, arrays)
 - Handles null/undefined values appropriately
 - JSON stringifies complex objects
 
 #### Notes Integration
+
 - Notes columns are only included when annotations are available
 - Each environment gets its own notes column
 - Notes are fetched from the annotation system
 - Empty notes are handled gracefully
 
 #### Data Type Handling
+
 - **Strings**: Direct inclusion
 - **Numbers**: Converted to strings
 - **Objects/Arrays**: JSON stringified
@@ -57,11 +65,13 @@ The enhanced CSV export now includes:
 - **File outputs**: Converted to markdown image syntax
 
 #### CSV Compliance
+
 - Proper quote escaping (double quotes become double-double quotes)
 - All cells are quoted for consistency
 - Handles newlines and special characters
 
 ### 5. Comprehensive Unit Tests (`src/lib/utils/csvExport.test.ts`)
+
 Created 9 comprehensive test cases covering:
 
 - Basic CSV structure generation
@@ -77,6 +87,7 @@ Created 9 comprehensive test cases covering:
 ## Usage
 
 ### Basic Usage (without notes)
+
 ```typescript
 import { generateCsvContent } from '$lib/utils/csvExport';
 
@@ -84,12 +95,13 @@ const csvContent = generateCsvContent(liveRun);
 ```
 
 ### With Notes Support
+
 ```typescript
 import { generateCsvContent } from '$lib/utils/csvExport';
 
 const csvContent = generateCsvContent(liveRun, {
   includeNotes: true,
-  annotations: annotationManager
+  annotations: annotationManager,
 });
 ```
 
@@ -103,4 +115,5 @@ const csvContent = generateCsvContent(liveRun, {
 6. **Reliability**: Comprehensive test suite ensures functionality works correctly
 
 ## Backward Compatibility
+
 The changes are fully backward compatible. Existing CSV exports will continue to work, but with enhanced data and better organization.

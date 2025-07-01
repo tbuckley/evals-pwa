@@ -167,7 +167,7 @@
     const annotations = $selectedRunAnnotationStore;
     const content = generateCsvContent(run, {
       includeNotes: annotations !== null,
-      annotations
+      annotations,
     });
     downloadCsvFile(content, `eval-results-${run.id}.csv`);
   }
