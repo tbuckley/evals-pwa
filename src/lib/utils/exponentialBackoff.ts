@@ -81,35 +81,6 @@ export function shouldRetryHttpError(error: unknown): boolean {
     // Retry for 429 (Too Many Requests) and 5xx (Server Error) status codes
     return status === 429 || (status >= 500 && status < 600);
   }
-
-  // Fallback: Check if the error contains HTTP status information in the message
-  if (error instanceof Error) {
-    const message = error.message;
-    
-    // Look for HTTP status codes in the error message
-    const statusMatch = message.match(/\b(\d{3})\b/);
-    if (statusMatch) {
-      const status = parseInt(statusMatch[1], 10);
-      
-      // Retry for 429 (Too Many Requests) and 5xx (Server Error) status codes
-      return status === 429 || (status >= 500 && status < 600);
-    }
-    
-    // If we can't parse a status code, check for common retryable error patterns
-    const retryablePatterns = [
-      /network.*error/i,
-      /connection.*timeout/i,
-      /request.*timeout/i,
-      /socket.*timeout/i,
-      /temporary.*failure/i,
-      /service.*unavailable/i,
-      /internal.*server.*error/i,
-      /bad.*gateway/i,
-      /gateway.*timeout/i,
-    ];
-    
-    return retryablePatterns.some(pattern => pattern.test(message));
-  }
   
   // For unknown error types, don't retry
   return false;
