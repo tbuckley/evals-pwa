@@ -302,8 +302,44 @@
       }
     }
     el.setAttribute('tabindex', '0');
+
+    // Ensure the element is fully visible, if it can fit on the screen
+
+    // First, find the nearest scrollable parent (should be <main>)
+    let scrollableParent = el.parentElement;
+    const MIN_OVERFLOW = 2; // Because the <tr> apparently has `scrollHeight == clientHeight+1`
+    while (scrollableParent && !['HTML', 'BODY'].includes(scrollableParent.tagName)) {
+      if (scrollableParent.scrollHeight > scrollableParent.clientHeight + MIN_OVERFLOW) {
+        break;
+      }
+      scrollableParent = scrollableParent.parentElement;
+    }
+    if (scrollableParent) {
+      // Get offset of el inside scrollableParent
+      const rect = el.getBoundingClientRect();
+      const parentRect = scrollableParent.getBoundingClientRect();
+
+      let top = scrollableParent.scrollTop;
+      let left = scrollableParent.scrollLeft;
+
+      if (rect.top < parentRect.top || rect.height > parentRect.height) {
+        top += rect.top - parentRect.top;
+      } else if (rect.bottom > parentRect.bottom) {
+        top += rect.bottom - parentRect.bottom;
+      }
+      if (rect.left < parentRect.left || rect.width > parentRect.width) {
+        left += rect.left - parentRect.left;
+      } else if (rect.right > parentRect.right) {
+        left += rect.right - parentRect.right;
+      }
+
+      scrollableParent.scrollTo({
+        top,
+        left,
+      });
+    }
+
     el.focus();
-    // TODO ensure the element is fully visible, if possible
   }
 
   function focusable(node: HTMLElement) {
