@@ -515,6 +515,8 @@ In Settings, you can enable the cache. When enabled, provider responses are cach
 - The Configuration tab lets you write a configuration in the browser, which will be saved in-memory. You can save it to disk at any point.
 - When you run tests, it will check if your configuration has changed on disk and prompt you to use the updated one if so.
 - If you run tests and they are taking a while, feel free to navigate elsewhere -- a notification will be shown when your tests are complete.
+- Click the pencil icon to save notes for a results cell.
+- You can quickly navigate the results table using the keyboard. Click a cell to begin, then use arrow keys to navigate. Tap "n" to edit the notes for your current cell.
 
 ### Splitting configuration across multiple files
 

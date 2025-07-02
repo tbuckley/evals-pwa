@@ -20,6 +20,8 @@
   import GripVertical from 'lucide-svelte/icons/grip-vertical';
   import { Button } from '../ui/button';
   import { selectedRunAnnotationStore } from '$lib/state/derived';
+  import { resultNotesDialogStore } from '$lib/state/ui';
+  import { showPrompt } from '$lib/state/actions';
   import { generateCsvContent, downloadCsv as downloadCsvFile } from '$lib/utils/csvExport';
 
   export let run: LiveRun;
@@ -171,7 +173,183 @@
     });
     downloadCsvFile(content, `eval-results-${run.id}.csv`);
   }
+
+  let tableBodyEl: HTMLTableSectionElement | null = null;
+  function isTableFocused() {
+    const el = document.activeElement;
+    if (el instanceof HTMLElement) {
+      return el.tagName === 'TD' && el.closest('tbody') === tableBodyEl;
+    }
+    return false;
+  }
+
+  function onKeyDown(e: KeyboardEvent) {
+    if (!isTableFocused()) {
+      return;
+    }
+
+    const el = document.activeElement as HTMLTableCellElement;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      // Get the index, and find the TD in the next row
+      const index = Array.from(el.parentElement?.children ?? []).indexOf(el);
+      if (index === -1) {
+        return;
+      }
+      const nextRow = el.parentElement?.nextElementSibling as HTMLTableRowElement | undefined;
+      if (nextRow) {
+        const nextEl = nextRow.children[index] as HTMLTableCellElement | undefined;
+        if (nextEl) {
+          focusElement(nextEl);
+        }
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const index = Array.from(el.parentElement?.children ?? []).indexOf(el);
+      if (index === -1) {
+        return;
+      }
+      const prevRow = el.parentElement?.previousElementSibling as HTMLTableRowElement | undefined;
+      if (prevRow) {
+        const prevEl = prevRow.children[index] as HTMLTableCellElement | undefined;
+        if (prevEl) {
+          focusElement(prevEl);
+        }
+      }
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const nextCell = el.nextElementSibling as HTMLTableCellElement | undefined;
+      if (nextCell) {
+        focusElement(nextCell);
+      }
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prevCell = el.previousElementSibling as HTMLTableCellElement | undefined;
+      if (prevCell) {
+        focusElement(prevCell);
+      }
+    } else if (e.key === 'n') {
+      // "n" key edits notes
+      e.preventDefault();
+      const rowElement = el.parentElement as HTMLTableRowElement | undefined;
+      if (!rowElement) {
+        return;
+      }
+
+      const HEADER_ROWS = 1;
+      const numHiddenVarCols = $showVarsColumnsStore ? 0 : run.varNames.length;
+      const colIndex = Array.from(rowElement.children).indexOf(el) + numHiddenVarCols;
+      const rowIndex = Array.from(tableBodyEl?.children ?? []).indexOf(rowElement) - HEADER_ROWS;
+      if (colIndex === -1 || rowIndex === -1) {
+        return;
+      }
+      const cell = [...body[rowIndex].cells][colIndex];
+      if (cell.type === 'result') {
+        openNotesDialog(cell.index, () => {
+          // Use 0ms setTimeout to ensure focus is set after the dialog is closed
+          // Without this, the submit button steals focus back
+          setTimeout(() => {
+            focusElement(el);
+          }, 0);
+        });
+      }
+    }
+  }
+
+  function focusElement(el: HTMLElement) {
+    if (isTableFocused()) {
+      const prevEl = document.activeElement as HTMLElement | null;
+      if (prevEl) {
+        prevEl.setAttribute('tabindex', '-1');
+      }
+    }
+    el.setAttribute('tabindex', '0');
+
+    // Ensure the element is fully visible, if it can fit on the screen
+
+    // First, find the nearest scrollable parent (should be <main>)
+    let scrollableParent = el.parentElement;
+    const MIN_OVERFLOW = 2; // Because the <tr> apparently has `scrollHeight == clientHeight+1`
+    while (scrollableParent && !['HTML', 'BODY'].includes(scrollableParent.tagName)) {
+      if (scrollableParent.scrollHeight > scrollableParent.clientHeight + MIN_OVERFLOW) {
+        break;
+      }
+      scrollableParent = scrollableParent.parentElement;
+    }
+    if (scrollableParent) {
+      // Get offset of el inside scrollableParent
+      const rect = el.getBoundingClientRect();
+      const parentRect = scrollableParent.getBoundingClientRect();
+
+      let top = scrollableParent.scrollTop;
+      let left = scrollableParent.scrollLeft;
+
+      if (rect.top < parentRect.top || rect.height > parentRect.height) {
+        top += rect.top - parentRect.top;
+      } else if (rect.bottom > parentRect.bottom) {
+        top += rect.bottom - parentRect.bottom;
+      }
+      if (rect.left < parentRect.left || rect.width > parentRect.width) {
+        left += rect.left - parentRect.left;
+      } else if (rect.right > parentRect.right) {
+        left += rect.right - parentRect.right;
+      }
+
+      scrollableParent.scrollTo({
+        top,
+        left,
+      });
+    }
+
+    el.focus();
+  }
+
+  function focusable(node: HTMLElement) {
+    function onClick(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      if (target.closest('button')) {
+        return;
+      }
+      e.preventDefault();
+      focusElement(node);
+    }
+    node.setAttribute('tabindex', '-1');
+    node.addEventListener('click', onClick);
+    return {
+      destroy() {
+        node.removeAttribute('tabindex');
+        node.removeEventListener('click', onClick);
+      },
+    };
+  }
+
+  function openNotesDialog(index: [number, number], cb?: () => void) {
+    const cellAnnotations = $selectedRunAnnotationStore?.getCellAnnotation(index);
+    if (!cellAnnotations) {
+      return;
+    }
+
+    const annotations = get(cellAnnotations);
+    resultNotesDialogStore.set({
+      index,
+      notes: annotations.notes?.value ?? '',
+      onSave: async (notes) => {
+        const store = $selectedRunAnnotationStore;
+        if (store) {
+          await store.setCellNotes(index, notes);
+        } else {
+          await showPrompt({
+            title: 'Error saving notes',
+            description: ['Please refresh the page and try again.'],
+          });
+        }
+      },
+      callback: cb,
+    });
+  }
 </script>
+
+<svelte:window on:keydown={onKeyDown} />
 
 <div class="mb-2 flex items-center gap-4">
   <div class="flex items-center gap-1.5">
@@ -236,7 +414,7 @@
         {/each}
       </tr>
     </thead>
-    <tbody>
+    <tbody bind:this={tableBodyEl}>
       <tr class="border-b transition-colors hover:bg-muted/50">
         {#each header as cell, i}
           {#if cell.type !== 'var' || $showVarsColumnsStore}
@@ -264,7 +442,7 @@
         >
           {#each row.cells as cell, i}
             {#if cell.type !== 'var' || $showVarsColumnsStore}
-              <td class="p-1 align-top">
+              <td class="p-1 align-top focus:bg-muted" use:focusable>
                 <RunResultsSized width={columnWidths[i]}>
                   {#if cell.type === 'label'}
                     {cell.text}
@@ -282,6 +460,9 @@
                       testResult={cell.result}
                       index={cell.index}
                       height={row.rowHeight}
+                      on:open-notes={() => {
+                        openNotesDialog(cell.index);
+                      }}
                     />
                   {/if}
                 </RunResultsSized>
