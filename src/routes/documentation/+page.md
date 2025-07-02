@@ -141,7 +141,7 @@ interface Config {
 
 `prompts` is an array of prompts. Prompts use [Handlebars](https://handlebarsjs.com/) format (unlike Promptfoo's nunjucks). Test case variables are all considered "safe" strings and will not be escaped.
 
-A prompt variable may also be substituted with a file, depending on what the provider supports. For example, Gemini models supports PDF and various image, video, and audio formats.
+A prompt variable may also be substituted with a file, depending on what the provider supports. For example, Gemini models support PDF and various image, video, and audio formats.
 
 To include system instructions or simulate a conversation, you can specify roles. Note that the prompt is still just a string, but it contains valid yaml; this approach supports iterating over a set of messages if desired.
 
@@ -340,7 +340,7 @@ tests:
           needle: washington
 ```
 
-#### Javascript Assertions=
+#### Javascript Assertions
 
 For `javascript` assertions, your code must provide a function with this signature:
 
@@ -556,7 +556,7 @@ Generators can help you quickly create tests (or any other configuration) from w
 
 ```yaml
 providers:
-  =gen: function(...args) {return args.map(a => `gemini:${a}`);}
+  =gen: function(...args) {return args.map(a => `openai:${a}`);}
   args:
     - 4o
     - 4o-mini
