@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { exponentialBackoff } from './exponentialBackoff';
+import { exponentialBackoff, shouldRetryHttpError, HttpError } from './exponentialBackoff';
 
 describe('exponentialBackoff', () => {
   afterEach(() => {
@@ -132,5 +132,85 @@ describe('exponentialBackoff', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith('Error in onRetry callback:', expect.any(Error));
 
     consoleErrorSpy.mockRestore();
+  });
+
+  it('should respect shouldRetry function to skip retries for non-retryable errors', async () => {
+    const fn = vi.fn().mockRejectedValue(new Error('Bad Request 400'));
+    const shouldRetry = vi.fn().mockReturnValue(false);
+
+    await expect(exponentialBackoff(fn, { shouldRetry, maxRetries: 3 })).rejects.toThrow(
+      'Bad Request 400',
+    );
+
+    expect(fn).toHaveBeenCalledTimes(1); // Should not retry
+    expect(shouldRetry).toHaveBeenCalledTimes(1);
+    expect(shouldRetry).toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  it('should retry when shouldRetry function returns true', async () => {
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Server Error 500'))
+      .mockResolvedValue('success');
+    const shouldRetry = vi.fn().mockReturnValue(true);
+
+    const result = await exponentialBackoff(fn, { shouldRetry, initialDelay: 1, maxRetries: 3 });
+
+    expect(result).toBe('success');
+    expect(fn).toHaveBeenCalledTimes(2); // Initial call + 1 retry
+    expect(shouldRetry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('HttpError', () => {
+  it('should create an HttpError with message and status', () => {
+    const error = new HttpError('Test error message', 404);
+    expect(error.message).toBe('Test error message');
+    expect(error.status).toBe(404);
+    expect(error.name).toBe('HttpError');
+    expect(error instanceof Error).toBe(true);
+    expect(error instanceof HttpError).toBe(true);
+  });
+
+  it('should maintain proper stack trace', () => {
+    const error = new HttpError('Test error', 500);
+    expect(error.stack).toBeDefined();
+    expect(error.stack).toContain('HttpError');
+  });
+});
+
+describe('shouldRetryHttpError', () => {
+  describe('with HttpError instances', () => {
+    it('should return true for 429 Too Many Requests', () => {
+      const error = new HttpError('Too Many Requests', 429);
+      expect(shouldRetryHttpError(error)).toBe(true);
+    });
+
+    it('should return true for 5xx server errors', () => {
+      const statusCodes = [500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511, 599];
+      statusCodes.forEach((status) => {
+        const error = new HttpError(`Server Error ${status}`, status);
+        expect(shouldRetryHttpError(error)).toBe(true);
+      });
+    });
+
+    it('should return false for 4xx client errors (except 429)', () => {
+      const statusCodes = [
+        400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417,
+        418, 421, 422, 423, 424, 425, 426, 428, 431, 451,
+      ];
+      statusCodes.forEach((status) => {
+        const error = new HttpError(`Client Error ${status}`, status);
+        expect(shouldRetryHttpError(error)).toBe(false);
+      });
+    });
+
+    it('should return false for 1xx, 2xx, and 3xx status codes', () => {
+      const statusCodes = [100, 101, 102, 200, 201, 204, 300, 301, 302, 304];
+      statusCodes.forEach((status) => {
+        const error = new HttpError(`Status ${status}`, status);
+        expect(shouldRetryHttpError(error)).toBe(false);
+      });
+    });
   });
 });

@@ -11,7 +11,7 @@ import { Semaphore } from '$lib/utils/semaphore';
 import { sse } from '$lib/utils/sse';
 import { z } from 'zod';
 import { CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN } from './common';
-import { exponentialBackoff } from '$lib/utils/exponentialBackoff';
+import { exponentialBackoff, shouldRetryHttpError, HttpError } from '$lib/utils/exponentialBackoff';
 
 const ANTHROPIC_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
 
@@ -135,30 +135,39 @@ export class AnthropicProvider implements ModelProvider {
       request,
       runModel: async function* () {
         yield '';
-        const resp = await exponentialBackoff(async () => {
-          const resp = await fetch(`https://api.anthropic.com/v1/messages`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': apiKey,
-              'anthropic-version': '2023-06-01', // SSE change to align with openai
-              'anthropic-dangerous-direct-browser-access': 'true',
-            },
-            body: JSON.stringify(request),
-            signal: context.abortSignal,
-          });
-          if (!resp.ok) {
-            let error;
-            try {
-              const json: unknown = await resp.json();
-              error = errorSchema.parse(json);
-            } catch {
-              throw new Error(`Failed to run model: ${resp.statusText} ${resp.status}`);
+        const resp = await exponentialBackoff(
+          async () => {
+            const resp = await fetch(`https://api.anthropic.com/v1/messages`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01', // SSE change to align with openai
+                'anthropic-dangerous-direct-browser-access': 'true',
+              },
+              body: JSON.stringify(request),
+              signal: context.abortSignal,
+            });
+            if (!resp.ok) {
+              let error;
+              try {
+                const json: unknown = await resp.json();
+                error = errorSchema.parse(json);
+                throw new HttpError(
+                  `Failed to run model: ${error.error.type}: ${error.error.message}`,
+                  resp.status,
+                );
+              } catch (parseError) {
+                if (parseError instanceof HttpError) {
+                  throw parseError;
+                }
+                throw new HttpError(`Failed to run model: ${resp.statusText}`, resp.status);
+              }
             }
-            throw new Error(`Failed to run model: ${error.error.type}: ${error.error.message}`);
-          }
-          return resp;
-        });
+            return resp;
+          },
+          { shouldRetry: shouldRetryHttpError },
+        );
 
         const stream = resp.body;
         let message: AnthropicMessage | null = null;
