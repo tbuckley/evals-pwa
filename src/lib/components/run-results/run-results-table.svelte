@@ -276,7 +276,8 @@
       }
 
       const HEADER_ROWS = 1;
-      const colIndex = Array.from(rowElement.children).indexOf(el);
+      const numHiddenVarCols = $showVarsColumnsStore ? 0 : run.varNames.length;
+      const colIndex = Array.from(rowElement.children).indexOf(el) + numHiddenVarCols;
       const rowIndex = Array.from(tableBodyEl?.children ?? []).indexOf(rowElement);
       if (colIndex === -1 || rowIndex === -1) {
         return;
