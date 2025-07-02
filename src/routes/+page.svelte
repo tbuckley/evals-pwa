@@ -30,15 +30,18 @@
     e.preventDefault();
 
     submittingNotes = true;
-    const state = $resultNotesDialogStore;
-    const formData = new FormData(e.target as HTMLFormElement);
-    const notes = formData.get('notes') as string;
-    if (state) {
-      await state.onSave(notes);
-      state.callback?.();
+    try {
+      const state = $resultNotesDialogStore;
+      const formData = new FormData(e.target as HTMLFormElement);
+      const notes = formData.get('notes') as string;
+      if (state) {
+        await state.onSave(notes);
+        state.callback?.();
+      }
+      resultNotesDialogStore.set(null);
+    } finally {
+      submittingNotes = false;
     }
-    resultNotesDialogStore.set(null);
-    submittingNotes = false;
   }
 
   function enterSubmit(event: KeyboardEvent) {

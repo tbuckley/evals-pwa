@@ -239,11 +239,11 @@
       const HEADER_ROWS = 1;
       const numHiddenVarCols = $showVarsColumnsStore ? 0 : run.varNames.length;
       const colIndex = Array.from(rowElement.children).indexOf(el) + numHiddenVarCols;
-      const rowIndex = Array.from(tableBodyEl?.children ?? []).indexOf(rowElement);
+      const rowIndex = Array.from(tableBodyEl?.children ?? []).indexOf(rowElement) - HEADER_ROWS;
       if (colIndex === -1 || rowIndex === -1) {
         return;
       }
-      const cell = [...body[rowIndex - HEADER_ROWS].cells][colIndex];
+      const cell = [...body[rowIndex].cells][colIndex];
       if (cell.type === 'result') {
         openNotesDialog(cell.index, () => {
           // Use 0ms setTimeout to ensure focus is set after the dialog is closed
