@@ -1,0 +1,26 @@
+description: Pipeline example with each functionality
+
+providers:
+  - openai:gpt-4o-mini
+
+prompts:
+  - $pipeline:
+      # Run for each combo of letter and type
+      - each:
+          letter: letters
+          type: types
+        prompt: >
+          Pick a {{type}} that starts with {{letter}}.
+          Respond with one word and nothing else
+        outputAs: words
+      # Lists all the generated words
+      - prompt: >
+          Write a one paragraph story using all these words:
+          {{#each words}}
+          {{this}}
+          {{/each}}
+
+tests:
+  - vars:
+      letters: ["B", "O", "Y"]
+      types: ["noun", "verb"]

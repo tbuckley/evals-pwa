@@ -84,19 +84,178 @@ export class PipelineEnvironment implements TestEnvironment {
     const start = Date.now();
 
     const safeRunStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
-      // Generate an ID for the step (will increment inside runStep)
-      const count = stepRunCount.get(step.id) ?? 1;
-      const stepId = step.id + (count > 1 ? ` #${count}` : '');
-
       try {
-        await runStep(step, pipelineContext);
+        if (step.each) {
+          await runEachStep(step, pipelineContext);
+        } else {
+          await runStep(step, pipelineContext);
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        // Generate an ID for error reporting
+        const count = stepRunCount.get(step.id) ?? 1;
+        const stepId = step.id + (count > 1 ? ` #${count}` : '');
         result = {
           error: errorMessage,
           history: [...history, { id: stepId, error: errorMessage }],
         };
         taskQueue.abort();
+      }
+    };
+
+    const generateCombinations = (eachConfig: Record<string, string>, allVars: VarSet): Record<string, unknown>[] => {
+      // eachConfig maps variable names to array variable names
+      // e.g., { letter: "letters", type: "types" }
+      
+      const arrays: { varName: string; values: unknown[] }[] = [];
+      
+      // Get the arrays from the variables
+      for (const varName in eachConfig) {
+        const arrayVarName = eachConfig[varName];
+        const arrayValue = allVars[arrayVarName];
+        if (!Array.isArray(arrayValue)) {
+          throw new Error(`Variable ${arrayVarName} is not an array or does not exist`);
+        }
+        arrays.push({ varName, values: arrayValue });
+      }
+      
+      if (arrays.length === 0) {
+        return [];
+      }
+      
+      // Generate all combinations using a recursive approach
+      const generateCombos = (index: number, currentCombo: Record<string, unknown>): Record<string, unknown>[] => {
+        if (index >= arrays.length) {
+          return [{ ...currentCombo }];
+        }
+        
+        const { varName, values } = arrays[index];
+        const results: Record<string, unknown>[] = [];
+        
+        for (const value of values) {
+          const newCombo = { ...currentCombo, [varName]: value };
+          results.push(...generateCombos(index + 1, newCombo));
+        }
+        
+        return results;
+      };
+      
+      return generateCombos(0, {});
+    };
+
+    const runEachStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
+      if (!step.each) {
+        throw new Error(`runEachStep called on step without each: ${step.id}`);
+      }
+
+      // Generate all combinations from the arrays
+      const combinations = generateCombinations(step.each, { ...vars, ...pipelineContext.vars });
+      
+      if (combinations.length === 0) {
+        throw new Error(`No combinations found for step ${step.id}. Check that all referenced arrays exist and are not empty.`);
+      }
+
+      // Create a step execution for each combination
+      const eachPromises: Promise<void>[] = [];
+      const eachOutputs: NonNullable<TestOutput['output']>[] = [];
+      
+      for (let i = 0; i < combinations.length; i++) {
+        const combo = combinations[i];
+        const comboVars = { ...pipelineContext.vars, ...combo };
+        const comboContext = { ...pipelineContext, vars: comboVars };
+        
+        // Create a modified step for this combination (without the each property)
+        const { each, ...stepWithoutEach } = step;
+        const comboStep = {
+          ...stepWithoutEach,
+          id: `${step.id}-each-${i}`,
+        };
+        
+        const promise = runStep(comboStep, comboContext).then(() => {
+          // Get the output from the last history entry for this step
+          const stepHistory = history.filter(h => h.id === comboStep.id);
+          if (stepHistory.length > 0) {
+            const lastEntry = stepHistory[stepHistory.length - 1];
+            if (lastEntry.output) {
+              eachOutputs[i] = lastEntry.output;
+            }
+          }
+        });
+        
+        eachPromises.push(promise);
+      }
+      
+      // Wait for all combinations to complete
+      await Promise.all(eachPromises);
+      
+      // Create a combined result with all outputs
+      const combinedOutput = eachOutputs.filter(output => output !== undefined) as NonNullable<TestOutput['output']>[];
+      
+      // Create a summary entry for the each step
+      const stepResult: TestOutput = {
+        rawPrompt: `Each step with ${combinations.length} combinations`,
+        output: combinedOutput,
+        latencyMillis: 0, // Could aggregate latencies if needed
+      };
+      
+      // Add to history with the original step ID
+      history.push({ id: step.id, ...stepResult });
+      
+      // Handle outputAs for the combined result
+      const newHistory = [...pipelineContext.history, { prompt: [], output: combinedOutput as NonNullable<TestOutput['output']> }];
+      const newVars = { ...pipelineContext.vars };
+      if (step.outputAs) {
+        newVars[step.outputAs] = combinedOutput;
+      }
+      
+      // Mark the step as complete and continue with the next steps
+      const { isLeaf, next } = await pipelineState.markCompleteAndGetNextSteps(
+        step,
+        {
+          ...vars,
+          ...newVars,
+          $history: newHistory,
+          $output: combinedOutput,
+        },
+        { history: newHistory, vars: newVars },
+      );
+      
+      if (isLeaf) {
+        // If this isn't the first result, return an error instead
+        if (result !== undefined) {
+          if (!result.error) {
+            result = {
+              error: 'Pipeline produced multiple results',
+            };
+            taskQueue.abort();
+          }
+          return;
+        }
+
+        // If this isn't the last task, return an error instead
+        if (taskQueue.remaining() !== 1) {
+          result = {
+            error: 'Pipeline produced a result while still running',
+          };
+          taskQueue.abort();
+          return;
+        }
+
+        result = {
+          ...stepResult,
+          history,
+          latencyMillis: Date.now() - start,
+          tokenUsage: {
+            costDollars: history
+              .map((h) => h.tokenUsage?.costDollars)
+              .filter((c) => c !== undefined)
+              .reduce((a, b) => a + b, 0),
+          },
+        };
+      }
+      
+      for (const { step, context } of next) {
+        taskQueue.enqueue(() => safeRunStep(step, context));
       }
     };
 
@@ -276,6 +435,7 @@ export interface PipelineStep {
   deps?: string[];
   if?: string | CodeReference;
   outputAs?: string;
+  each?: Record<string, string>;
 }
 
 interface StepDepsStatus<S> {

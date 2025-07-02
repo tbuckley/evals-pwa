@@ -36,7 +36,33 @@ function normalizePrompt(prompt: FsPrompt): NormalizedPrompt {
   if (typeof prompt === 'object' && 'prompt' in prompt) {
     return prompt;
   }
-  return { $pipeline: prompt.$pipeline.map((step, index) => normalizePipelineStep(step, index)) };
+  const expandedSteps: NormalizedPipelineStep[] = [];
+  
+  for (let index = 0; index < prompt.$pipeline.length; index++) {
+    const step = prompt.$pipeline[index];
+    const normalizedStep = normalizePipelineStep(step, index);
+    
+    if (normalizedStep.each) {
+      // Expand the step into multiple steps for each combination
+      const expandedStepsForThis = expandEachStep(normalizedStep, index);
+      expandedSteps.push(...expandedStepsForThis);
+    } else {
+      expandedSteps.push(normalizedStep);
+    }
+  }
+  
+  return { $pipeline: expandedSteps };
+}
+
+function expandEachStep(step: NormalizedPipelineStep, baseIndex: number): NormalizedPipelineStep[] {
+  if (!step.each) {
+    return [step];
+  }
+
+  // The actual expansion will happen in the PipelineEnvironment when we have access to the vars
+  // For now, we just preserve the each configuration in the normalized step
+  
+  return [step];
 }
 
 function normalizePipelineStep(
@@ -56,7 +82,7 @@ function normalizePipelineStep(
     };
   }
   return {
-    id: `step-${index}`, // Provide a default ID
+    id: step.id ?? `step-${index}`, // Use provided ID or default
     ...step,
     prompt: Array.isArray(step.prompt) ? yaml.stringify(step.prompt) : step.prompt,
   };

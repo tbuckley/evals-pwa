@@ -152,6 +152,8 @@ describe('PipelineState', () => {
       return new PipelineState([{ id: 'step-0' }, { id: 'step-0' }], defaultMerge);
     }).toThrow('Steps have duplicate IDs');
   });
+
+
 });
 
 describe('orderedMerge', () => {
