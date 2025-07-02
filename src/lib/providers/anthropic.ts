@@ -135,33 +135,39 @@ export class AnthropicProvider implements ModelProvider {
       request,
       runModel: async function* () {
         yield '';
-        const resp = await exponentialBackoff(async () => {
-          const resp = await fetch(`https://api.anthropic.com/v1/messages`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': apiKey,
-              'anthropic-version': '2023-06-01', // SSE change to align with openai
-              'anthropic-dangerous-direct-browser-access': 'true',
-            },
-            body: JSON.stringify(request),
-            signal: context.abortSignal,
-          });
-          if (!resp.ok) {
-            let error;
-            try {
-              const json: unknown = await resp.json();
-              error = errorSchema.parse(json);
-              throw new HttpError(`Failed to run model: ${error.error.type}: ${error.error.message}`, resp.status);
-            } catch (parseError) {
-              if (parseError instanceof HttpError) {
-                throw parseError;
+        const resp = await exponentialBackoff(
+          async () => {
+            const resp = await fetch(`https://api.anthropic.com/v1/messages`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01', // SSE change to align with openai
+                'anthropic-dangerous-direct-browser-access': 'true',
+              },
+              body: JSON.stringify(request),
+              signal: context.abortSignal,
+            });
+            if (!resp.ok) {
+              let error;
+              try {
+                const json: unknown = await resp.json();
+                error = errorSchema.parse(json);
+                throw new HttpError(
+                  `Failed to run model: ${error.error.type}: ${error.error.message}`,
+                  resp.status,
+                );
+              } catch (parseError) {
+                if (parseError instanceof HttpError) {
+                  throw parseError;
+                }
+                throw new HttpError(`Failed to run model: ${resp.statusText}`, resp.status);
               }
-              throw new HttpError(`Failed to run model: ${resp.statusText}`, resp.status);
             }
-          }
-          return resp;
-        }, { shouldRetry: shouldRetryHttpError });
+            return resp;
+          },
+          { shouldRetry: shouldRetryHttpError },
+        );
 
         const stream = resp.body;
         let message: AnthropicMessage | null = null;

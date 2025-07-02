@@ -62,8 +62,13 @@ export class HttpError extends Error {
     this.status = status;
 
     // Maintains proper stack trace for where our error was thrown (only available on V8)
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, HttpError);
+    try {
+      const ErrorConstructor = Error as typeof Error & {
+        captureStackTrace: (targetObject: object, constructorOpt: typeof HttpError) => void;
+      };
+      ErrorConstructor.captureStackTrace(this, HttpError);
+    } catch {
+      // captureStackTrace is not available in all environments
     }
   }
 }
@@ -81,7 +86,37 @@ export function shouldRetryHttpError(error: unknown): boolean {
     // Retry for 429 (Too Many Requests) and 5xx (Server Error) status codes
     return status === 429 || (status >= 500 && status < 600);
   }
-  
+
+  // Fallback: Check if the error contains HTTP status information in the message
+  if (error instanceof Error) {
+    const message = error.message;
+
+    // Look for HTTP status codes in the error message
+    const statusRegex = /\b(\d{3})\b/;
+    const statusMatch = statusRegex.exec(message);
+    if (statusMatch) {
+      const status = parseInt(statusMatch[1], 10);
+
+      // Retry for 429 (Too Many Requests) and 5xx (Server Error) status codes
+      return status === 429 || (status >= 500 && status < 600);
+    }
+
+    // If we can't parse a status code, check for common retryable error patterns
+    const retryablePatterns = [
+      /network.*error/i,
+      /connection.*timeout/i,
+      /request.*timeout/i,
+      /socket.*timeout/i,
+      /temporary.*failure/i,
+      /service.*unavailable/i,
+      /internal.*server.*error/i,
+      /bad.*gateway/i,
+      /gateway.*timeout/i,
+    ];
+
+    return retryablePatterns.some((pattern) => pattern.test(message));
+  }
+
   // For unknown error types, don't retry
   return false;
 }

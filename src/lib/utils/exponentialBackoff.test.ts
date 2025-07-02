@@ -138,8 +138,10 @@ describe('exponentialBackoff', () => {
     const fn = vi.fn().mockRejectedValue(new Error('Bad Request 400'));
     const shouldRetry = vi.fn().mockReturnValue(false);
 
-    await expect(exponentialBackoff(fn, { shouldRetry, maxRetries: 3 })).rejects.toThrow('Bad Request 400');
-    
+    await expect(exponentialBackoff(fn, { shouldRetry, maxRetries: 3 })).rejects.toThrow(
+      'Bad Request 400',
+    );
+
     expect(fn).toHaveBeenCalledTimes(1); // Should not retry
     expect(shouldRetry).toHaveBeenCalledTimes(1);
     expect(shouldRetry).toHaveBeenCalledWith(expect.any(Error));
@@ -153,7 +155,7 @@ describe('exponentialBackoff', () => {
     const shouldRetry = vi.fn().mockReturnValue(true);
 
     const result = await exponentialBackoff(fn, { shouldRetry, initialDelay: 1, maxRetries: 3 });
-    
+
     expect(result).toBe('success');
     expect(fn).toHaveBeenCalledTimes(2); // Initial call + 1 retry
     expect(shouldRetry).toHaveBeenCalledTimes(1);
@@ -186,15 +188,18 @@ describe('shouldRetryHttpError', () => {
 
     it('should return true for 5xx server errors', () => {
       const statusCodes = [500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511, 599];
-      statusCodes.forEach(status => {
+      statusCodes.forEach((status) => {
         const error = new HttpError(`Server Error ${status}`, status);
         expect(shouldRetryHttpError(error)).toBe(true);
       });
     });
 
     it('should return false for 4xx client errors (except 429)', () => {
-      const statusCodes = [400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 421, 422, 423, 424, 425, 426, 428, 431, 451];
-      statusCodes.forEach(status => {
+      const statusCodes = [
+        400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417,
+        418, 421, 422, 423, 424, 425, 426, 428, 431, 451,
+      ];
+      statusCodes.forEach((status) => {
         const error = new HttpError(`Client Error ${status}`, status);
         expect(shouldRetryHttpError(error)).toBe(false);
       });
@@ -202,7 +207,7 @@ describe('shouldRetryHttpError', () => {
 
     it('should return false for 1xx, 2xx, and 3xx status codes', () => {
       const statusCodes = [100, 101, 102, 200, 201, 204, 300, 301, 302, 304];
-      statusCodes.forEach(status => {
+      statusCodes.forEach((status) => {
         const error = new HttpError(`Status ${status}`, status);
         expect(shouldRetryHttpError(error)).toBe(false);
       });

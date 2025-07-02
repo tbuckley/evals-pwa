@@ -175,33 +175,36 @@ export class GeminiProvider implements ModelProvider {
     return {
       request,
       runModel: async function* () {
-        const resp = await exponentialBackoff(async () => {
-          const resp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
+        const resp = await exponentialBackoff(
+          async () => {
+            const resp = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(request),
+                signal: context.abortSignal,
               },
-              body: JSON.stringify(request),
-              signal: context.abortSignal,
-            },
-          );
-          if (!resp.ok) {
-            let error;
-            try {
-              const json: unknown = await resp.json();
-              error = errorSchema.parse(json);
-              throw new HttpError(`Failed to run model: ${error.error.message}`, resp.status);
-            } catch (parseError) {
-              if (parseError instanceof HttpError) {
-                throw parseError;
+            );
+            if (!resp.ok) {
+              let error;
+              try {
+                const json: unknown = await resp.json();
+                error = errorSchema.parse(json);
+                throw new HttpError(`Failed to run model: ${error.error.message}`, resp.status);
+              } catch (parseError) {
+                if (parseError instanceof HttpError) {
+                  throw parseError;
+                }
+                throw new HttpError(`Failed to run model: ${resp.statusText}`, resp.status);
               }
-              throw new HttpError(`Failed to run model: ${resp.statusText}`, resp.status);
             }
-          }
-          return resp;
-        }, { shouldRetry: shouldRetryHttpError });
+            return resp;
+          },
+          { shouldRetry: shouldRetryHttpError },
+        );
         const stream = resp.body;
         const fullResponse: Part[] = [];
 
