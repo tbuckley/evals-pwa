@@ -170,6 +170,43 @@ export class PipelineEnvironment implements TestEnvironment {
         throw e;
       }
 
+      // Apply transform if specified
+      if (step.transform) {
+        try {
+          const code = await toCodeReference(step.transform);
+          const execute = await code.bind();
+          const transformedOutput = await execute(output, {
+            vars: {
+              ...vars,
+              ...pipelineContext.vars,
+              $history: pipelineContext.history,
+              $output: pipelineContext.history[history.length - 1]?.output ?? null,
+            },
+          });
+
+          // Validate transform output type
+          if (
+            typeof transformedOutput === 'string' ||
+            (Array.isArray(transformedOutput) &&
+              transformedOutput.every((item) => typeof item === 'string' || item instanceof Blob))
+          ) {
+            output = await modelOutputToTestOutput(transformedOutput);
+          } else {
+            throw new Error('Transform must return string or array of strings/Blobs');
+          }
+        } catch (e) {
+          const errorMessage = e instanceof Error ? e.message : 'Transform error';
+          result = {
+            rawPrompt: prompt,
+            rawOutput: response,
+            error: `Transform failed: ${errorMessage}`,
+            latencyMillis,
+          };
+          history.push({ id: stepId, ...result });
+          return;
+        }
+      }
+
       // Add the output to the vars
       const newHistory = [...pipelineContext.history, { prompt, output }];
       const newVars = { ...pipelineContext.vars };

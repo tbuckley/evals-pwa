@@ -1,7 +1,19 @@
 import { describe, test, expect } from 'vitest';
-import { makeOrderedMerge, orderedMerge, PipelineState } from './PipelineEnvironment';
+import {
+  makeOrderedMerge,
+  orderedMerge,
+  PipelineState,
+  PipelineEnvironment,
+} from './PipelineEnvironment';
 import { toCodeReference } from '$lib/storage/CodeReference';
 import dedent from 'dedent';
+import type {
+  ModelProvider,
+  RunContext,
+  TokenUsage,
+  NormalizedPipelinePrompt,
+  TestOutput,
+} from '$lib/types';
 
 function defaultMerge<T>(a: T, _b: T) {
   return a;
@@ -180,5 +192,210 @@ describe('orderedMerge', () => {
     expect(orderedMerge(a, orderedMerge(a, b, mergeFn), mergeFn)).toEqual(
       orderedMerge(a, b, mergeFn),
     );
+  });
+});
+
+describe('PipelineEnvironment Transform', () => {
+  // Mock model provider for testing
+  const mockProvider: ModelProvider = {
+    id: 'test-provider',
+    run() {
+      return Promise.resolve({
+        request: {},
+        runModel: async function* () {
+          yield 'Hello, World!';
+          return await Promise.resolve({ response: 'Hello, World!', latencyMillis: 100 });
+        },
+      });
+    },
+    extractOutput(response: unknown) {
+      return Promise.resolve(response as string);
+    },
+    extractTokenUsage(): TokenUsage {
+      return { totalTokens: 10, costDollars: 0.01 };
+    },
+  };
+
+  const mockContext: RunContext = {
+    abortSignal: new AbortController().signal,
+  };
+
+  async function runPipelineTest(env: PipelineEnvironment, vars = {}): Promise<TestOutput | null> {
+    const generator = env.run(vars, mockContext);
+    let finalResult: TestOutput | null = null;
+
+    for await (const update of generator) {
+      // The final result will be a TestOutput object
+      if (typeof update === 'object') {
+        finalResult = update as TestOutput;
+      }
+    }
+
+    return finalResult;
+  }
+
+  test('applies string transform to pipeline step output', {}, async function () {
+    const pipeline: NormalizedPipelinePrompt = {
+      $pipeline: [
+        {
+          id: 'step-0',
+          prompt: 'Say hello',
+          transform: dedent`
+            function execute(output) {
+              return output.toUpperCase();
+            }
+          `,
+          outputAs: 'greeting',
+        },
+      ],
+    };
+
+    const env = new PipelineEnvironment({
+      models: { default: mockProvider },
+      pipeline,
+    });
+
+    const result = await runPipelineTest(env);
+    expect(result?.output).toBe('HELLO, WORLD!');
+    expect(result?.error).toBeUndefined();
+  });
+
+  test('transform has access to variables', {}, async function () {
+    const pipeline: NormalizedPipelinePrompt = {
+      $pipeline: [
+        {
+          id: 'step-0',
+          prompt: 'Say hello',
+          transform: dedent`
+            function execute(output, context) {
+              return output + ' from ' + context.vars.name;
+            }
+          `,
+          outputAs: 'greeting',
+        },
+      ],
+    };
+
+    const env = new PipelineEnvironment({
+      models: { default: mockProvider },
+      pipeline,
+    });
+
+    const result = await runPipelineTest(env, { name: 'Alice' });
+    expect(result?.output).toBe('Hello, World! from Alice');
+    expect(result?.error).toBeUndefined();
+  });
+
+  test('transform error is handled gracefully', {}, async function () {
+    const pipeline: NormalizedPipelinePrompt = {
+      $pipeline: [
+        {
+          id: 'step-0',
+          prompt: 'Say hello',
+          transform: dedent`
+            function execute(output) {
+              throw new Error('Transform failed intentionally');
+            }
+          `,
+          outputAs: 'greeting',
+        },
+      ],
+    };
+
+    const env = new PipelineEnvironment({
+      models: { default: mockProvider },
+      pipeline,
+    });
+
+    const result = await runPipelineTest(env);
+    expect(result?.error).toContain('Transform failed: Transform failed intentionally');
+  });
+
+  test('transform validates return type', {}, async function () {
+    const pipeline: NormalizedPipelinePrompt = {
+      $pipeline: [
+        {
+          id: 'step-0',
+          prompt: 'Say hello',
+          transform: dedent`
+            function execute(output) {
+              return 42; // Invalid return type
+            }
+          `,
+          outputAs: 'greeting',
+        },
+      ],
+    };
+
+    const env = new PipelineEnvironment({
+      models: { default: mockProvider },
+      pipeline,
+    });
+
+    const result = await runPipelineTest(env);
+    expect(result?.error).toContain('Transform must return string or array of strings/Blobs');
+  });
+
+  test('transform works with array output', {}, async function () {
+    // Mock provider that returns array output
+    const arrayMockProvider: ModelProvider = {
+      ...mockProvider,
+      extractOutput() {
+        return Promise.resolve(['Hello', 'World']);
+      },
+    };
+
+    const pipeline: NormalizedPipelinePrompt = {
+      $pipeline: [
+        {
+          id: 'step-0',
+          prompt: 'Say hello',
+          transform: dedent`
+            function execute(output) {
+              return output.map(s => s.toUpperCase());
+            }
+          `,
+          outputAs: 'greeting',
+        },
+      ],
+    };
+
+    const env = new PipelineEnvironment({
+      models: { default: arrayMockProvider },
+      pipeline,
+    });
+
+    const result = await runPipelineTest(env);
+    expect(result?.output).toEqual(['HELLO', 'WORLD']);
+    expect(result?.error).toBeUndefined();
+  });
+
+  test('transform works with CodeReference (file reference)', {}, async function () {
+    // Create a CodeReference for the transform
+    const transformCodeRef = await toCodeReference(dedent`
+      function execute(output, context) {
+        return 'Transformed: ' + output + ' (var: ' + context.vars.testVar + ')';
+      }
+    `);
+
+    const pipeline: NormalizedPipelinePrompt = {
+      $pipeline: [
+        {
+          id: 'step-0',
+          prompt: 'Say hello',
+          transform: transformCodeRef,
+          outputAs: 'greeting',
+        },
+      ],
+    };
+
+    const env = new PipelineEnvironment({
+      models: { default: mockProvider },
+      pipeline,
+    });
+
+    const result = await runPipelineTest(env, { testVar: 'test123' });
+    expect(result?.output).toBe('Transformed: Hello, World! (var: test123)');
+    expect(result?.error).toBeUndefined();
   });
 });

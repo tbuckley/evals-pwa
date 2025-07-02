@@ -1,0 +1,36 @@
+description: Pipeline example with transform functions
+
+providers:
+  - gemini:gemini-2.5-flash
+
+prompts:
+  - $pipeline:
+      - prompt: 'Write a short sentence about {{topic}}.'
+        outputAs: sentence
+        transform: |
+          function execute(output) {
+            return output.toUpperCase();
+          }
+      - deps: ['sentence']
+        prompt: 'Take this sentence and make it more interesting: {{sentence}}'
+        outputAs: enhanced
+        transform: |
+          function execute(output, context) {
+            return output + ' (Enhanced from: ' + context.vars.sentence + ')';
+          }
+      - deps: ['enhanced']
+        prompt: 'Rate this text from 1-10: {{enhanced}}'
+        transform: |
+          function execute(output) {
+            // Extract number from output and add context
+            const rating = output.match(/\d+/)?.[0] || 'unknown';
+            return 'Rating: ' + rating + '/10';
+          }
+
+tests:
+  - vars:
+      topic: cats
+  - vars:
+      topic: space exploration
+  - vars:
+      topic: cooking
