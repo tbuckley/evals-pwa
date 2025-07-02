@@ -1,0 +1,25 @@
+description: Pipeline example with each feature
+
+providers:
+  - gemini:gemini-2.5-flash
+
+prompts:
+  - $pipeline:
+      # Run for each combo of letter and type
+      - each:
+          letter: letters
+          type: types
+        prompt: >
+          Pick a {{type}} that starts with {{letter}}.
+          Respond with one word and nothing else
+      # Lists all the generated words
+      - prompt: >
+          Write a one paragraph story using all these words:
+          {{#each $output}}
+          {{this}}
+          {{/each}}
+
+tests:
+  - vars:
+      letters: ['B', 'O', 'Y']
+      types: ['noun', 'verb']

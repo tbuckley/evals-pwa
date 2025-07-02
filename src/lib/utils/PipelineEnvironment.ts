@@ -113,12 +113,17 @@ export class PipelineEnvironment implements TestEnvironment {
         throw new Error(`Model for step ${step.id} not found`);
       }
 
+      // Get each variables if this is an expanded step
+      const stepWithEach = step as NormalizedPipelineStep & { _eachVars?: Record<string, unknown> };
+      const eachVars = stepWithEach._eachVars ?? {};
+
       // Render the prompt
       const promptFormatter = new HandlebarsPromptFormatter(step.prompt);
       const prompt = await promptFormatter.format(
         {
           ...vars,
           ...pipelineContext.vars,
+          ...eachVars,
           $history: pipelineContext.history,
           $output: pipelineContext.history[history.length - 1]?.output ?? null,
         },
@@ -276,6 +281,7 @@ export interface PipelineStep {
   deps?: string[];
   if?: string | CodeReference;
   outputAs?: string;
+  each?: Record<string, string>;
 }
 
 interface StepDepsStatus<S> {
@@ -296,6 +302,7 @@ function createStepDepsStatus<S>(stepIds: string[], outputs: string[]): StepDeps
 
 export class PipelineState<T extends PipelineStep, S> {
   stepIdMap: Map<string, T> = new Map<string, T>();
+  originalSteps: T[] = [];
 
   stepDepsStatus: Map<string, StepDepsStatus<S>> = new Map<string, StepDepsStatus<S>>();
   stepDepToIds: Map<string, string[]> = new Map<string, string[]>();
@@ -305,6 +312,7 @@ export class PipelineState<T extends PipelineStep, S> {
 
   constructor(steps: T[], contextMerge: (a: S, b: S) => S) {
     this.contextMerge = contextMerge;
+    this.originalSteps = steps;
 
     // Register step dependencies
     for (let i = 0; i < steps.length; i++) {
@@ -351,15 +359,83 @@ export class PipelineState<T extends PipelineStep, S> {
     });
   }
 
-  private async testStep(step: T, vars: VarSet): Promise<boolean> {
+  private generateCombinations(
+    eachSpec: Record<string, string>,
+    vars: VarSet,
+  ): Record<string, unknown>[] {
+    const keys = Object.keys(eachSpec);
+    const arrays = keys.map((key) => {
+      const arrayName = eachSpec[key];
+      const arr = vars[arrayName];
+      if (!Array.isArray(arr)) {
+        return [];
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+      return arr;
+    });
+
+    // Generate cartesian product
+    const combinations: Record<string, unknown>[] = [];
+
+    function generateCombos(index: number, current: Record<string, unknown>) {
+      if (index === keys.length) {
+        combinations.push({ ...current });
+        return;
+      }
+
+      const array = arrays[index];
+      const key = keys[index];
+
+      for (const value of array) {
+        current[key] = value;
+        generateCombos(index + 1, current);
+      }
+    }
+
+    if (arrays.length > 0 && arrays.every((arr) => arr.length > 0)) {
+      generateCombos(0, {});
+    }
+
+    return combinations;
+  }
+
+  private expandStepWithEach(originalStep: T, vars: VarSet): T[] {
+    if (!originalStep.each) {
+      return [originalStep];
+    }
+
+    const combinations = this.generateCombinations(originalStep.each, vars);
+
+    return combinations.map((combo, index) => {
+      const expandedStep = {
+        ...originalStep,
+        id: `${originalStep.id}-each-${index}`,
+        _eachVars: combo,
+        _originalId: originalStep.id,
+      } as T & { _eachVars: Record<string, unknown>; _originalId: string };
+
+      return expandedStep;
+    });
+  }
+
+  private async testStep(
+    step: T & { _eachVars?: Record<string, unknown> },
+    vars: VarSet,
+  ): Promise<boolean> {
     if (!step.if) {
       return true;
     }
 
+    // Merge each variables with vars for evaluation
+    const evaluationVars = {
+      ...vars,
+      ...(step._eachVars ?? {}),
+    };
+
     // Evaluate the if statement
     const code = await toCodeReference(step.if);
     const execute = await code.bind();
-    const result = await execute(vars);
+    const result = await execute(evaluationVars);
     if (typeof result !== 'boolean') {
       throw new Error(`Step ${step.id} if statement returned non-boolean`);
     }
@@ -436,8 +512,14 @@ export class PipelineState<T extends PipelineStep, S> {
       candidates.push(...res.next.map(({ step }) => step));
     }
 
+    // Expand steps with 'each' property
+    const expandedCandidates: T[] = [];
+    for (const step of candidates) {
+      expandedCandidates.push(...this.expandStepWithEach(step, latestVars));
+    }
+
     const validSteps = await Promise.all(
-      candidates.map(async (step) => ({
+      expandedCandidates.map(async (step) => ({
         step,
         valid: await this.testStep(step, latestVars),
       })),
@@ -453,8 +535,12 @@ export class PipelineState<T extends PipelineStep, S> {
     const nextSteps: { step: T; context: S }[] = [];
     let numDeps = 0;
 
+    // Get the original step ID for dependency tracking
+    const stepWithEach = step as T & { _originalId?: string };
+    const stepIdForDeps = stepWithEach._originalId ?? step.id;
+
     // Mark any dependencies on this step ID as complete
-    const res = this.markStepAsComplete(step.id, context);
+    const res = this.markStepAsComplete(stepIdForDeps, context);
     nextSteps.push(...res.next);
     numDeps += res.numDeps;
 
@@ -474,9 +560,18 @@ export class PipelineState<T extends PipelineStep, S> {
       }
     });
 
+    // Expand next steps with 'each' if needed
+    const expandedNextSteps: { step: T; context: S }[] = [];
+    for (const { step: nextStep, context: nextContext } of nextSteps) {
+      const expanded = this.expandStepWithEach(nextStep, latestVars);
+      expandedNextSteps.push(
+        ...expanded.map((expandedStep) => ({ step: expandedStep, context: nextContext })),
+      );
+    }
+
     // Check that all steps are available with if statements
     const nextStepsValid = await Promise.all(
-      nextSteps.map(async (step) => ({
+      expandedNextSteps.map(async (step) => ({
         step,
         valid: await this.testStep(step.step, latestVars),
       })),

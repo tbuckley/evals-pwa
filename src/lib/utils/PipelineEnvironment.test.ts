@@ -152,6 +152,124 @@ describe('PipelineState', () => {
       return new PipelineState([{ id: 'step-0' }, { id: 'step-0' }], defaultMerge);
     }).toThrow('Steps have duplicate IDs');
   });
+
+  // NEW TESTS FOR 'each' FEATURE
+  test('expands steps with single array each', {}, async function () {
+    const step0 = {
+      id: 'step-0',
+      each: { letter: 'letters' },
+      prompt: 'Letter: {{letter}}',
+    };
+    const pipeline = new PipelineState([step0], defaultMerge);
+
+    const vars = { letters: ['A', 'B', 'C'] };
+    const startingSteps = await pipeline.getStartingSteps(vars, null);
+
+    expect(startingSteps).toHaveLength(3);
+    expect(startingSteps.map((s) => s.id)).toEqual([
+      'step-0-each-0',
+      'step-0-each-1',
+      'step-0-each-2',
+    ]);
+  });
+
+  test('expands steps with multiple array each (cartesian product)', {}, async function () {
+    const step0 = {
+      id: 'step-0',
+      each: { letter: 'letters', type: 'types' },
+      prompt: 'Pick a {{type}} that starts with {{letter}}',
+    };
+    const pipeline = new PipelineState([step0], defaultMerge);
+
+    const vars = {
+      letters: ['B', 'O'],
+      types: ['noun', 'verb'],
+    };
+    const startingSteps = await pipeline.getStartingSteps(vars, null);
+
+    expect(startingSteps).toHaveLength(4);
+    expect(startingSteps.map((s) => s.id)).toEqual([
+      'step-0-each-0',
+      'step-0-each-1',
+      'step-0-each-2',
+      'step-0-each-3',
+    ]);
+  });
+
+  test('handles each with if conditions', {}, async function () {
+    const ifCode = await toCodeReference(dedent`
+        function execute(vars) {
+            return vars.letter !== 'B';
+        }
+    `);
+    const step0 = {
+      id: 'step-0',
+      each: { letter: 'letters' },
+      if: ifCode,
+      prompt: 'Letter: {{letter}}',
+    };
+    const pipeline = new PipelineState([step0], defaultMerge);
+
+    const vars = { letters: ['A', 'B', 'C'] };
+    const startingSteps = await pipeline.getStartingSteps(vars, null);
+
+    expect(startingSteps).toHaveLength(2);
+    // Should exclude the step where letter='B'
+    expect(startingSteps.map((s) => s.id)).toEqual([
+      'step-0-each-0', // A
+      'step-0-each-2', // C
+    ]);
+  });
+
+  test('handles each with deps', {}, async function () {
+    const step0 = {
+      id: 'step-0',
+      each: { letter: 'letters' },
+      deps: ['input'],
+      prompt: 'Letter: {{letter}}',
+    };
+    const step1 = { id: 'step-1' };
+    const pipeline = new PipelineState([step0, step1], defaultMerge);
+
+    const vars = {
+      letters: ['A', 'B'],
+      input: 'ready',
+    };
+    const startingSteps = await pipeline.getStartingSteps(vars, null);
+
+    expect(startingSteps).toHaveLength(3); // 2 each steps + step1
+    expect(startingSteps.map((s) => s.id)).toContain('step-0-each-0');
+    expect(startingSteps.map((s) => s.id)).toContain('step-0-each-1');
+    expect(startingSteps.map((s) => s.id)).toContain('step-1');
+  });
+
+  test('handles empty arrays in each', {}, async function () {
+    const step0 = {
+      id: 'step-0',
+      each: { letter: 'letters' },
+      prompt: 'Letter: {{letter}}',
+    };
+    const pipeline = new PipelineState([step0], defaultMerge);
+
+    const vars = { letters: [] };
+    const startingSteps = await pipeline.getStartingSteps(vars, null);
+
+    expect(startingSteps).toHaveLength(0);
+  });
+
+  test('handles missing arrays in each', {}, async function () {
+    const step0 = {
+      id: 'step-0',
+      each: { letter: 'letters' },
+      prompt: 'Letter: {{letter}}',
+    };
+    const pipeline = new PipelineState([step0], defaultMerge);
+
+    const vars = {};
+    const startingSteps = await pipeline.getStartingSteps(vars, null);
+
+    expect(startingSteps).toHaveLength(0);
+  });
 });
 
 describe('orderedMerge', () => {
