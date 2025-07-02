@@ -27,6 +27,7 @@ function clockLatest<T>(
 
 export class AnnotationManager {
   private cellAnnotations = new Map<string, Writable<CellAnnotation>>();
+  hasNotes = false;
 
   constructor(
     annotations: AnnotationLogEntry[],
@@ -47,6 +48,7 @@ export class AnnotationManager {
           value: annotation.notes,
         }),
       }));
+      this.hasNotes = true;
     } else if ((annotation as { type: string }).type === 'unknown') {
       // Ignore unknown annotations
     } else {
