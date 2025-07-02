@@ -12,8 +12,16 @@ This document summarizes the changes made to implement proper HTTP error retry l
 - This function allows callers to determine whether a specific error should be retried
 - Default behavior remains unchanged (retry all errors) for backward compatibility
 
+#### New Class: `HttpError`
+- Custom error class that extends the standard `Error` class
+- Takes a message (string) and HTTP status code (number) as constructor parameters
+- Provides type-safe access to the HTTP status code via the `status` property
+- Maintains proper stack traces and error inheritance
+
 #### New Function: `shouldRetryHttpError`
 - Exported function that determines if an HTTP error should be retried
+- **Primary behavior:** Checks if error is an `HttpError` instance and examines the `status` property directly
+- **Fallback behavior:** For regular `Error` instances, parses status codes from error messages
 - **Retryable errors:**
   - HTTP 429 (Too Many Requests)
   - HTTP 5xx (Server Error codes: 500-599)
@@ -30,21 +38,29 @@ This document summarizes the changes made to implement proper HTTP error retry l
 ### 2. Updated Provider Implementations
 
 #### OpenAI Provider (`src/lib/providers/openai.ts`)
-- Added import for `shouldRetryHttpError` function
+- Added import for `shouldRetryHttpError` function and `HttpError` class
+- Updated error handling to throw `HttpError` instances with proper status codes
 - Updated the `exponentialBackoff` call to use `{ shouldRetry: shouldRetryHttpError }`
-- Now only retries appropriate HTTP errors during API calls
+- Now provides type-safe HTTP status codes and only retries appropriate errors
 
 #### Gemini Provider (`src/lib/providers/gemini.ts`)
-- Added import for `shouldRetryHttpError` function
+- Added import for `shouldRetryHttpError` function and `HttpError` class
+- Updated error handling to throw `HttpError` instances with proper status codes
 - Updated the `exponentialBackoff` call to use `{ shouldRetry: shouldRetryHttpError }`
-- Now only retries appropriate HTTP errors during API calls
+- Now provides type-safe HTTP status codes and only retries appropriate errors
 
 #### Anthropic Provider (`src/lib/providers/anthropic.ts`)
-- Added import for `shouldRetryHttpError` function
+- Added import for `shouldRetryHttpError` function and `HttpError` class
+- Updated error handling to throw `HttpError` instances with proper status codes
 - Updated the `exponentialBackoff` call to use `{ shouldRetry: shouldRetryHttpError }`
-- Now only retries appropriate HTTP errors during API calls
+- Now provides type-safe HTTP status codes and only retries appropriate errors
 
 ### 3. Comprehensive Test Coverage (`src/lib/utils/exponentialBackoff.test.ts`)
+
+#### New Tests for `HttpError` Class
+- Test proper instantiation with message and status code
+- Verify inheritance from Error class
+- Test stack trace maintenance
 
 #### New Tests for `shouldRetry` Option
 - Test that non-retryable errors are not retried
@@ -52,11 +68,15 @@ This document summarizes the changes made to implement proper HTTP error retry l
 - Verify the `shouldRetry` function is called with correct parameters
 
 #### New Tests for `shouldRetryHttpError` Function
-- **HTTP 429 Tests:** Verify 429 errors are marked as retryable
-- **HTTP 5xx Tests:** Verify all server error codes (500-511) are marked as retryable
-- **HTTP 4xx Tests:** Verify client error codes (400-428, 430-499) are marked as non-retryable
-- **Pattern Matching Tests:** Verify common error patterns are handled correctly
-- **Edge Case Tests:** Verify non-Error objects and unrecognized patterns are handled
+- **HttpError Instance Tests:** 
+  - Verify 429 errors are marked as retryable
+  - Verify all server error codes (500-599) are marked as retryable
+  - Verify client error codes (400-428, 430-499) are marked as non-retryable
+  - Verify 1xx, 2xx, 3xx codes are marked as non-retryable
+- **Fallback Behavior Tests (regular Error instances):**
+  - HTTP status code parsing from error messages
+  - Pattern matching for common error types
+  - Edge cases with unrecognized patterns
 
 ## Benefits
 
@@ -83,9 +103,10 @@ This document summarizes the changes made to implement proper HTTP error retry l
 ### Error Detection Strategy
 The `shouldRetryHttpError` function uses a multi-layered approach:
 
-1. **Status Code Parsing:** Extracts HTTP status codes from error messages using regex
-2. **Pattern Matching:** Falls back to common error pattern recognition for network-level issues
-3. **Conservative Default:** Returns `false` for unrecognized errors to avoid infinite retries
+1. **Type-Safe Status Check:** First checks if error is an `HttpError` instance and examines the `status` property directly
+2. **Fallback Status Code Parsing:** For regular `Error` instances, extracts HTTP status codes from error messages using regex
+3. **Pattern Matching:** Falls back to common error pattern recognition for network-level issues
+4. **Conservative Default:** Returns `false` for unrecognized errors to avoid infinite retries
 
 ### Status Code Categories
 - **429 (Too Many Requests):** Always retryable - indicates rate limiting
@@ -112,13 +133,16 @@ All three providers now use the enhanced retry logic in their main HTTP request 
 
 ### After Implementation
 ```typescript
-// Only appropriate errors are retried:
-// ✅ 429 Too Many Requests → RETRY with backoff
-// ✅ 500 Internal Server Error → RETRY with backoff
-// ✅ 502 Bad Gateway → RETRY with backoff
-// ❌ 400 Bad Request → FAIL FAST (no retry)
-// ❌ 401 Unauthorized → FAIL FAST (no retry)
-// ❌ 404 Not Found → FAIL FAST (no retry)
+// Type-safe error handling with HttpError class:
+throw new HttpError('Too Many Requests', 429);        // ✅ RETRY with backoff
+throw new HttpError('Internal Server Error', 500);    // ✅ RETRY with backoff
+throw new HttpError('Bad Gateway', 502);              // ✅ RETRY with backoff
+throw new HttpError('Bad Request', 400);              // ❌ FAIL FAST (no retry)
+throw new HttpError('Unauthorized', 401);             // ❌ FAIL FAST (no retry)
+throw new HttpError('Not Found', 404);                // ❌ FAIL FAST (no retry)
+
+// shouldRetryHttpError checks error.status directly for type safety
+// Falls back to message parsing for backward compatibility
 ```
 
 This implementation ensures robust and efficient error handling across all AI provider integrations while maintaining backward compatibility and following HTTP best practices.

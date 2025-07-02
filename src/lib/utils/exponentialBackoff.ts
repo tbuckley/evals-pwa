@@ -51,13 +51,38 @@ interface BackoffOptions {
 const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * HTTP Error class that includes the HTTP status code.
+ */
+export class HttpError extends Error {
+  public readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'HttpError';
+    this.status = status;
+
+    // Maintains proper stack trace for where our error was thrown (only available on V8)
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, HttpError);
+    }
+  }
+}
+
+/**
  * Determines if an HTTP error should be retried based on the status code.
  * Only retries for 429 (Too Many Requests) and 5xx (Server Error) status codes.
  * @param error The error to check
  * @returns true if the error should be retried, false otherwise
  */
 export function shouldRetryHttpError(error: unknown): boolean {
-  // Check if the error contains HTTP status information
+  // Check if the error is an HttpError instance
+  if (error instanceof HttpError) {
+    const status = error.status;
+    // Retry for 429 (Too Many Requests) and 5xx (Server Error) status codes
+    return status === 429 || (status >= 500 && status < 600);
+  }
+
+  // Fallback: Check if the error contains HTTP status information in the message
   if (error instanceof Error) {
     const message = error.message;
     

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { exponentialBackoff, shouldRetryHttpError } from './exponentialBackoff';
+import { exponentialBackoff, shouldRetryHttpError, HttpError } from './exponentialBackoff';
 
 describe('exponentialBackoff', () => {
   afterEach(() => {
@@ -160,13 +160,62 @@ describe('exponentialBackoff', () => {
   });
 });
 
-describe('shouldRetryHttpError', () => {
-  it('should return true for 429 Too Many Requests', () => {
-    const error = new Error('Failed to run model: Too Many Requests 429');
-    expect(shouldRetryHttpError(error)).toBe(true);
+describe('HttpError', () => {
+  it('should create an HttpError with message and status', () => {
+    const error = new HttpError('Test error message', 404);
+    expect(error.message).toBe('Test error message');
+    expect(error.status).toBe(404);
+    expect(error.name).toBe('HttpError');
+    expect(error instanceof Error).toBe(true);
+    expect(error instanceof HttpError).toBe(true);
   });
 
-  it('should return true for 5xx server errors', () => {
+  it('should maintain proper stack trace', () => {
+    const error = new HttpError('Test error', 500);
+    expect(error.stack).toBeDefined();
+    expect(error.stack).toContain('HttpError');
+  });
+});
+
+describe('shouldRetryHttpError', () => {
+  describe('with HttpError instances', () => {
+    it('should return true for 429 Too Many Requests', () => {
+      const error = new HttpError('Too Many Requests', 429);
+      expect(shouldRetryHttpError(error)).toBe(true);
+    });
+
+    it('should return true for 5xx server errors', () => {
+      const statusCodes = [500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511, 599];
+      statusCodes.forEach(status => {
+        const error = new HttpError(`Server Error ${status}`, status);
+        expect(shouldRetryHttpError(error)).toBe(true);
+      });
+    });
+
+    it('should return false for 4xx client errors (except 429)', () => {
+      const statusCodes = [400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 421, 422, 423, 424, 425, 426, 428, 431, 451];
+      statusCodes.forEach(status => {
+        const error = new HttpError(`Client Error ${status}`, status);
+        expect(shouldRetryHttpError(error)).toBe(false);
+      });
+    });
+
+    it('should return false for 1xx, 2xx, and 3xx status codes', () => {
+      const statusCodes = [100, 101, 102, 200, 201, 204, 300, 301, 302, 304];
+      statusCodes.forEach(status => {
+        const error = new HttpError(`Status ${status}`, status);
+        expect(shouldRetryHttpError(error)).toBe(false);
+      });
+    });
+  });
+
+  describe('with regular Error instances (fallback behavior)', () => {
+    it('should return true for 429 Too Many Requests', () => {
+      const error = new Error('Failed to run model: Too Many Requests 429');
+      expect(shouldRetryHttpError(error)).toBe(true);
+    });
+
+    it('should return true for 5xx server errors', () => {
     const errors = [
       new Error('Failed to run model: Internal Server Error 500'),
       new Error('Failed to run model: Bad Gateway 502'),
@@ -183,9 +232,9 @@ describe('shouldRetryHttpError', () => {
     errors.forEach(error => {
       expect(shouldRetryHttpError(error)).toBe(true);
     });
-  });
+    });
 
-  it('should return false for 4xx client errors (except 429)', () => {
+    it('should return false for 4xx client errors (except 429)', () => {
     const errors = [
       new Error('Failed to run model: Bad Request 400'),
       new Error('Failed to run model: Unauthorized 401'),
@@ -220,9 +269,9 @@ describe('shouldRetryHttpError', () => {
     errors.forEach(error => {
       expect(shouldRetryHttpError(error)).toBe(false);
     });
-  });
+    });
 
-  it('should return true for common retryable error patterns', () => {
+    it('should return true for common retryable error patterns', () => {
     const errors = [
       new Error('Network error occurred'),
       new Error('Connection timeout'),
@@ -238,9 +287,9 @@ describe('shouldRetryHttpError', () => {
     errors.forEach(error => {
       expect(shouldRetryHttpError(error)).toBe(true);
     });
-  });
+    });
 
-  it('should return false for errors without recognizable patterns', () => {
+    it('should return false for errors without recognizable patterns', () => {
     const errors = [
       new Error('Invalid API key'),
       new Error('Model not found'),
@@ -254,13 +303,14 @@ describe('shouldRetryHttpError', () => {
     errors.forEach(error => {
       expect(shouldRetryHttpError(error)).toBe(false);
     });
-  });
+    });
 
-  it('should return false for non-Error objects', () => {
+    it('should return false for non-Error objects', () => {
     expect(shouldRetryHttpError('string error')).toBe(false);
     expect(shouldRetryHttpError(null)).toBe(false);
     expect(shouldRetryHttpError(undefined)).toBe(false);
     expect(shouldRetryHttpError(123)).toBe(false);
     expect(shouldRetryHttpError({})).toBe(false);
+    });
   });
 });
