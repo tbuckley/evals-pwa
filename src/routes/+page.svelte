@@ -25,10 +25,11 @@
     selectedRunIdStore.set(id);
   }
 
+  let submittingNotes = false;
   async function handleSubmitNotes(e: SubmitEvent) {
     e.preventDefault();
 
-    // TODO disable while saving
+    submittingNotes = true;
     const state = $resultNotesDialogStore;
     const formData = new FormData(e.target as HTMLFormElement);
     const notes = formData.get('notes') as string;
@@ -37,6 +38,15 @@
       state.callback?.();
     }
     resultNotesDialogStore.set(null);
+    submittingNotes = false;
+  }
+
+  function enterSubmit(event: KeyboardEvent) {
+    const target = event.target as HTMLTextAreaElement;
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      target.form?.requestSubmit();
+    }
   }
 </script>
 
@@ -184,12 +194,19 @@ tests:
       {#if $resultNotesDialogStore !== null}
         <div class="max-h-[50vh] overflow-y-scroll">
           <h3 class="my-2 font-bold">Notes</h3>
-          <Textarea name="notes" value={$resultNotesDialogStore.notes}></Textarea>
+          <Textarea
+            disabled={submittingNotes}
+            on:keydown={enterSubmit}
+            name="notes"
+            value={$resultNotesDialogStore.notes}
+          ></Textarea>
         </div>
         <div class="mt-2 flex flex-row-reverse justify-start gap-2">
-          <Button type="submit">Save</Button>
+          <Button type="submit" disabled={submittingNotes}>Save</Button>
           <Dialog.Close asChild let:builder>
-            <Button variant="secondary" builders={[builder]}>Cancel</Button>
+            <Button variant="secondary" builders={[builder]} disabled={submittingNotes}>
+              Cancel
+            </Button>
           </Dialog.Close>
         </div>
       {/if}
