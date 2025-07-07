@@ -284,12 +284,19 @@
       let top = scrollableParent.scrollTop;
       let left = scrollableParent.scrollLeft;
 
-      if (rect.top < parentRect.top || rect.height > parentRect.height) {
+      // Adjust horizontal scroll
+      if (rect.top < parentRect.top && rect.bottom > parentRect.bottom) {
+        // The element is fully visible, so do nothing
+      } else if (rect.top < parentRect.top || rect.height > parentRect.height) {
         top += rect.top - parentRect.top;
       } else if (rect.bottom > parentRect.bottom) {
         top += rect.bottom - parentRect.bottom;
       }
-      if (rect.left < parentRect.left || rect.width > parentRect.width) {
+
+      // Adjust vertical scroll
+      if (rect.left < parentRect.left && rect.right > parentRect.right) {
+        // The element is fully visible, so do nothing
+      } else if (rect.left < parentRect.left || rect.width > parentRect.width) {
         left += rect.left - parentRect.left;
       } else if (rect.right > parentRect.right) {
         left += rect.right - parentRect.right;
@@ -310,6 +317,18 @@
       if (target.closest('button')) {
         return;
       }
+
+      // Return early if text is selected within the node
+      const selection = window.getSelection();
+      if (
+        selection &&
+        !selection.isCollapsed &&
+        node.contains(selection.anchorNode) &&
+        node.contains(selection.focusNode)
+      ) {
+        return;
+      }
+
       e.preventDefault();
       focusElement(node);
     }
