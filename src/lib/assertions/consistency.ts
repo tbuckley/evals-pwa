@@ -4,17 +4,15 @@ import {
   assertionResultSchema,
   providerSchema,
   type AssertionResult,
+  type CellAssertionProvider,
   type NormalizedTestCase,
-  type RowAssertionProvider,
   type TestOutput,
 } from '$lib/types';
 import { extractAllJsonObjects } from '$lib/utils/extractAllJson';
-import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
 import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
 import { z } from 'zod';
 
 const argsSchema = z.object({
-  criteria: z.string(),
   prompt: z.string().optional(),
   provider: providerSchema.optional(),
 });
@@ -24,13 +22,13 @@ export function createConsistencyAssertion(
   testVars: NormalizedTestCase['vars'],
   providerManager: ProviderManager,
   abortSignal: AbortSignal,
-): RowAssertionProvider {
+): CellAssertionProvider {
   const parsedArgs = argsSchema.safeParse(args);
   if (!parsedArgs.success) {
-    throw new Error('Invalid LLM Rubric arguments');
+    throw new Error('Invalid consistency arguments');
   }
 
-  const { criteria, prompt, provider: providerOptions } = parsedArgs.data;
+  const { prompt, provider: providerOptions } = parsedArgs.data;
   const provider =
     typeof providerOptions === 'string'
       ? { id: providerOptions, config: {} }
@@ -38,26 +36,15 @@ export function createConsistencyAssertion(
   const model = providerManager.getProvider(provider.id, provider.config);
   const env = new SimpleEnvironment({
     model,
-    promptFormatter: new HandlebarsPromptFormatter(prompt ?? CONSISTENCY_PROMPT),
+    prompt: prompt ?? CONSISTENCY_PROMPT,
   });
-  // TODO also populate placeholders in the rubric
-  // TODO make rubric optional if prompt is provided
 
   return {
-    type: 'row',
-    run: async function (results, _context): Promise<AssertionResult[]> {
-      const output = results.map((r) => {
-        if (!r.output) {
-          // TODO ignore these indices in the evaluation
-          return [];
-        }
-        if (!Array.isArray(r.output)) {
-          return [r.output];
-        }
-        return r.output;
-      });
-
-      const generator = env.run({ output, criteria, ...testVars }, { abortSignal });
+    run: async function (output: NonNullable<TestOutput['output']>): Promise<AssertionResult> {
+      if (!Array.isArray(output)) {
+        output = [output];
+      }
+      const generator = env.run({ output, ...testVars }, { abortSignal });
       let next;
       while (!next?.done) {
         // Skip over the streaming responses.
@@ -65,24 +52,22 @@ export function createConsistencyAssertion(
       }
       const result = next.value;
       const rubricOutput = extractOutputAsString(result.output);
-      // If there's no output, return an array of failures
       if (!rubricOutput) {
-        const res = {
+        return {
           pass: false,
           message: `Rubric did not succeed: ${result.error ?? 'No error message'}`,
-        } satisfies AssertionResult;
-        return Array(results.length).fill(res) as AssertionResult[];
+        };
       }
 
       const objs = extractAllJsonObjects(rubricOutput);
       try {
         const validated = assertionResultSchema.parse(objs[0]);
-        return Array(results.length).fill(validated) as AssertionResult[];
+        return validated;
       } catch {
-        return Array(results.length).fill({
+        return {
           pass: false,
           message: `Invalid rubric output: "${rubricOutput}"`,
-        }) as AssertionResult[];
+        };
       }
     },
   };

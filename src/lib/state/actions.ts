@@ -9,7 +9,6 @@ import {
   selectedConfigFileStore,
 } from './stores';
 import {
-  type AssertionResult,
   type LiveResult,
   type LiveRun,
   type ModelCache,
@@ -25,7 +24,6 @@ import { UiError } from '$lib/types/errors';
 import { type FileStorage } from '$lib/types/storage';
 import { ProviderManager } from '$lib/providers/ProviderManager';
 import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
-import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
 import { ParallelTaskQueue } from '$lib/utils/ParallelTaskQueue';
 import { AssertionManager } from '$lib/assertions/AssertionManager';
 import { parsedEnvStore } from './derived';
@@ -462,7 +460,7 @@ function getRunEnvs(providers: NormalizedProvider[], prompts: NormalizedPrompt[]
         return true;
       });
       for (const provider of matchingProviders) {
-        envs.push({ provider, prompt: prompt.prompt });
+        envs.push({ provider, prompt: prompt });
       }
     } else if (typeof prompt === 'object' && '$pipeline' in prompt) {
       // Pipeline
@@ -516,9 +514,7 @@ function createEnvironments(
       envs.push(
         new SimpleEnvironment({
           model,
-          promptFormatter: new HandlebarsPromptFormatter(
-            typeof prompt === 'string' ? prompt : prompt.prompt,
-          ),
+          prompt,
           cache,
         }),
       );
@@ -588,7 +584,17 @@ async function runTest(
   let next;
   let started = false;
   while (!next?.done) {
-    next = await generator.next();
+    try {
+      next = await generator.next();
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      result.update((state) => ({
+        ...state,
+        state: 'error',
+        error: error.message,
+      }));
+      return;
+    }
     if (!started) {
       // Wait for the model to respond before marking as in-progress
       result.update((state) => ({
@@ -642,76 +648,90 @@ async function runTest(
       }
     }
   }
-  const testResult = next.value;
+  const finalResult = next.value;
 
-  // FIXME: We should guarantee that SimpleEnvironment returns an array
-  let arrayOutput: LiveResult['output'];
-  if (testResult.output) {
-    arrayOutput = Array.isArray(testResult.output) ? testResult.output : [testResult.output];
+  if (finalResult.exportInfo) {
+    const storage = get(storageStore);
+    if (storage && storage instanceof FileSystemEvalsStorage) {
+      const { exportPath, content } = finalResult.exportInfo;
+      // This needs to be unique.
+      const filePath = `${exportPath}/test-${Date.now()}.yaml`;
+      try {
+        await storage.fs.writeFile(filePath, content);
+        toast(`Exported test case to ${filePath}`);
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        toast(`Failed to export test case: ${error.message}`);
+      }
+    }
   }
 
-  if (testResult.error) {
-    result.update((state) => ({
+  // Final update
+  const { exportInfo: _ei, ...finalResultRest } = finalResult;
+  const arrayOutput =
+    finalResultRest.output === undefined
+      ? undefined
+      : Array.isArray(finalResultRest.output)
+        ? finalResultRest.output
+        : [finalResultRest.output];
+
+  result.update((state) => {
+    return {
       ...state,
-      ...testResult,
-      history: testResult.history?.map((h) => ({
+      ...finalResultRest,
+      output: arrayOutput,
+      history: finalResultRest.history?.map((h) => ({
         ...h,
         output:
           h.output === undefined ? undefined : Array.isArray(h.output) ? h.output : [h.output],
       })),
-      output: arrayOutput,
-      state: 'error',
-      pass: false,
-    }));
+      state: finalResultRest.error ? 'error' : 'success',
+    };
+  });
+
+  if (finalResult.error) {
     return;
   }
-  if (!testResult.output) {
+  if (!finalResult.output) {
     result.update((state) => ({
       ...state,
       state: 'error',
-      error: 'No output',
-      pass: false,
+      error: 'No output received',
     }));
     return;
   }
 
-  // Test assertions
+  // Run cell-level assertions
   const assertions = test.assert.map((a) => ({
     id: a.id,
     assert: assertionManager.getAssertion(a, test.vars),
   }));
-  const assertionResults: AssertionResult[] = [];
   for (const assertion of assertions) {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!('type' in assertion.assert)) {
       // TODO: Run in parallel
-      const result = await assertion.assert.run(testResult.output, {
+      const resultUpdate = await assertion.assert.run(finalResult.output, {
         provider: env.provider,
         prompt: env.prompt,
       });
-      result.id = assertion.id;
-      assertionResults.push(result);
+      resultUpdate.id = assertion.id;
+      result.update((state) => {
+        const assertionResults = [...(state.assertionResults ?? []), resultUpdate];
+
+        // Only update resultState if this is the last assertion result
+        let resultState = state.state;
+        if (assertionResults.length === assertions.length) {
+          resultState = assertionResults.every((r) => r.pass) ? 'success' : 'error';
+        }
+
+        return {
+          ...state,
+          assertionResults,
+          state: resultState,
+        };
+      });
     }
   }
-  const hasAssertionsPending = assertions.some(
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    (a) => 'type' in a.assert && a.assert.type === 'row',
-  );
-
-  result.update((state) => ({
-    ...state,
-    ...testResult,
-    history: testResult.history?.map((h) => ({
-      ...h,
-      output: h.output === undefined ? undefined : Array.isArray(h.output) ? h.output : [h.output],
-    })),
-    output: arrayOutput,
-    state: hasAssertionsPending
-      ? 'in-progress'
-      : assertionResults.every((r) => r.pass)
-        ? 'success'
-        : 'error',
-    assertionResults,
-  }));
 }
 
 async function runRowAssertions(

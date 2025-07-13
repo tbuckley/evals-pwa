@@ -36,6 +36,7 @@ export interface NormalizedPipelineStep {
   if?: string | CodeReference;
   deps?: string[];
   providerLabel?: string;
+  export?: string;
 }
 export interface NormalizedPipelinePrompt {
   $pipeline: NormalizedPipelineStep[];
@@ -44,6 +45,7 @@ const simplePromptSchema = z.string();
 const objectPromptSchema = z.object({
   prompt: z.string(),
   providerLabel: z.string().optional(),
+  export: z.string().optional(),
 });
 export const pipelinePromptSchema = z.object({
   $pipeline: z.array(
@@ -56,6 +58,7 @@ export const pipelinePromptSchema = z.object({
         outputAs: z.string().optional(),
         if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
         deps: z.array(z.string()).optional(),
+        export: z.string().optional(),
       }),
     ]),
   ),
@@ -75,7 +78,7 @@ export type NormalizedProvider = z.infer<typeof normalizedProviderSchema>;
 export type Provider = z.infer<typeof providerSchema>;
 export type NormalizedPrompt =
   | string
-  | { prompt: string; providerLabel?: string }
+  | { prompt: string; providerLabel?: string; export?: string }
   | NormalizedPipelinePrompt;
 export type NormalizedAssertion = Assertion & Required<Pick<Assertion, 'vars'>>;
 
@@ -133,6 +136,14 @@ const baseTestOutputSchema = z.object({
 
   // Error
   error: z.string().optional(),
+
+  // For internal use
+  exportInfo: z
+    .object({
+      exportPath: z.string(),
+      content: z.string(),
+    })
+    .optional(),
 });
 
 const testOutputSchema = baseTestOutputSchema.extend({
