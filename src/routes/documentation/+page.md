@@ -37,7 +37,7 @@ tests:
           ignoreCase: true
 ```
 
-**Not familiar with YAML?** It is a markup language, with a similar structure to JSON but easier to read and write. See the [YAML spec](https://yaml.org/). Our configuration files mostly follow the Promptfoo format, with some minor differences.
+**Not familiar with YAML?** It is a markup language, with a similar structure to JSON but easier to read and write. See the [YAML spec](https://yaml.org/). Our configuration files mostly follow the Promptfoo format, with some minor differences. Alternatively, you can use an `evals.json` file.
 
 Next, click "Choose a folder" in the header and select your folder. You will then be prompted (ha) to add any API keys or other environment variables for your chosen providers. (Note: These keys will be saved locally in your browser's storage. You can edit them from the settings icon in the top-right.)
 
@@ -592,7 +592,7 @@ tests:
 
 ### Multiple configurations
 
-You can create multiple configuration files within your folder (including in subdirectories) by naming them `*.evals.yaml`. A dropdown in the header bar lets you switch between them. Runs will be saved in a corresponding folder, for example runs for `basic.evals.yaml` will be saved to `runs/basic/<ID>.json`.
+You can create multiple configuration files within your folder (including in subdirectories) by naming them `*.evals.yaml` (or `*.evals.json`). A dropdown in the header bar lets you switch between them. Runs will be saved in a corresponding folder, for example runs for `basic.evals.yaml` will be saved to `runs/basic/<ID>.json`.
 
 For legacy reasons, `config.yaml` is also supported.
 
