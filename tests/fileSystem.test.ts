@@ -123,6 +123,26 @@ test.describe('File System', () => {
     }
   });
 
+  test('loads examples/json without errors', async ({ page }) => {
+    await chooseDirectory(page, '../examples/json');
+
+    // Ensure no error dialog is visible
+    await expect(page.locator('#alert-dialog')).toHaveCount(0);
+
+    await expect(page.locator('#env-editor')).toBeVisible();
+    await page.locator('[name=env-gemini_api_key]').fill('1234');
+    await page.locator('button', { hasText: 'Save changes' }).click();
+
+    // Check the configuration
+    await page.getByText('Configuration').click();
+    await page.waitForLoadState('networkidle');
+
+    const lines = ['gemini:gemini-2.5-flash', 'What is the capital of {{country}}?', 'France'];
+    for (const line of lines) {
+      await expect(page.locator('pre')).toContainText(line);
+    }
+  });
+
   test('loads examples/errors with a visible error', async ({ page }) => {
     await chooseDirectory(page, '../examples/errors');
 

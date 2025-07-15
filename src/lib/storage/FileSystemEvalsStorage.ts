@@ -18,6 +18,7 @@ import * as CodeSandbox from '$lib/utils/CodeSandbox';
 import {
   fileUriToPath,
   getDirname,
+  getFileExtension,
   joinPath,
   pathIsAbsolute,
   pathIsRelative,
@@ -33,7 +34,7 @@ export class FileSystemEvalsStorage implements StorageProvider {
 
   async getConfigNames(): Promise<string[]> {
     // Get everything matching config.yaml, evals.yaml, or *.evals.yaml
-    const files = await this.fs.load('file:///**/*.{yaml,evals.yaml}');
+    const files = await this.fs.load('file:///**/*.{yaml,evals.yaml,json,evals.json}');
     const fileNames = (files as { uri: string; file: File }[])
       .map(({ uri }) => {
         const path = fileUriToPath(uri);
@@ -43,20 +44,36 @@ export class FileSystemEvalsStorage implements StorageProvider {
         return path.substring(1);
       })
       .filter(
-        (name) => name === 'config.yaml' || name === 'evals.yaml' || name.endsWith('.evals.yaml'),
+        (name) =>
+          name === 'config.yaml' ||
+          name === 'evals.yaml' ||
+          name.endsWith('.evals.yaml') ||
+          name === 'config.json' ||
+          name === 'evals.json' ||
+          name.endsWith('.evals.json'),
       );
 
     // Separate the files into categories
     const evalsYaml = fileNames.find((name) => name === 'evals.yaml');
     const configYaml = fileNames.find((name) => name === 'config.yaml');
+    const evalsJson = fileNames.find((name) => name === 'evals.json');
+    const configJson = fileNames.find((name) => name === 'config.json');
     const otherEvalsYaml = fileNames
-      .filter((name) => name !== 'evals.yaml' && name !== 'config.yaml')
+      .filter(
+        (name) =>
+          name !== 'evals.yaml' &&
+          name !== 'config.yaml' &&
+          name !== 'evals.json' &&
+          name !== 'config.json',
+      )
       .sort((a, b) => a.localeCompare(b));
 
     // Combine the results in the desired order
     return [
       ...(evalsYaml ? [evalsYaml] : []),
+      ...(evalsJson ? [evalsJson] : []),
       ...(configYaml ? [configYaml] : []),
+      ...(configJson ? [configJson] : []),
       ...otherEvalsYaml,
     ];
   }
@@ -69,11 +86,18 @@ export class FileSystemEvalsStorage implements StorageProvider {
       throw new UiError({ type: 'missing-config', path: `file:///${name}` });
     }
 
+    const ext = getFileExtension(name);
     let text;
     let raw: unknown;
     try {
       text = await file.text();
-      raw = yaml.parse(text);
+      if (ext === 'yaml') {
+        raw = yaml.parse(text);
+      } else if (ext === 'json') {
+        raw = JSON.parse(text);
+      } else {
+        throw new UiError({ type: 'invalid-config', errors: ['Invalid file extension'] });
+      }
     } catch (err) {
       if (err instanceof yaml.YAMLParseError) {
         if (text && err.linePos) {
@@ -255,6 +279,9 @@ function getRunsDir(configName: string): string {
   let baseDir = 'file:///runs/';
   if (configName.endsWith('.evals.yaml')) {
     const prefix = configName.slice(0, '.evals.yaml'.length * -1); // Remove '.evals.yaml'
+    baseDir += `${prefix}/`;
+  } else if (configName.endsWith('.evals.json')) {
+    const prefix = configName.slice(0, '.evals.json'.length * -1); // Remove '.evals.json'
     baseDir += `${prefix}/`;
   }
   return baseDir;
