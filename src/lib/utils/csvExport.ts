@@ -19,7 +19,8 @@ export function generateCsvContent(run: LiveRun, options: CsvExportOptions = {})
   }
 
   // Add environment headers with notes columns
-  for (const env of run.envs) {
+  for (let envIndex = 0; envIndex < run.envs.length; envIndex++) {
+    const env = run.envs[envIndex];
     let envHeader = 'unknown';
     if (typeof env.provider === 'string') {
       envHeader = env.provider;
@@ -27,6 +28,10 @@ export function generateCsvContent(run: LiveRun, options: CsvExportOptions = {})
       envHeader = env.provider.id;
     }
     headers.push(envHeader);
+
+    if (get(run.results[0][envIndex]).history) {
+      headers.push(`${envHeader} History`);
+    }
 
     // Add Notes column after each environment if annotations exist and includeNotes is true
     if (includeNotes && annotations) {
@@ -39,7 +44,8 @@ export function generateCsvContent(run: LiveRun, options: CsvExportOptions = {})
   for (const _varName of run.varNames) {
     providerRow.push(''); // Empty cells for var columns
   }
-  for (const env of run.envs) {
+  for (let envIndex = 0; envIndex < run.envs.length; envIndex++) {
+    const env = run.envs[envIndex];
     let providerName = 'unknown';
     if (typeof env.provider === 'string') {
       providerName = env.provider;
@@ -47,6 +53,10 @@ export function generateCsvContent(run: LiveRun, options: CsvExportOptions = {})
       providerName = env.provider.id;
     }
     providerRow.push(providerName);
+
+    if (get(run.results[0][envIndex]).history) {
+      providerRow.push(''); // Empty cell for history column
+    }
 
     if (includeNotes && annotations) {
       providerRow.push(''); // Empty cell for notes column
@@ -58,10 +68,15 @@ export function generateCsvContent(run: LiveRun, options: CsvExportOptions = {})
   for (const _varName of run.varNames) {
     promptRow.push(''); // Empty cells for var columns
   }
-  for (const env of run.envs) {
+  for (let envIndex = 0; envIndex < run.envs.length; envIndex++) {
+    const env = run.envs[envIndex];
     const promptText =
       typeof env.prompt === 'string' ? env.prompt : JSON.stringify(env.prompt, null, 2);
     promptRow.push(promptText);
+
+    if (get(run.results[0][envIndex]).history) {
+      providerRow.push(''); // Empty cell for history column
+    }
 
     if (includeNotes && annotations) {
       promptRow.push(''); // Empty cell for notes column
@@ -102,6 +117,11 @@ export function generateCsvContent(run: LiveRun, options: CsvExportOptions = {})
           .join('');
       }
       row.push(resultText);
+
+      if (get(run.results[0][envIndex]).history) {
+        const history = (result.history ?? []).map((h) => ({ id: h.id, output: h.output ?? null }));
+        row.push(JSON.stringify(history, null, 2));
+      }
 
       // Add notes if annotations exist and includeNotes is true
       if (includeNotes && annotations) {
