@@ -7,6 +7,7 @@ import {
   storageStore,
   configFilesStore,
   selectedConfigFileStore,
+  numRunningTestsStore,
 } from './stores';
 import {
   type AssertionResult,
@@ -355,7 +356,12 @@ export async function runTests() {
         const result = writable<LiveResult>({ rawPrompt: null, state: 'waiting' });
         testResults.push(result);
         runner.enqueue(async ({ abortSignal }) => {
-          await runTest(test, env, mgr, result, { abortSignal, cacheKey: test.cacheKey });
+          try {
+            numRunningTestsStore.update((n) => n + 1);
+            await runTest(test, env, mgr, result, { abortSignal, cacheKey: test.cacheKey });
+          } finally {
+            numRunningTestsStore.update((n) => n - 1);
+          }
           finished += 1;
 
           // Wait for testResults to be finished, then run any row-level assertions

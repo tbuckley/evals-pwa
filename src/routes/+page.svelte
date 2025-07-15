@@ -10,13 +10,14 @@
     selectedRunStore,
     selectedRunTitle,
   } from '$lib/state/derived';
-  import { configStore, selectedRunIdStore } from '$lib/state/stores';
+  import { configStore, numRunningTestsStore, selectedRunIdStore } from '$lib/state/stores';
   import { resultDialogStore, resultNotesDialogStore } from '$lib/state/ui';
   import * as Dialog from '$lib/components/ui/dialog';
   import CancelIcon from 'lucide-svelte/icons/ban';
   import * as Alert from '$lib/components/ui/alert';
   import Filter from 'lucide-svelte/icons/filter';
   import { Textarea } from '$lib/components/ui/textarea';
+  import { pluralize } from '$lib/utils/strings';
 
   function setSelectedRunId(id: unknown) {
     if (id !== null && typeof id !== 'string') {
@@ -97,10 +98,18 @@ tests:
       For more details, check out the <a href="/documentation">documentation</a>.
     </p>
   {:else}
-    <Button on:click={runTests}>Run tests</Button>
-    {#if $abortRunStore !== null}
-      <Button variant="secondary" on:click={$abortRunStore}>Cancel run</Button>
-    {/if}
+    <div class="flex flex-row items-center gap-2">
+      <Button on:click={runTests}>Run tests</Button>
+      {#if $abortRunStore !== null}
+        <Button variant="secondary" on:click={$abortRunStore}>Cancel run</Button>
+      {/if}
+      {#if $numRunningTestsStore > 0}
+        <div class="text-sm text-muted-foreground">
+          Running {$numRunningTestsStore}
+          {pluralize($numRunningTestsStore, 'test')}...
+        </div>
+      {/if}
+    </div>
 
     {#if $hasTestsMarkedOnlyStore}
       <Alert.Root class="mt-2">
