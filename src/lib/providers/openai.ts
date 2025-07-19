@@ -163,11 +163,11 @@ export class OpenaiProvider implements ModelProvider {
     return json.choices[0]?.delta?.content ?? '';
   }
 
-  extractOutput(response: unknown): string {
+  extractOutput(response: unknown): (string | Blob)[] {
     const json = generateContentResponseSchema.parse(response);
     const firstChoice = json.choices[0].message?.content;
     if (typeof firstChoice === 'string') {
-      return firstChoice;
+      return [firstChoice];
     }
 
     throw new Error('Unexpected output format');
