@@ -3,16 +3,15 @@ import type { ProviderManager } from '$lib/providers/ProviderManager';
 import {
   providerSchema,
   type AssertionResult,
-  type NormalizedTestCase,
   type RowAssertionProvider,
+  type NormalizedTestCase,
   type TestOutput,
 } from '$lib/types';
-import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
+import { extractAllJsonObjects } from '$lib/utils/extractAllJson';
 import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
 import { z } from 'zod';
 
 const argsSchema = z.object({
-  criteria: z.string(),
   prompt: z.string().optional(),
   provider: providerSchema.optional(),
 });
@@ -25,10 +24,10 @@ export function createSelectBestAssertion(
 ): RowAssertionProvider {
   const parsedArgs = argsSchema.safeParse(args);
   if (!parsedArgs.success) {
-    throw new Error('Invalid LLM Rubric arguments');
+    throw new Error('Invalid select best arguments');
   }
 
-  const { criteria, prompt, provider: providerOptions } = parsedArgs.data;
+  const { prompt, provider: providerOptions } = parsedArgs.data;
   const provider =
     typeof providerOptions === 'string'
       ? { id: providerOptions, config: {} }
@@ -36,57 +35,39 @@ export function createSelectBestAssertion(
   const model = providerManager.getProvider(provider.id, provider.config);
   const env = new SimpleEnvironment({
     model,
-    promptFormatter: new HandlebarsPromptFormatter(prompt ?? SELECT_BEST_PROMPT),
+    prompt: prompt ?? SELECT_BEST_PROMPT,
   });
-  // TODO also populate placeholders in the rubric
-  // TODO make rubric optional if prompt is provided
 
   return {
     type: 'row',
-    run: async function (results, _context): Promise<AssertionResult[]> {
-      const output = results.map((r) => {
-        if (!r.output) {
-          // TODO ignore these indices in the evaluation
-          return [];
-        }
-        if (!Array.isArray(r.output)) {
-          return [r.output];
-        }
-        return r.output;
-      });
-
-      const generator = env.run({ output, criteria, ...testVars }, { abortSignal });
+    run: async function (outputs: TestOutput[]): Promise<AssertionResult[]> {
+      const { criteria, ...rest } = testVars as { criteria: unknown };
+      const generator = env.run({ outputs, criteria, ...rest }, { abortSignal });
       let next;
       while (!next?.done) {
         // Skip over the streaming responses.
         next = await generator.next();
       }
       const result = next.value;
-      const rubricOutput = extractOutputAsString(result.output);
-      // If there's no output, return an array of failures
-      if (!rubricOutput) {
-        const res = {
-          pass: false,
-          message: `Rubric did not succeed: ${result.error ?? 'No error message'}`,
-        } satisfies AssertionResult;
-        return Array(results.length).fill(res) as AssertionResult[];
+      const selectBestOutput = extractOutputAsString(result.output);
+      if (!selectBestOutput) {
+        throw new Error(`Select best did not succeed: ${result.error ?? 'No error message'}`);
       }
 
-      const index = parseInt(rubricOutput, 10);
-      if (isNaN(index)) {
-        const res = {
-          pass: false,
-          message: `Rubric did not succeed: ${rubricOutput} is not a number'}`,
-        } satisfies AssertionResult;
-        return Array(results.length).fill(res) as AssertionResult[];
-      }
+      const objs = extractAllJsonObjects(selectBestOutput);
+      const chosen = z.array(z.number().int()).parse(objs[0]);
 
-      // Pass the matching index
-      const ret = Array(results.length).fill({ pass: false }) as AssertionResult[];
-      ret[index] = {
-        pass: true,
-      } satisfies AssertionResult;
-      return ret;
+      const results: AssertionResult[] = outputs.map(() => ({
+        pass: false,
+        message: 'Not chosen',
+      }));
+      for (const index of chosen) {
+        results[index] = {
+          pass: true,
+          message: 'Chosen',
+        };
+      }
+      return results;
     },
   };
 }

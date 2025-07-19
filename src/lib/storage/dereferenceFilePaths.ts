@@ -56,6 +56,10 @@ export async function dereferenceFilePathsImpl(
         throw new Error(`Generated invalid file URI: ${fileUri} (from ${val})`);
       }
 
+      if (await options.storage.isDirectory(fileUri)) {
+        return val;
+      }
+
       let res;
       try {
         res = await options.storage.load(fileUri);

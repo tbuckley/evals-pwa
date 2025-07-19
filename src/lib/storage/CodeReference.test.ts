@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { CodeReference } from './CodeReference';
-
-export interface ReadonlyFileStorage {
-  load(path: string): Promise<File | { uri: string; file: File }[]>;
-  loadFile(path: string): Promise<File>;
-}
+import type { ReadonlyFileStorage } from '$lib/types/storage';
 
 async function load(files: Record<string, string>, entry: string) {
   const fs = {

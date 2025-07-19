@@ -1,0 +1,10 @@
+providers:
+  - echo:whatever
+
+prompts:
+  - prompt: "This is a test prompt. The output of this prompt will be exported: {{input}}"
+    export: file:///output/
+
+tests:
+  - vars:
+      input: "some value"

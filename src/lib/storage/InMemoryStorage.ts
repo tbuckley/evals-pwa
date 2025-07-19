@@ -73,4 +73,16 @@ export class InMemoryStorage implements FileStorage {
     this.files.set(path, file);
     return Promise.resolve();
   }
+
+  isDirectory(uri: string): Promise<boolean> {
+    const path = fileUriToPath(uri);
+    // In-memory storage represents directories as keys ending with a slash
+    const dirPath = path.endsWith('/') ? path : `${path}/`;
+    for (const key of this.files.keys()) {
+      if (key.startsWith(dirPath)) {
+        return Promise.resolve(true);
+      }
+    }
+    return Promise.resolve(this.files.has(dirPath));
+  }
 }

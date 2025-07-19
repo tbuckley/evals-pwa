@@ -31,6 +31,10 @@ export class FileSystemEvalsStorage implements StorageProvider {
     return this.fs.getName();
   }
 
+  async isDirectory(uri: string): Promise<boolean> {
+    return this.fs.isDirectory(uri);
+  }
+
   async getConfigNames(): Promise<string[]> {
     // Get everything matching config.yaml, evals.yaml, or *.evals.yaml
     const files = await this.fs.load('file:///**/*.{yaml,evals.yaml}');
