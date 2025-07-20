@@ -85,17 +85,13 @@ export class PipelineEnvironment implements TestEnvironment {
     const start = Date.now();
 
     const safeRunStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
-      // Generate an ID for the step (will increment inside runStep)
-      const count = stepRunCount.get(step.id) ?? 1;
-      const stepId = step.id + (count > 1 ? ` #${count}` : '');
-
       try {
         await runStep(step, pipelineContext);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         result = {
           error: errorMessage,
-          history: [...history, { id: stepId, error: errorMessage }],
+          history: [...history, { id: step.id, error: errorMessage }],
         };
         taskQueue.abort();
       }
@@ -165,7 +161,7 @@ export class PipelineEnvironment implements TestEnvironment {
             error: e.toString(),
             latencyMillis,
           };
-          history.push({ id: stepId, ...result });
+          history.push({ id: step.id, ...result });
           return;
         }
         throw e;
@@ -185,7 +181,7 @@ export class PipelineEnvironment implements TestEnvironment {
         latencyMillis: latencyMillis,
         tokenUsage: tokenUsage,
       };
-      history.push({ id: stepId, ...stepResult });
+      history.push({ id: step.id, ...stepResult });
 
       // Mark the step as complete and continue with the next steps
       const { isLeaf, next } = await pipelineState.markCompleteAndGetNextSteps(
