@@ -54,19 +54,19 @@ describe('PipelineState', () => {
 
   test('goes through steps in order if no deps', {}, async function () {
     const pipeline = new PipelineState(
-      [{ id: 'step-0' }, { id: 'step-1' }, { id: 'step-2' }],
+      [{ id: 'first' }, { id: 'second' }, { id: 'third' }],
       defaultMerge,
     );
-    expect(await pipeline.getStartingSteps({}, null)).toEqual([{ id: 'step-0' }]);
-    expect(await pipeline.markCompleteAndGetNextSteps({ id: 'step-0' }, {}, null)).toEqual({
+    expect(await pipeline.getStartingSteps({}, null)).toEqual([{ id: 'first' }]);
+    expect(await pipeline.markCompleteAndGetNextSteps({ id: 'first' }, {}, null)).toEqual({
       isLeaf: false,
-      next: [{ step: { id: 'step-1' }, context: null }],
+      next: [{ step: { id: 'second' }, context: null }],
     });
-    expect(await pipeline.markCompleteAndGetNextSteps({ id: 'step-1' }, {}, null)).toEqual({
+    expect(await pipeline.markCompleteAndGetNextSteps({ id: 'second' }, {}, null)).toEqual({
       isLeaf: false,
-      next: [{ step: { id: 'step-2' }, context: null }],
+      next: [{ step: { id: 'third' }, context: null }],
     });
-    expect(await pipeline.markCompleteAndGetNextSteps({ id: 'step-2' }, {}, null)).toEqual({
+    expect(await pipeline.markCompleteAndGetNextSteps({ id: 'third' }, {}, null)).toEqual({
       isLeaf: true,
       next: [],
     });

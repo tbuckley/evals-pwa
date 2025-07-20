@@ -312,7 +312,7 @@ export class PipelineState<T extends PipelineStep, S> {
       const step = steps[i];
       if (!step.deps) {
         // The first step becomes a starting state, other steps depend on the previous
-        const prevStepId = i > 0 ? [`step-${i - 1}`] : [];
+        const prevStepId = i > 0 ? [steps[i - 1].id] : [];
         this.stepDepsStatus.set(step.id, createStepDepsStatus(prevStepId, []));
         for (const dep of prevStepId) {
           const ids = this.stepDepToIds.get(dep) ?? [];
