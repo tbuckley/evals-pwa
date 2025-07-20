@@ -194,7 +194,7 @@ This will run each prompt one after the other. Each prompt will get access to th
 
 ```typescript
 type Output = string | (string | File)[];
-type History = { prompt: ConversationPrompt; output: Output }[];
+type History = { id: string; prompt: ConversationPrompt; output: Output }[];
 ```
 
 You can alternatively use an object for pipeline steps (see `PipelinePrompt` above). As with normal prompts, this object lets you indicate which provider labels can run it; unlike normal prompts, a pipeline may use labels to specify multiple models that should be used. The pipeline will be tested against every valid combination of providers.
@@ -249,6 +249,18 @@ prompts:
         prompt: Here is a haiku about {{topic}}, make it better:\n{{haiku}}
         outputAs: haiku
 ```
+
+#### Handlebars Helpers (Advanced)
+
+You can use these helpers inside your prompts, for example:
+
+```
+{{#if (eq myVar 42)}}It's the answer{{/if}}
+```
+
+- Boolean logic: `(not a)`, `(and a b)`, `(or a b)`
+- Comparison: `(eq a b)`, `(neq a b)`, `(lt a b)`, `(gt a b)`, `(lte a b)`, `(gte a b)`
+- Types: `(typeof a)`, `(isArray a)`
 
 ### Tests
 
