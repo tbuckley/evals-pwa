@@ -81,17 +81,20 @@ export class PipelineEnvironment implements TestEnvironment {
     // TODO: Rate limit at provider level
     const taskQueue = new ParallelTaskQueue(6);
     let result: TestOutput | undefined;
-    const history: TestOutput['history'] = [];
+    const history: TestOutput['history'] = []; // NOTE: IDs must be unique for display
     const start = Date.now();
 
     const safeRunStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
+      const count = stepRunCount.get(step.id) ?? 1;
+      const stepId = step.id + (count > 1 ? ` #${count}` : '');
+
       try {
         await runStep(step, pipelineContext);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         result = {
           error: errorMessage,
-          history: [...history, { id: step.id, error: errorMessage }],
+          history: [...history, { id: stepId, error: errorMessage }],
         };
         taskQueue.abort();
       }
@@ -117,7 +120,7 @@ export class PipelineEnvironment implements TestEnvironment {
           ...vars,
           ...pipelineContext.vars,
           $history: pipelineContext.history,
-          $output: pipelineContext.history[history.length - 1]?.output ?? null,
+          $output: pipelineContext.history[pipelineContext.history.length - 1]?.output ?? null,
         },
         model.mimeTypes,
       );
@@ -161,13 +164,14 @@ export class PipelineEnvironment implements TestEnvironment {
             error: e.toString(),
             latencyMillis,
           };
-          history.push({ id: step.id, ...result });
+          history.push({ id: stepId, ...result });
           return;
         }
         throw e;
       }
 
       // Add the output to the vars
+      // Use step.id for this history since it is only used for prompts/if
       const newHistory = [...pipelineContext.history, { id: step.id, prompt, output }];
       const newVars = { ...pipelineContext.vars };
       if (step.outputAs) {
@@ -181,7 +185,7 @@ export class PipelineEnvironment implements TestEnvironment {
         latencyMillis: latencyMillis,
         tokenUsage: tokenUsage,
       };
-      history.push({ id: step.id, ...stepResult });
+      history.push({ id: stepId, ...stepResult });
 
       // Mark the step as complete and continue with the next steps
       const { isLeaf, next } = await pipelineState.markCompleteAndGetNextSteps(

@@ -65,7 +65,7 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
     const conversation = getAsConversation(rendered);
 
     // Find all file placeholders, and use the file
-    return conversation.map((part): RolePromptPart => {
+    const prompt = conversation.map((part): RolePromptPart => {
       if ('system' in part) {
         return {
           role: 'system',
@@ -86,6 +86,7 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
       }
       throw new Error(`Invalid conversation part: ${JSON.stringify(part)}`);
     });
+    return prompt;
   }
 }
 
