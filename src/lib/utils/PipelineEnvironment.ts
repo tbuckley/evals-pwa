@@ -30,6 +30,7 @@ export interface Config {
 }
 
 export interface HistoryItem {
+  id: string;
   prompt: ConversationPrompt;
   output: NonNullable<TestResult['output']>;
 }
@@ -80,11 +81,10 @@ export class PipelineEnvironment implements TestEnvironment {
     // TODO: Rate limit at provider level
     const taskQueue = new ParallelTaskQueue(6);
     let result: TestOutput | undefined;
-    const history: TestOutput['history'] = [];
+    const history: TestOutput['history'] = []; // NOTE: IDs must be unique for display
     const start = Date.now();
 
     const safeRunStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
-      // Generate an ID for the step (will increment inside runStep)
       const count = stepRunCount.get(step.id) ?? 1;
       const stepId = step.id + (count > 1 ? ` #${count}` : '');
 
@@ -120,7 +120,7 @@ export class PipelineEnvironment implements TestEnvironment {
           ...vars,
           ...pipelineContext.vars,
           $history: pipelineContext.history,
-          $output: pipelineContext.history[history.length - 1]?.output ?? null,
+          $output: pipelineContext.history[pipelineContext.history.length - 1]?.output ?? null,
         },
         model.mimeTypes,
       );
@@ -171,7 +171,8 @@ export class PipelineEnvironment implements TestEnvironment {
       }
 
       // Add the output to the vars
-      const newHistory = [...pipelineContext.history, { prompt, output }];
+      // Use step.id for this history since it is only used for prompts/if
+      const newHistory = [...pipelineContext.history, { id: step.id, prompt, output }];
       const newVars = { ...pipelineContext.vars };
       if (step.outputAs) {
         newVars[step.outputAs] = output;
@@ -311,7 +312,7 @@ export class PipelineState<T extends PipelineStep, S> {
       const step = steps[i];
       if (!step.deps) {
         // The first step becomes a starting state, other steps depend on the previous
-        const prevStepId = i > 0 ? [`step-${i - 1}`] : [];
+        const prevStepId = i > 0 ? [steps[i - 1].id] : [];
         this.stepDepsStatus.set(step.id, createStepDepsStatus(prevStepId, []));
         for (const dep of prevStepId) {
           const ids = this.stepDepToIds.get(dep) ?? [];
@@ -529,8 +530,18 @@ export function orderedMerge<T>(a: T[], b: T[], cmp: (a: T, b: T) => number): T[
   return merged;
 }
 
+// This just needs some way to consistently compare history items, or return 0 if identical
+// All properties should be tested
+// TODO consider using a JSON hash?
 const historyMergeFn = makeOrderedMerge<HistoryItem>(function (a, b) {
-  // First, by prompt length
+  // By step ID
+  if (a.id < b.id) {
+    return -1;
+  } else if (a.id > b.id) {
+    return 1;
+  }
+
+  // Then, by prompt length
   if (a.prompt.length < b.prompt.length) {
     return -1;
   } else if (a.prompt.length > b.prompt.length) {

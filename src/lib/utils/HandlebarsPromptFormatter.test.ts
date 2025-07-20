@@ -113,6 +113,27 @@ describe('HandlebarsPromptFormatter', () => {
       { role: 'assistant', content: [{ text: 'Waddling!' }] },
     ]);
   });
+  test('supports equality tests', async function () {
+    const formatter = new HandlebarsPromptFormatter('{{#if (eq id "b")}}YAY{{else}}BOO{{/if}}');
+    const output = await formatter.format({ id: 'b' });
+    expect(output).toEqual([{ role: 'user', content: [{ text: 'YAY' }] }]);
+  });
+  test('supports other helpers', async function () {
+    const formatter = new HandlebarsPromptFormatter(dedent`
+      {{#if (eq val 42)}}YAY{{else}}BOO{{/if}}
+      {{#if (neq val 41)}}YAY{{else}}BOO{{/if}}
+      {{#if (lt val 43)}}YAY{{else}}BOO{{/if}}
+      {{#if (gt val 41)}}YAY{{else}}BOO{{/if}}
+      {{#if (lte val 42)}}YAY{{else}}BOO{{/if}}
+      {{#if (gte val 42)}}YAY{{else}}BOO{{/if}}
+      {{#if (not (isArray val))}}YAY{{else}}BOO{{/if}}
+      {{#if (eq (typeof val) "number")}}YAY{{else}}BOO{{/if}}
+    `);
+    const output = await formatter.format({ val: 42 });
+    expect(output).toEqual([
+      { role: 'user', content: [{ text: 'YAY\nYAY\nYAY\nYAY\nYAY\nYAY\nYAY\nYAY' }] },
+    ]);
+  });
 
   // Errors
   test('throws an error for unsupported file types that are not valid utf-8', async function () {

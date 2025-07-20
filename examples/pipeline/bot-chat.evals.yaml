@@ -1,0 +1,46 @@
+description: Test of bot chat
+
+providers:
+  - id: gemini:gemini-2.0-flash-lite
+    labels: ['pirate']
+  - id: openai:gpt-4o-mini
+    labels: ['astronaut']
+
+prompts:
+  - $pipeline:
+      - id: start
+        prompt: |
+          - system: You are a pirate talking with an astronaut. Keep your responses short.
+          - user: {{message}}
+        providerLabel: pirate
+        outputAs: a
+      - id: a
+        deps: ['b']
+        if: |
+          function execute(vars) {
+            return vars.$history.length < 4;
+          }
+        prompt: | # Use (not (eq this.id "b")) to get both a + start
+          - system: You are a pirate talking with an astronaut. Keep your responses short.
+          - user: {{message}}
+          {{#each $history}}- {{#if (not (eq this.id "b"))}}assistant{{else}}user{{/if}}: {{#each this.output}}{{this}}{{/each}}
+          {{/each}}
+        providerLabel: pirate
+        outputAs: a
+      - id: b
+        deps: ['a']
+        if: |
+          function execute(vars) {
+            return vars.$history.length < 4;
+          }
+        prompt: |
+          - system: You are an astronaut talking with a pirate. Keep your responses short.
+          - assistant: {{message}}
+          {{#each $history}}- {{#if (eq this.id "b")}}assistant{{else}}user{{/if}}: {{#each this.output}}{{this}}{{/each}}
+          {{/each}}
+        providerLabel: astronaut
+        outputAs: b
+
+tests:
+  - vars:
+      message: I bet I've seen scarier things than you!
