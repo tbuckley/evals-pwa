@@ -57,9 +57,6 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
         // We want to leave other strings alone so equality tests work, ex. `(eq this.id "b")`
         stringVars[path] = val;
         return `__STRING_PLACEHOLDER_${path}__`;
-      } else if (typeof val === 'string') {
-        // Otherwise, mark it as safe string
-        return val;
       }
       return val;
     });

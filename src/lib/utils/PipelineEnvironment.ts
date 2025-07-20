@@ -526,6 +526,9 @@ export function orderedMerge<T>(a: T[], b: T[], cmp: (a: T, b: T) => number): T[
   return merged;
 }
 
+// This just needs some way to consistently compare history items, or return 0 if identical
+// All properties should be tested
+// TODO consider using a JSON hash?
 const historyMergeFn = makeOrderedMerge<HistoryItem>(function (a, b) {
   // By step ID
   if (a.id < b.id) {
