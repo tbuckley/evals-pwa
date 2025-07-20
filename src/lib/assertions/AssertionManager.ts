@@ -6,7 +6,6 @@ import { createRegexAssertion } from './regex';
 import { createEqualsAssertion } from './equals';
 import { createLlmRubricAssertion } from './llmRubric';
 import type { ProviderManager } from '$lib/providers/ProviderManager';
-import { objectDfsMap } from '$lib/utils/objectDFS';
 import { createSelectBestAssertion } from './selectBest';
 import { createConsistencyAssertion } from './consistency';
 
@@ -59,17 +58,11 @@ export class AssertionManager {
 
 function prePopulateVars(vars: Assertion['vars'], testVars: NormalizedTestCase['vars']) {
   const populatedVars = { ...vars };
-  const safeVars = objectDfsMap(testVars, (val) => {
-    if (typeof val === 'string') {
-      return new Handlebars.SafeString(val);
-    }
-    return val;
-  });
 
   for (const key in populatedVars) {
     if (typeof populatedVars[key] === 'string') {
-      const template = Handlebars.compile(populatedVars[key]);
-      populatedVars[key] = template(safeVars);
+      const template = Handlebars.compile(populatedVars[key], { noEscape: true });
+      populatedVars[key] = template(testVars);
     }
   }
 

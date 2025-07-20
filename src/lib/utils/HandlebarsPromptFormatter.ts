@@ -13,15 +13,22 @@ import * as yaml from 'yaml';
 import { z } from 'zod';
 
 Handlebars.registerHelper('eq', (a, b) => a === b);
+Handlebars.registerHelper('neq', (a, b) => a !== b);
 Handlebars.registerHelper('not', (a) => !a);
 Handlebars.registerHelper('and', (a: boolean, b: boolean) => a && b);
 Handlebars.registerHelper('or', (a: boolean, b: boolean) => a || b);
+Handlebars.registerHelper('lt', (a: number, b: number) => a < b);
+Handlebars.registerHelper('gt', (a: number, b: number) => a > b);
+Handlebars.registerHelper('lte', (a: number, b: number) => a <= b);
+Handlebars.registerHelper('gte', (a: number, b: number) => a >= b);
+Handlebars.registerHelper('isArray', (a) => Array.isArray(a));
+Handlebars.registerHelper('typeof', (a) => typeof a);
 
 export class HandlebarsPromptFormatter implements PromptFormatter {
   template: HandlebarsTemplateDelegate;
 
   constructor(public readonly prompt: string) {
-    this.template = Handlebars.compile(prompt);
+    this.template = Handlebars.compile(prompt, { noEscape: true });
   }
   async format(vars: VarSet, mimeTypes?: string[]): Promise<ConversationPrompt> {
     const files: Record<string, FileReference> = {};
@@ -38,22 +45,24 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
           try {
             const decoder = new TextDecoder('utf-8', { fatal: true });
             const decodedText = decoder.decode(await val.file.arrayBuffer());
-            return new Handlebars.SafeString(decodedText);
+            return decodedText;
           } catch (e) {
             console.warn(`Cannot read file ${val.uri} (for ${path}) as utf-8:`, e);
             errorFiles[path] = val;
             return `__FILE_PLACEHOLDER_${path}__`;
           }
         }
-      }
-      // If it's a string that contains newlines, use a placeholder
-      if (typeof val === 'string' && val.includes('\n')) {
+      } else if (typeof val === 'string' && val.includes('\n')) {
+        // If it's a string that contains newlines, use a placeholder
+        // We want to leave other strings alone so equality tests work, ex. `(eq this.id "b")`
         stringVars[path] = val;
         return `__STRING_PLACEHOLDER_${path}__`;
+      } else if (typeof val === 'string') {
+        // Otherwise, mark it as safe string
+        return val;
       }
       return val;
     });
-    console.log('placeholderVars', placeholderVars);
 
     const rendered = this.template(placeholderVars);
     const conversation = getAsConversation(rendered);
@@ -86,7 +95,6 @@ export class HandlebarsPromptFormatter implements PromptFormatter {
 function getAsConversation(rendered: string): Conversation {
   try {
     const parsed: unknown = yaml.parse(rendered);
-    console.log('parsed', parsed);
     return conversationSchema.parse(parsed);
   } catch (e) {
     console.error('Error parsing conversation:', e);
