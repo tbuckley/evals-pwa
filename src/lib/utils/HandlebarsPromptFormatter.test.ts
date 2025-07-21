@@ -134,6 +134,50 @@ describe('HandlebarsPromptFormatter', () => {
       { role: 'user', content: [{ text: 'YAY\nYAY\nYAY\nYAY\nYAY\nYAY\nYAY\nYAY' }] },
     ]);
   });
+  test('supports math helpers', async function () {
+    const formatter = new HandlebarsPromptFormatter(dedent`
+      {{add a b}}
+      {{sub a b}}
+      {{mult a b}}
+      {{div a b}}
+      {{lt a 20}}
+    `);
+    const output = await formatter.format({ a: 3, b: 5 });
+    expect(output).toEqual([{ role: 'user', content: [{ text: '8\n-2\n15\n0.6\ntrue' }] }]);
+  });
+  test('helpers work with array indices', async function () {
+    const formatter = new HandlebarsPromptFormatter(dedent`
+      {{#each names}}
+      {{#if (eq @index 0)}}
+      FIRST: {{this}}
+      {{else}}
+      #{{add @index 1}}: {{this}}
+      {{~/if}}
+      {{/each}}
+    `);
+    const output = await formatter.format({ names: ['Tom', 'Jerry'] });
+    expect(output).toEqual([{ role: 'user', content: [{ text: 'FIRST: Tom\n#2: Jerry' }] }]);
+  });
+  test('helpers work with arrays', async function () {
+    const formatter = new HandlebarsPromptFormatter(dedent`
+      {{length names}}
+      {{first names}}
+      {{last names}}
+      {{#each (rest names)}}
+      Rest: {{this}}
+      {{/each}}
+      {{slice names 1 3}}
+    `);
+    const output = await formatter.format({ names: ['Tom', 'Jerry', 'Spike'] });
+    expect(output).toEqual([
+      { role: 'user', content: [{ text: '3\nTom\nSpike\nRest: Jerry\nRest: Spike\nJerry,Spike' }] },
+    ]);
+  });
+  test('supports json helpers', async function () {
+    const formatter = new HandlebarsPromptFormatter('{{json names}}');
+    const output = await formatter.format({ names: ['Tom', 'Jerry'] });
+    expect(output).toEqual([{ role: 'user', content: [{ text: '["Tom","Jerry"]' }] }]);
+  });
 
   // Errors
   test('throws an error for unsupported file types that are not valid utf-8', async function () {

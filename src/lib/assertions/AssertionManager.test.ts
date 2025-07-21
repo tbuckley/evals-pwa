@@ -86,7 +86,7 @@ describe('AssertionManager', () => {
         type: 'llm-rubric',
         vars: {
           rubric: 'THIS IS IGNORED BECAUSE {{ rubric }} IS NOT IN THE PROMPT',
-          prompt: '} "{{ output }} {{ first }} :tuptuO" :"egassem" ,eurt :"ssap" {',
+          prompt: '} "{{ output }} {{ ./first }} :tuptuO" :"egassem" ,eurt :"ssap" {',
           provider: 'reverser:whatever',
         },
       },
