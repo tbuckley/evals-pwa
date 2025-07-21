@@ -12,17 +12,35 @@ import { matchesMimeType } from './media';
 import * as yaml from 'yaml';
 import { z } from 'zod';
 
-Handlebars.registerHelper('eq', (a, b) => a === b);
-Handlebars.registerHelper('neq', (a, b) => a !== b);
+// Boolean
 Handlebars.registerHelper('not', (a) => !a);
 Handlebars.registerHelper('and', (a: boolean, b: boolean) => a && b);
 Handlebars.registerHelper('or', (a: boolean, b: boolean) => a || b);
+// Comparison
+Handlebars.registerHelper('eq', (a, b) => a === b);
+Handlebars.registerHelper('neq', (a, b) => a !== b);
 Handlebars.registerHelper('lt', (a: number, b: number) => a < b);
 Handlebars.registerHelper('gt', (a: number, b: number) => a > b);
 Handlebars.registerHelper('lte', (a: number, b: number) => a <= b);
 Handlebars.registerHelper('gte', (a: number, b: number) => a >= b);
+// Type
 Handlebars.registerHelper('isArray', (a) => Array.isArray(a));
 Handlebars.registerHelper('typeof', (a) => typeof a);
+// Math
+Handlebars.registerHelper('add', (a: number, b: number) => a + b);
+Handlebars.registerHelper('sub', (a: number, b: number) => a - b);
+Handlebars.registerHelper('mult', (a: number, b: number) => a * b);
+Handlebars.registerHelper('div', (a: number, b: number) => a / b);
+// Array
+Handlebars.registerHelper('first', (a: string[]) => a[0]);
+Handlebars.registerHelper('last', (a: string[]) => a[a.length - 1]);
+Handlebars.registerHelper('rest', (a: string[]) => a.slice(1));
+Handlebars.registerHelper('length', (a: string[]) => a.length);
+Handlebars.registerHelper('slice', (a: string[], start: number, end: number) =>
+  a.slice(start, end),
+);
+// JSON
+Handlebars.registerHelper('json', (a: unknown) => JSON.stringify(a));
 
 export class HandlebarsPromptFormatter implements PromptFormatter {
   template: HandlebarsTemplateDelegate;

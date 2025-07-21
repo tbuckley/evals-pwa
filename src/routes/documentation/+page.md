@@ -261,6 +261,9 @@ You can use these helpers inside your prompts, for example:
 - Boolean logic: `(not a)`, `(and a b)`, `(or a b)`
 - Comparison: `(eq a b)`, `(neq a b)`, `(lt a b)`, `(gt a b)`, `(lte a b)`, `(gte a b)`
 - Types: `(typeof a)`, `(isArray a)`
+- Math: `(add a b)`, `(sub a b)`, `(mult a b)`, `(div a b)`
+- Arrays: `(first arr)`, `(last arr)`, `(rest arr)`, `(length arr)`, `(slice arr)`
+- JSON: `(json a)`
 
 ### Tests
 
