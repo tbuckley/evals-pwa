@@ -1,0 +1,11 @@
+{
+  "providers": ["gemini:gemini-2.5-flash"],
+  "prompts": ["What is the capital of {{country}}?"],
+  "tests": [
+    {
+      "vars": {
+        "country": "France"
+      }
+    }
+  ]
+}
