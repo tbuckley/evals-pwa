@@ -79,6 +79,8 @@ export class ProviderManager {
       return ['ANTHROPIC_API_KEY'];
     } else if (providerId === 'reverser') {
       return [];
+    } else if (providerId === 'echo') {
+      return [];
     } else if (providerId === 'chrome') {
       return [];
     } else if (providerId === 'ollama') {

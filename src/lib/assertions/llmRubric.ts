@@ -10,7 +10,6 @@ import {
   type TestResult,
 } from '$lib/types';
 import { extractAllJsonObjects } from '$lib/utils/extractAllJson';
-import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
 import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
 import { z } from 'zod';
 
@@ -39,7 +38,7 @@ export function createLlmRubricAssertion(
   const model = providerManager.getProvider(provider.id, provider.config);
   const env = new SimpleEnvironment({
     model,
-    promptFormatter: new HandlebarsPromptFormatter(prompt ?? LLM_RUBRIC_PROMPT),
+    prompt: prompt ?? LLM_RUBRIC_PROMPT,
   });
   // TODO also populate placeholders in the rubric
   // TODO make rubric optional if prompt is provided

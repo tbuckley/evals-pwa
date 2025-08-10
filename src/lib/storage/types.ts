@@ -51,6 +51,7 @@ export const fsPipelinePromptSchema = z
           outputAs: z.string().optional(),
           if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
           deps: z.array(z.string()).optional(),
+          export: z.string().optional(),
         }),
       ]),
     ),
@@ -58,7 +59,13 @@ export const fsPipelinePromptSchema = z
   .strict();
 export const fsPromptSchema = z.union([
   z.string(),
-  z.object({ prompt: z.string(), providerLabel: z.string().optional() }).strict(),
+  z
+    .object({
+      prompt: z.string(),
+      providerLabel: z.string().optional(),
+      export: z.string().optional(),
+    })
+    .strict(),
   fsConvoPromptSchema,
   fsPipelinePromptSchema,
 ]);

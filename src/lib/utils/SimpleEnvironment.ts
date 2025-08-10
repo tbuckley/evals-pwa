@@ -1,39 +1,48 @@
 import type {
-  TestEnvironment,
-  ModelProvider,
-  TestOutput,
-  PromptFormatter,
-  TokenUsage,
-  VarSet,
-  RunContext,
-  ModelUpdate,
   ConversationPrompt,
   ModelCache,
+  ModelProvider,
+  ModelUpdate,
+  NormalizedPrompt,
+  PromptFormatter,
+  RunContext,
+  TestEnvironment,
+  TestOutput,
+  TokenUsage,
+  VarSet,
 } from '$lib/types';
 import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
+import { HandlebarsPromptFormatter } from './HandlebarsPromptFormatter';
+import { stringify } from 'yaml';
 
 export interface Config {
   model: ModelProvider;
-  promptFormatter: PromptFormatter;
+  prompt: NormalizedPrompt;
   cache?: ModelCache;
 }
 
 export class SimpleEnvironment implements TestEnvironment {
   model: ModelProvider;
-  promptFormatter: PromptFormatter;
+  prompt: NormalizedPrompt;
   cache?: ModelCache;
+  promptFormatter: PromptFormatter;
 
   constructor(options: Config) {
     this.model = options.model;
-    this.promptFormatter = options.promptFormatter;
+    this.prompt = options.prompt;
     this.cache = options.cache;
+
+    const promptText =
+      typeof this.prompt === 'string'
+        ? this.prompt
+        : 'prompt' in this.prompt
+          ? this.prompt.prompt
+          : ''; // TODO: what should happen with pipeline prompts?
+    this.promptFormatter = new HandlebarsPromptFormatter(promptText);
   }
 
   get provider() {
     return { id: this.model.id };
-  }
-  get prompt() {
-    return this.promptFormatter.prompt;
   }
 
   async *run(
@@ -44,12 +53,10 @@ export class SimpleEnvironment implements TestEnvironment {
     try {
       prompt = await this.promptFormatter.format(vars, this.model.mimeTypes);
     } catch (e) {
-      if (e instanceof Error) {
-        return {
-          error: e.toString(),
-        };
-      }
-      throw e;
+      const error = e instanceof Error ? e : new Error(String(e));
+      return {
+        error: error.toString(),
+      };
     }
 
     let response: unknown;
@@ -72,12 +79,10 @@ export class SimpleEnvironment implements TestEnvironment {
       response = cachedResponse;
       latencyMillis = cachedLatencyMillis;
     } catch (e) {
-      if (e instanceof Error) {
-        return {
-          error: e.toString(),
-        };
-      }
-      throw e;
+      const error = e instanceof Error ? e : new Error(String(e));
+      return {
+        error: error.toString(),
+      };
     }
 
     let output: NonNullable<TestOutput['output']>;
@@ -87,23 +92,37 @@ export class SimpleEnvironment implements TestEnvironment {
       output = await modelOutputToTestOutput(rawOutput);
       tokenUsage = this.model.extractTokenUsage(response);
     } catch (e) {
-      if (e instanceof Error) {
-        return {
-          rawPrompt: prompt,
-          rawOutput: response,
-          error: e.toString(),
-          latencyMillis,
-        };
-      }
-      throw e;
+      const error = e instanceof Error ? e : new Error(String(e));
+      return {
+        rawPrompt: prompt,
+        rawOutput: response,
+        error: error.toString(),
+        latencyMillis,
+      };
     }
 
-    return {
+    const result: TestOutput = {
       rawPrompt: prompt,
       rawOutput: response,
       output,
       latencyMillis,
       tokenUsage,
     };
+
+    if (typeof this.prompt === 'object' && 'export' in this.prompt && this.prompt.export) {
+      const exportPath = this.prompt.export;
+      const newTestCase = {
+        vars: {
+          ...vars,
+          output,
+        },
+      };
+      result.exportInfo = {
+        exportPath,
+        content: stringify(newTestCase),
+      };
+    }
+
+    return result;
   }
 }

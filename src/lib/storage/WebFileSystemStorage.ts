@@ -100,6 +100,19 @@ export class WebFileSystemStorage implements FileStorage {
     return handle.getFile();
   }
 
+  async isDirectory(uri: string): Promise<boolean> {
+    const path = fileUriToPath(uri);
+    try {
+      await this.getSubdirHandle(path);
+      return true;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'NotFoundError') {
+        return false;
+      }
+      throw err;
+    }
+  }
+
   private async getSubdirHandle(path: string, create = false): Promise<FileSystemDirectoryHandle> {
     if (path === '') {
       return this.dir;
