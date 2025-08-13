@@ -207,7 +207,9 @@ export class GeminiLiveProvider implements ModelProvider {
       }
 
       const fullResponseParts: Part[] = [];
+      const audioBuffers: Int16Array[] = [];
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       while (!isClosed || responseQueue.length > 0) {
         if (errorQueue.length > 0) {
           const error = errorQueue.shift();
@@ -224,9 +226,7 @@ export class GeminiLiveProvider implements ModelProvider {
               byteNumbers[i] = byteCharacters.charCodeAt(i);
             }
             const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'audio/wav' });
-            fullResponseParts.push({ inlineData: { mimeType: 'audio/wav', data: message.data } });
-            yield { type: 'append', output: await blobToFileReference(blob) };
+            audioBuffers.push(new Int16Array(byteArray.buffer));
           }
 
           if ('serverContent' in message && message.serverContent?.modelTurn?.parts) {
@@ -244,6 +244,20 @@ export class GeminiLiveProvider implements ModelProvider {
         } else {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
+      }
+
+      if (audioBuffers.length > 0) {
+        const concatenated = new Int16Array(audioBuffers.flatMap((b) => Array.from(b)));
+
+        const wav = new WaveFile();
+        wav.fromScratch(1, 24000, '16', concatenated);
+        const wavBlob = new Blob([wav.toBuffer()], { type: 'audio/wav' });
+
+        const b64 = await fileToBase64(new File([wavBlob], 'audio.wav'));
+        const data = b64.slice(b64.indexOf(',') + 1);
+
+        fullResponseParts.push({ inlineData: { mimeType: 'audio/wav', data } });
+        yield { type: 'append', output: await blobToFileReference(wavBlob) };
       }
 
       session.close();

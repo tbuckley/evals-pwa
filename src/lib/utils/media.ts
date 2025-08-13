@@ -51,3 +51,11 @@ export function isImageFile(val: unknown): boolean {
     imageExtensions.some((ext) => val.uri.toLowerCase().endsWith(ext))
   );
 }
+
+export function isAudioFile(val: unknown): boolean {
+  const audioExtensions = ['.wav', '.mp3', '.ogg', '.flac', '.m4a', '.opus'];
+  return (
+    val instanceof FileReference &&
+    audioExtensions.some((ext) => val.uri.toLowerCase().endsWith(ext))
+  );
+}
