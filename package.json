@@ -46,6 +46,7 @@
   },
   "type": "module",
   "dependencies": {
+    "@google/genai": "^1.13.0",
     "@mlc-ai/web-llm": "^0.2.68",
     "@sveltejs/adapter-static": "^3.0.5",
     "@types/wicg-file-system-access": "^2023.10.5",
@@ -64,6 +65,7 @@
     "svelte-sonner": "^0.3.28",
     "tailwind-merge": "^2.5.2",
     "tailwind-variants": "^0.2.1",
+    "wavefile": "^11.0.0",
     "yaml": "^2.5.1",
     "zod": "^3.23.8"
   }

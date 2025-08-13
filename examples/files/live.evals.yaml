@@ -1,0 +1,15 @@
+description: Test Gemini's file support
+
+providers:
+  - id: gemini-live:gemini-2.5-flash-preview-native-audio-dialog
+    config:
+      responseModalities: ["AUDIO"]
+      systemInstructions: "You repeat back anything that is said to you."
+
+prompts:
+  - "{{ audio }}"
+
+tests:
+  - description: Audio file
+    vars:
+      audio: file:///Man-of-war.wav

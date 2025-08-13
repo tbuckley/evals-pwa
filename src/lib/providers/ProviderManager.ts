@@ -9,6 +9,7 @@ import { AnthropicProvider } from './anthropic';
 import { DalleProvider } from './dalle';
 import { ComfyuiProvider } from './comfyui';
 import { EchoProvider } from './echo';
+import { GeminiLiveProvider } from './gemini-live';
 
 export class ProviderManager {
   constructor(public env: Record<string, string>) {}
@@ -27,6 +28,11 @@ export class ProviderManager {
         throw new Error('GEMINI_API_KEY not found');
       }
       return new GeminiProvider(modelName, this.env.GEMINI_API_KEY, config);
+    } else if (providerId === 'gemini-live') {
+      if (typeof this.env.GEMINI_API_KEY !== 'string') {
+        throw new Error('GEMINI_API_KEY not found');
+      }
+      return new GeminiLiveProvider(modelName, this.env.GEMINI_API_KEY, config);
     } else if (providerId === 'openai') {
       if (typeof this.env.OPENAI_API_KEY !== 'string') {
         throw new Error('OPENAI_API_KEY not found');
@@ -71,7 +77,7 @@ export class ProviderManager {
     }
     const providerId = id.slice(0, index);
 
-    if (providerId === 'gemini') {
+    if (providerId === 'gemini' || providerId === 'gemini-live') {
       return ['GEMINI_API_KEY'];
     } else if (providerId === 'openai' || providerId === 'dalle') {
       return ['OPENAI_API_KEY'];
