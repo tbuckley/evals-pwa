@@ -197,6 +197,12 @@ export class GeminiLiveProvider implements ModelProvider {
               },
             });
           }
+          if (audioParts.length > 0) {
+            console.log(`[${uuid}] Audio stream ended`);
+            session.sendRealtimeInput({ audioStreamEnd: true });
+          } else {
+            session.sendClientContent({ turnComplete: true });
+          }
         }
       }
 
@@ -230,6 +236,11 @@ export class GeminiLiveProvider implements ModelProvider {
               yield { type: 'append', output: part.text };
             }
           }
+
+          // Detect an end from the server
+          if ('serverContent' in message && message.serverContent?.turnComplete) {
+            break;
+          }
         } else {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
@@ -237,8 +248,6 @@ export class GeminiLiveProvider implements ModelProvider {
 
       session.close();
 
-      // This is a mock response to satisfy the type checker.
-      // A proper implementation would construct a valid GenerateContentResponse.
       return {
         parts: fullResponseParts,
       };
