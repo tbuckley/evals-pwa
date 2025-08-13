@@ -8,10 +8,12 @@ providers:
   - id: gemini-live:gemini-2.5-flash-preview-native-audio-dialog
     config:
       responseModalities: ["AUDIO"]
-      systemInstruction: "You repeat back anything that is said to you."
+      systemInstruction: "You only respond by singing."
 
 prompts:
-  - "{{ audio }}"
+  - - user: "{{ audio }}"
+    # - assistant: ignore
+    # - user: "What's the capital of France?"
 
 tests:
   - description: Audio file
