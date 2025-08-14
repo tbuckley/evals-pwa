@@ -1,4 +1,5 @@
 import { FileReference } from '$lib/storage/FileReference';
+import { WaveFile } from 'wavefile';
 
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -58,4 +59,31 @@ export function isAudioFile(val: unknown): boolean {
     val instanceof FileReference &&
     audioExtensions.some((ext) => val.uri.toLowerCase().endsWith(ext))
   );
+}
+
+export async function wavToGeminiLive(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const wav = new WaveFile();
+  wav.fromBuffer(new Uint8Array(buffer));
+  wav.toSampleRate(16000);
+  wav.toBitDepth('16');
+  const base64Audio = wav.toBase64();
+  return base64Audio;
+}
+
+export function geminiDataToWav(chunks: Uint8Array[]): Blob {
+  const data = new Int16Array(chunks.flatMap((c) => Array.from(new Int16Array(c.buffer))));
+  const wav = new WaveFile();
+  wav.fromScratch(1, 24000, '16', new Int16Array(data.buffer));
+  return new Blob([wav.toBuffer()], { type: 'audio/wav' });
+}
+
+export function decodeB64Blob(data: string): Uint8Array {
+  const byteCharacters = atob(data);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return byteArray;
 }

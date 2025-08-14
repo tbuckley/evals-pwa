@@ -7,7 +7,7 @@ import type {
   RunContext,
   TokenUsage,
 } from '$lib/types';
-import { fileToBase64 } from '$lib/utils/media';
+import { decodeB64Blob, fileToBase64, geminiDataToWav, wavToGeminiLive } from '$lib/utils/media';
 import { Semaphore } from '$lib/utils/semaphore';
 import { CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN } from './common';
 import {
@@ -18,7 +18,6 @@ import {
   Session,
   type LiveConnectParameters,
 } from '@google/genai';
-import { WaveFile } from 'wavefile';
 
 const GEMINI_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
 
@@ -258,13 +257,7 @@ export class LiveApiWrapper {
     }
     if (audioParts.length > 0) {
       for (const audioFile of audioParts) {
-        const buffer = await audioFile.arrayBuffer();
-        const wav = new WaveFile();
-        wav.fromBuffer(new Uint8Array(buffer));
-        wav.toSampleRate(16000);
-        wav.toBitDepth('16');
-        const base64Audio = wav.toBase64();
-
+        const base64Audio = await wavToGeminiLive(audioFile);
         this.session?.sendRealtimeInput({
           audio: {
             data: base64Audio,
@@ -282,7 +275,7 @@ export class LiveApiWrapper {
 
     let turnOver = false;
     const fullResponseParts: Part[] = [];
-    const audioBuffers: Int16Array[] = [];
+    const audioBuffers: Uint8Array[] = [];
 
     while (!this.isClosed && !turnOver) {
       if (this.errorQueue.length > 0) {
@@ -293,14 +286,8 @@ export class LiveApiWrapper {
       const message = this.responseQueue.shift();
       if (message) {
         if ('data' in message && message.data) {
-          // audio
-          const byteCharacters = atob(message.data);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          audioBuffers.push(new Int16Array(byteArray.buffer));
+          const byteArray = decodeB64Blob(message.data);
+          audioBuffers.push(byteArray);
         }
 
         if ('serverContent' in message && message.serverContent?.modelTurn?.parts) {
@@ -321,11 +308,7 @@ export class LiveApiWrapper {
     }
 
     if (audioBuffers.length > 0) {
-      const concatenated = new Int16Array(audioBuffers.flatMap((b) => Array.from(b)));
-
-      const wav = new WaveFile();
-      wav.fromScratch(1, 24000, '16', concatenated);
-      const wavBlob = new Blob([wav.toBuffer()], { type: 'audio/wav' });
+      const wavBlob = geminiDataToWav(audioBuffers);
 
       const b64 = await fileToBase64(new File([wavBlob], 'audio.wav'));
       const data = b64.slice(b64.indexOf(',') + 1);

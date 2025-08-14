@@ -61,6 +61,7 @@ type Provider = string | { id: string; config?: any; labels?: string[] };
 Currently supported model providers:
 
 - [x] Gemini -- prefix with `gemini:`, e.g. `gemini:gemini-2.5-pro`. Requires `GEMINI_API_KEY` in your environment.
+- [x] Gemini Live -- prefix with `gemini-live:`, e.g. `gemini-live:gemini-2.5-flash-preview-native-audio-dialog`. Requires `GEMINI_API_KEY` in your environment.
 - [x] OpenAI -- prefix with `openai:`, e.g. `openai:gpt-4o`. Requires `OPENAI_API_KEY` in your environment.
 - [x] [Chrome](https://goo.gle/chrome-ai-dev-preview) -- use `chrome:ai`.
 - [x] Ollama -- prefix with `ollama:`, e.g. `ollama:gemma-2:2b`. Requires `OLLAMA_ENDPOINT` (e.g. `http://localhost:11434`) in your environment, or the `apiBaseUrl` config option.

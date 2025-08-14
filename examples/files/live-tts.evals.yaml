@@ -1,0 +1,26 @@
+providers:
+  - id: gemini:gemini-2.5-flash-preview-tts
+    labels: ['tts']
+    config:
+      generationConfig:
+        responseModalities: ['AUDIO']
+        speechConfig:
+          voiceConfig:
+            prebuiltVoiceConfig:
+              voiceName: 'Kore'
+  - id: gemini-live:gemini-2.5-flash-preview-native-audio-dialog
+    labels: ['live']
+    config:
+      responseModalities: ['AUDIO']
+      systemInstruction: 'You only respond by singing.'
+
+prompts:
+  - $pipeline:
+      - prompt: "What's the capital of {{country}}?"
+        providerLabel: tts
+      - prompt: '{{$output}}'
+        providerLabel: live
+
+tests:
+  - vars:
+      country: 'France'
