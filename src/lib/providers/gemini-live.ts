@@ -67,7 +67,7 @@ export class GeminiLiveProvider implements ModelProvider {
     'application/pdf',
   ];
 
-  run(conversation: ConversationPrompt, _context: RunContext) {
+  async run(conversation: ConversationPrompt, _context: RunContext) {
     const systemInstructionParts: string[] = [];
     for (const message of conversation) {
       if (message.role === 'system') {
@@ -79,12 +79,13 @@ export class GeminiLiveProvider implements ModelProvider {
       }
     }
     const systemInstruction = systemInstructionParts.join('\n');
+    const turns = await conversationToTurns(conversation);
 
     const request = {
       model: this.model,
       config: this.config,
       systemInstruction,
-      conversation,
+      turns,
     };
 
     const runModel = async function* (
@@ -104,12 +105,12 @@ export class GeminiLiveProvider implements ModelProvider {
       const responseParts: Part[] = [];
 
       // Send the conversation history
-      for (const message of conversation) {
+      for (const message of turns) {
         if (message.role === 'user') {
           console.log('Sending turn...', message);
-          await live.sendTurn(message.content);
+          await live.sendTurn(message.turn);
           console.log('Finished turn', message);
-        } else if (message.role === 'assistant') {
+        } else {
           // Ignore message, just wait for a turn
           console.log('Awaiting reply');
           const reply = await live.assistantTurnComplete();
@@ -223,41 +224,17 @@ export class LiveApiWrapper {
     }
   }
 
-  async sendTurn(prompt: MultiPartPrompt): Promise<void> {
+  async sendTurn(turn: Turn): Promise<void> {
     await this.isReady();
 
-    const parts: Part[] = [];
-
-    const audioParts: File[] = [];
-
-    for (const part of prompt) {
-      if ('text' in part) {
-        parts.push({ text: part.text });
-      } else if ('file' in part) {
-        const { file } = part;
-        if (file.type === 'audio/wav') {
-          // Only WAV files are supported for real-time sessions
-          // TODO: Add video support (TBD what format)
-          audioParts.push(file);
-        } else {
-          const b64 = await fileToBase64(file);
-          const data = b64.slice(b64.indexOf(',') + 1);
-          parts.push({
-            inlineData: {
-              data,
-              mimeType: file.type,
-            },
-          });
-        }
-      }
+    if (turn.parts.length > 0) {
+      this.session?.sendClientContent({
+        turns: turn.parts,
+        turnComplete: turn.audio.length > 0,
+      });
     }
-
-    if (parts.length > 0) {
-      this.session?.sendClientContent({ turns: parts, turnComplete: audioParts.length > 0 });
-    }
-    if (audioParts.length > 0) {
-      for (const audioFile of audioParts) {
-        const base64Audio = await wavToGeminiLive(audioFile);
+    if (turn.audio.length > 0) {
+      for (const base64Audio of turn.audio) {
         this.session?.sendRealtimeInput({
           audio: {
             data: base64Audio,
@@ -280,7 +257,7 @@ export class LiveApiWrapper {
       });
 
       // Simulate muting the microphone
-      // this.session?.sendRealtimeInput({ audioStreamEnd: true });
+      this.session?.sendRealtimeInput({ audioStreamEnd: true });
     }
   }
   async assistantTurnComplete(): Promise<Part[]> {
@@ -336,4 +313,61 @@ export class LiveApiWrapper {
     await this.isReady();
     this.session?.close();
   }
+}
+
+type ConversationTurn = { role: 'user'; turn: Turn } | { role: 'assistant' };
+
+async function conversationToTurns(prompt: ConversationPrompt): Promise<ConversationTurn[]> {
+  const parts = prompt
+    .filter((p) => p.role === 'user' || p.role === 'assistant')
+    .map(async (p) => {
+      if (p.role === 'user') {
+        return { role: 'user', turn: await prepareTurn(p.content) } as const;
+      }
+      return { role: 'assistant' } as const;
+    });
+  return Promise.all(parts);
+}
+
+interface Turn {
+  parts: Part[];
+  audio: string[];
+}
+
+async function prepareTurn(prompt: MultiPartPrompt): Promise<Turn> {
+  const parts: Part[] = [];
+  const audio: string[] = [];
+
+  const audioParts: File[] = [];
+
+  for (const part of prompt) {
+    if ('text' in part) {
+      parts.push({ text: part.text });
+    } else if ('file' in part) {
+      const { file } = part;
+      if (file.type === 'audio/wav') {
+        // Only WAV files are supported for real-time sessions
+        // TODO: Add video support (TBD what format)
+        audioParts.push(file);
+      } else {
+        const b64 = await fileToBase64(file);
+        const data = b64.slice(b64.indexOf(',') + 1);
+        parts.push({
+          inlineData: {
+            data,
+            mimeType: file.type,
+          },
+        });
+      }
+    }
+  }
+
+  if (audioParts.length > 0) {
+    for (const audioFile of audioParts) {
+      const base64Audio = await wavToGeminiLive(audioFile);
+      audio.push(base64Audio);
+    }
+  }
+
+  return { parts, audio };
 }
