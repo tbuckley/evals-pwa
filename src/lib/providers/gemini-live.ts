@@ -266,8 +266,21 @@ export class LiveApiWrapper {
         });
       }
 
+      // Now send 500ms of silence
+      const silenceBytes = new Uint8Array(16000); // 500ms of 16kHz 16-bit PCM silence
+      const base64Silence = btoa(
+        // This is slow, there must be a better way to convert Uint8Array to base64 string
+        silenceBytes.reduce((data, byte) => data + String.fromCharCode(byte), ''),
+      );
+      this.session?.sendRealtimeInput({
+        audio: {
+          data: base64Silence,
+          mimeType: 'audio/pcm;rate=16000',
+        },
+      });
+
       // Simulate muting the microphone
-      this.session?.sendRealtimeInput({ audioStreamEnd: true });
+      // this.session?.sendRealtimeInput({ audioStreamEnd: true });
     }
   }
   async assistantTurnComplete(): Promise<Part[]> {
