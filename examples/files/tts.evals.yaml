@@ -1,0 +1,16 @@
+providers:
+  - id: gemini:gemini-2.5-flash-preview-tts
+    config:
+      generationConfig:
+        responseModalities: ['AUDIO']
+        speechConfig:
+          voiceConfig:
+            prebuiltVoiceConfig:
+              voiceName: 'Kore'
+
+prompts:
+  - 'Say {{tone}}: Hello, how are you today?'
+
+tests:
+  - vars:
+      tone: 'cheerfully'

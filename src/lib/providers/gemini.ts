@@ -8,7 +8,7 @@ import type {
   TokenUsage,
 } from '$lib/types';
 import { sse } from '$lib/utils/sse';
-import { fileToBase64 } from '$lib/utils/media';
+import { decodeB64Blob, fileToBase64, geminiDataToWav } from '$lib/utils/media';
 import { z } from 'zod';
 import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 import { Semaphore } from '$lib/utils/semaphore';
@@ -262,12 +262,13 @@ export class GeminiProvider implements ModelProvider {
         return part.text;
       }
       if ('inlineData' in part) {
-        const byteCharacters = atob(part.inlineData.data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        const byteArray = decodeB64Blob(part.inlineData.data);
+
+        // If it's audio (ex from TTS), convert to wav
+        if (part.inlineData.mimeType === 'audio/L16;codec=pcm;rate=24000') {
+          return geminiDataToWav([byteArray]);
         }
-        const byteArray = new Uint8Array(byteNumbers);
+
         return new Blob([byteArray], { type: part.inlineData.mimeType });
       }
       throw new Error('Unexpected output format');

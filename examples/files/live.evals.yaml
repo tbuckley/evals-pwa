@@ -1,0 +1,21 @@
+description: Test Gemini's file support
+
+providers:
+  - id: gemini-live:gemini-live-2.5-flash-preview
+    config:
+      responseModalities: ['TEXT']
+      systemInstruction: 'You repeat back anything that is said to you.'
+  - id: gemini-live:gemini-2.5-flash-preview-native-audio-dialog
+    config:
+      responseModalities: ['AUDIO']
+      systemInstruction: 'You only respond by singing.'
+
+prompts:
+  - - user: '{{ audio }}'
+    # - assistant: ignore
+    # - user: "What's the capital of France?"
+
+tests:
+  - description: Audio file
+    vars:
+      audio: file:///converted.wav

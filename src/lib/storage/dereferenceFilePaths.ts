@@ -234,6 +234,7 @@ function getFileExtension(blob: Blob): string {
     'application/typescript': '.ts',
     'application/javascript': '.js',
     'text/plain': '.txt',
+    'audio/wav': '.wav',
   };
 
   if (blob.type in extensionMap) {
