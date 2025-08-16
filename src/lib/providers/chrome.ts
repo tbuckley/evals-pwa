@@ -71,7 +71,7 @@ export class ChromeProvider implements ModelProvider {
           yield chunk.substring(reply.length);
           reply = chunk;
         }
-        return reply;
+        return { response: reply };
       },
     };
   }

@@ -26,7 +26,7 @@ export class EchoProvider implements ModelProvider {
       // eslint-disable-next-line @typescript-eslint/require-await
       runModel: async function* () {
         yield '';
-        return { prompt };
+        return { response: { prompt } };
       },
     };
   }

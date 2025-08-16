@@ -91,7 +91,9 @@ export class OpenaiProvider implements ModelProvider {
   ];
 
   async run(conversation: ConversationPrompt, context: RunContext) {
-    const messages = await conversationToOpenAI(conversation);
+    const sessionMessages = (context.session?.state ?? []) as Message[];
+    const newMessages = await conversationToOpenAI(conversation);
+    const messages = mergeMessages(sessionMessages, newMessages);
 
     const request = {
       model: this.model,
@@ -152,8 +154,14 @@ export class OpenaiProvider implements ModelProvider {
         }
 
         const parsed = generateContentResponseSchema.parse(lastResponseJson);
-        parsed.choices = [{ message: { role: 'assistant', content: fullText } }];
-        return parsed;
+        const message = { role: 'assistant', content: fullText } satisfies Message;
+        parsed.choices = [{ message }];
+        return {
+          response: parsed,
+          session: {
+            state: [...messages, message] satisfies Message[],
+          },
+        };
       },
     };
   }
@@ -268,7 +276,7 @@ export async function multiPartPromptToOpenAI(part: PromptPart): Promise<Part> {
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
-  content: Part[];
+  content: Part[] | string;
 }
 
 async function conversationToOpenAI(conversation: ConversationPrompt): Promise<Message[]> {
@@ -280,4 +288,8 @@ async function conversationToOpenAI(conversation: ConversationPrompt): Promise<M
       }),
     ),
   );
+}
+
+function mergeMessages(a: Message[], b: Message[]): Message[] {
+  return [...a, ...b.filter((m) => m.role !== 'system')];
 }

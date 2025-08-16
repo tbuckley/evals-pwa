@@ -1,0 +1,23 @@
+providers:
+  - id: gemini:gemini-2.5-flash
+
+prompts:
+  - $pipeline:
+      - if: | # Only allow 4 back-and-forths before we stop
+          function execute(vars) {
+            return vars.$history.length < 4;
+          }
+        deps: ['dougMessage'] # Requires a message from doug to run this step
+        session: tom # Saves the chat history as "tom"
+        prompt: '{{dougMessage}}' # Sends the doug message to tom
+        outputAs: tomMessage
+
+      - deps: ['tomMessage'] # Requires a message from tom to run this step
+        session: doug # Saves the chat history as "doug"
+        prompt: '{{tomMessage}}' # Sends the tom message to doug
+        outputAs: dougMessage
+
+tests:
+  - vars:
+      # Start with a message from doug to kick things off
+      dougMessage: "G'day mate, how are you?"

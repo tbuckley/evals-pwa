@@ -90,7 +90,7 @@ export class ComfyuiProvider implements ModelProvider {
         // Get the output images
         const outputs = history[prompt_id].outputs;
         if (!outputs) {
-          return { output: null };
+          return { response: { output: null } };
         }
 
         const outputImages = Object.values(outputs).flatMap((output) => output.images ?? []);
@@ -100,7 +100,9 @@ export class ComfyuiProvider implements ModelProvider {
           ),
         );
 
-        return Promise.all(outputFiles.map((file) => blobToFileReference(file)));
+        return {
+          response: await Promise.all(outputFiles.map((file) => blobToFileReference(file))),
+        };
       },
     };
   }

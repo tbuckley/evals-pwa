@@ -36,6 +36,7 @@ export interface NormalizedPipelineStep {
   if?: string | CodeReference;
   deps?: string[];
   providerLabel?: string;
+  session?: string;
 }
 export interface NormalizedPipelinePrompt {
   $pipeline: NormalizedPipelineStep[];
@@ -210,6 +211,7 @@ export interface RunContext {
   abortSignal: AbortSignal;
   cache?: ModelCache;
   cacheKey?: Record<string, unknown>;
+  session?: ModelSession;
 }
 
 export type ModelUpdate =
@@ -220,14 +222,25 @@ export type ModelUpdate =
     }
   | { type: 'begin-stream' };
 
-export type ModelGenerator = () => AsyncGenerator<string | ModelUpdate, unknown, void>;
+// A con
+export interface ModelSession {
+  state: unknown;
+  close?: () => MaybePromise<void>;
+  skipCache?: boolean;
+}
+export interface ModelResponse {
+  response: unknown;
+  session?: ModelSession;
+}
+export type ModelGenerator = AsyncGenerator<string | ModelUpdate, ModelResponse, void>;
+export type ModelRunner = () => ModelGenerator;
 
 export interface ModelProvider {
   id: string;
   run(
     prompt: ConversationPrompt,
     context: RunContext,
-  ): MaybePromise<{ request: unknown; runModel: ModelGenerator }>;
+  ): MaybePromise<{ request: unknown; runModel: ModelRunner }>;
   extractOutput(response: unknown): MaybePromise<string | (string | Blob)[]>;
   extractTokenUsage(response: unknown): TokenUsage;
   mimeTypes?: string[];

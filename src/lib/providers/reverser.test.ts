@@ -12,7 +12,7 @@ describe('ReverserProvider', () => {
     do {
       next = await resp.next();
     } while (!next.done);
-    const output = provider.extractOutput(next.value);
+    const output = provider.extractOutput(next.value.response);
     expect(output).toBe('olleh');
   });
   test('supports multi-part', async function () {
@@ -29,7 +29,7 @@ describe('ReverserProvider', () => {
     do {
       next = await resp.next();
     } while (!next.done);
-    const output = provider.extractOutput(next.value);
+    const output = provider.extractOutput(next.value.response);
     expect(output).toBe('dlrow\nolleh');
   });
 });

@@ -130,7 +130,7 @@ export class DalleProvider implements ModelProvider {
         }
 
         const json: unknown = await resp.json();
-        return json;
+        return { response: json };
       },
     };
   }

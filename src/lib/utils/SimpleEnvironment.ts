@@ -45,6 +45,7 @@ export class SimpleEnvironment implements TestEnvironment {
       prompt = await this.promptFormatter.format(vars, this.model.mimeTypes);
     } catch (e) {
       if (e instanceof Error) {
+        console.error('Error formatting prompt:', e);
         return {
           error: e.toString(),
         };
@@ -73,6 +74,7 @@ export class SimpleEnvironment implements TestEnvironment {
       latencyMillis = cachedLatencyMillis;
     } catch (e) {
       if (e instanceof Error) {
+        console.error('Error running model:', e);
         return {
           error: e.toString(),
         };
