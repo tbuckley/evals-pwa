@@ -240,7 +240,8 @@ export class GeminiProvider implements ModelProvider {
         parsed.candidates[0].content.parts ??= [];
 
         parsed.candidates[0].content.parts = fullResponse;
-        return parsed;
+        // TODO include session
+        return { response: parsed, session: {} };
       },
     };
   }
