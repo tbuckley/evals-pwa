@@ -1,5 +1,5 @@
 import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
-import type { ModelCache, ModelUpdate, TestResult } from '$lib/types';
+import type { ModelCache, ModelRunner, ModelSession, ModelUpdate, TestResult } from '$lib/types';
 import { z } from 'zod';
 import type { Semaphore } from './semaphore';
 
@@ -16,11 +16,11 @@ function isValidCacheValue(value: unknown): value is CacheValue {
 export async function* maybeUseCache(
   cache: ModelCache | undefined,
   key: unknown,
-  runModel: () => AsyncGenerator<string | ModelUpdate, unknown, void>,
+  runModel: ModelRunner,
   semaphore?: Semaphore,
 ): AsyncGenerator<
   string | ModelUpdate,
-  { latencyMillis: number; response: unknown; fromCache: boolean },
+  { latencyMillis: number; response: unknown; fromCache: boolean; session: ModelSession },
   void
 > {
   const cachedValue = await cache?.get(key);
@@ -31,6 +31,9 @@ export async function* maybeUseCache(
       latencyMillis,
       response,
       fromCache: true,
+      session: {
+        // FIXME: Restore session from cache
+      },
     };
   }
 
@@ -39,10 +42,13 @@ export async function* maybeUseCache(
   yield { type: 'begin-stream' }; // Signal that we're starting the request
 
   let response: unknown;
+  let session: ModelSession;
   let latencyMillis: number;
   try {
     const start = Date.now();
-    response = yield* runModel();
+    const res = yield* runModel();
+    response = res.response;
+    session = res.session;
     latencyMillis = Date.now() - start;
   } finally {
     // Release the semaphore after running the model
@@ -58,6 +64,7 @@ export async function* maybeUseCache(
     latencyMillis,
     response,
     fromCache: false,
+    session,
   };
 }
 

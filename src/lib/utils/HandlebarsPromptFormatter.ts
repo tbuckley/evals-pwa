@@ -94,8 +94,8 @@ function getAsConversation(rendered: string): Conversation {
   try {
     const parsed: unknown = yaml.parse(rendered);
     return conversationSchema.parse(parsed);
-  } catch (e) {
-    console.error('Error parsing conversation:', e);
+  } catch {
+    // console.error('Error parsing conversation:', e);
     return [{ user: rendered }];
   }
 }

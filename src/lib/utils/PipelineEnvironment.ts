@@ -12,6 +12,7 @@ import type {
   TestResult,
   NormalizedPipelinePrompt,
   TokenUsage,
+  ModelSession,
 } from '$lib/types';
 import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
 import { generator } from './generator';
@@ -84,6 +85,8 @@ export class PipelineEnvironment implements TestEnvironment {
     const history: TestOutput['history'] = []; // NOTE: IDs must be unique for display
     const start = Date.now();
 
+    const sessionManager = new Map<string, ModelSession>();
+
     const safeRunStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
       const count = stepRunCount.get(step.id) ?? 1;
       const stepId = step.id + (count > 1 ? ` #${count}` : '');
@@ -92,6 +95,7 @@ export class PipelineEnvironment implements TestEnvironment {
         await runStep(step, pipelineContext);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('Error running step:', error);
         result = {
           error: errorMessage,
           history: [...history, { id: stepId, error: errorMessage }],
@@ -126,7 +130,11 @@ export class PipelineEnvironment implements TestEnvironment {
       );
 
       // Run the prompt (or read from cache)
-      const { request, runModel } = await model.run(prompt, context);
+      const existingSession = step.session ? sessionManager.get(step.session) : undefined;
+      const { request, runModel } = await model.run(prompt, {
+        ...context,
+        session: existingSession,
+      });
       const cacheKey = {
         provider: model.id,
         request,
@@ -146,8 +154,14 @@ export class PipelineEnvironment implements TestEnvironment {
         }
         nextRes = await generator.next();
       }
-      const { response, latencyMillis } = nextRes.value;
+      const { response, latencyMillis, session } = nextRes.value;
       const finished = Date.now();
+
+      if (step.session) {
+        sessionManager.set(step.session, session);
+      } else {
+        await session.close?.();
+      }
 
       // Extract the output
       let output: NonNullable<TestOutput['output']>;
@@ -232,6 +246,7 @@ export class PipelineEnvironment implements TestEnvironment {
         };
       }
       for (const { step, context } of next) {
+        console.log('enqueueing step', step.id);
         taskQueue.enqueue(() => safeRunStep(step, context));
       }
     };
@@ -267,6 +282,12 @@ export class PipelineEnvironment implements TestEnvironment {
           });
         }
       });
+    // .finally(() => {
+    //   const sessions = [...sessionManager.values()];
+    //   Promise.all(sessions.map((s) => s.close?.())).catch((e: unknown) => {
+    //     console.error('Error closing pipeline sessions:', e);
+    //   });
+    // });
 
     return yield* modelUpdateGenerator.generator;
   }

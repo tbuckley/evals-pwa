@@ -1,6 +1,7 @@
 import type {
   ConversationPrompt,
   ModelProvider,
+  ModelResponse,
   ModelUpdate,
   MultiPartPrompt,
   NormalizedProviderConfig,
@@ -67,7 +68,7 @@ export class GeminiLiveProvider implements ModelProvider {
     'application/pdf',
   ];
 
-  async run(conversation: ConversationPrompt, _context: RunContext) {
+  async run(conversation: ConversationPrompt, context: RunContext) {
     const systemInstructionParts: string[] = [];
     for (const message of conversation) {
       if (message.role === 'system') {
@@ -90,15 +91,18 @@ export class GeminiLiveProvider implements ModelProvider {
 
     const runModel = async function* (
       this: GeminiLiveProvider,
-    ): AsyncGenerator<ModelUpdate, { parts: Part[] } | undefined, void> {
-      const live = new LiveApiWrapper(this.apiKey, {
-        model: this.model,
-        config: {
-          responseModalities: [Modality.AUDIO, Modality.TEXT],
-          systemInstruction: systemInstruction || undefined,
-          ...this.config,
-        },
-      });
+    ): AsyncGenerator<ModelUpdate, ModelResponse, void> {
+      const live =
+        context.session instanceof LiveApiWrapper
+          ? context.session
+          : new LiveApiWrapper(this.apiKey, {
+              model: this.model,
+              config: {
+                responseModalities: [Modality.AUDIO, Modality.TEXT],
+                systemInstruction: systemInstruction || undefined,
+                ...this.config,
+              },
+            });
 
       yield { type: 'append', output: 'processing...' };
 
@@ -115,16 +119,20 @@ export class GeminiLiveProvider implements ModelProvider {
           console.log('Awaiting reply');
           const reply = await live.assistantTurnComplete();
           responseParts.push(...reply);
-          console.log('Receive reply');
+          console.log('Received reply');
         }
       }
 
+      console.log('Awaiting final reply');
       const finalParts = await live.assistantTurnComplete();
       responseParts.push(...finalParts);
-      await live.close();
+      console.log('Received final reply', responseParts);
 
       return {
-        parts: responseParts,
+        response: {
+          parts: responseParts,
+        },
+        session: live,
       };
     };
 
@@ -198,7 +206,7 @@ export class LiveApiWrapper {
           console.log(`[${uuid}] Gemini Live API connected`);
         },
         onmessage: (message) => {
-          console.log(`[${uuid}] Gemini Live API message:`, message);
+          // console.log(`[${uuid}] Gemini Live API message:`, message);
           if ('setupComplete' in message) {
             this.resolveSetupComplete();
           } else {
@@ -290,7 +298,11 @@ export class LiveApiWrapper {
 
         // Detect an end from the server
         if ('serverContent' in message && message.serverContent?.turnComplete) {
-          turnOver = true;
+          // FIXME: Sometimes we get interrupted with zero content
+          // Should we instead have a timeout before we finish?
+          if (fullResponseParts.length > 0 || audioBuffers.length > 0) {
+            turnOver = true;
+          }
         }
       } else {
         await new Promise((resolve) => setTimeout(resolve, 100));
