@@ -44,6 +44,18 @@ export const partSchema = z.union([
       data: z.string(),
     }),
   }),
+  z.object({
+    executableCode: z.object({
+      code: z.string(),
+      language: z.string(),
+    }),
+  }),
+  z.object({
+    codeExecutionResult: z.object({
+      outcome: z.string(),
+      output: z.string(),
+    }),
+  }),
 ]);
 export type Part = z.infer<typeof partSchema>;
 
@@ -291,7 +303,7 @@ export class GeminiProvider implements ModelProvider {
 
         return new Blob([byteArray], { type: part.inlineData.mimeType });
       }
-      throw new Error('Unexpected output format');
+      return { type: 'meta', message: JSON.stringify(part, null, 2) };
     });
   }
 
