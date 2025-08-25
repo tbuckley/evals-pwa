@@ -356,7 +356,10 @@ export class GeminiProvider implements ModelProvider {
           message: JSON.stringify(json.candidates[0].safetyRatings, null, 2),
         });
       }
-      if (json.candidates[0]?.citationMetadata) {
+      if (
+        json.candidates[0]?.citationMetadata &&
+        Object.keys(json.candidates[0].citationMetadata).length > 0
+      ) {
         metaParts.push({
           type: 'meta',
           title: 'Citation Metadata',
@@ -364,7 +367,10 @@ export class GeminiProvider implements ModelProvider {
           message: JSON.stringify(json.candidates[0].citationMetadata, null, 2),
         });
       }
-      if (json.candidates[0]?.groundingMetadata) {
+      if (
+        json.candidates[0]?.groundingMetadata &&
+        Object.keys(json.candidates[0].groundingMetadata).length > 0
+      ) {
         metaParts.push({
           type: 'meta',
           title: 'Grounding Metadata',
@@ -372,7 +378,10 @@ export class GeminiProvider implements ModelProvider {
           message: JSON.stringify(json.candidates[0].groundingMetadata, null, 2),
         });
       }
-      if (json.candidates[0]?.urlContextMetadata) {
+      if (
+        json.candidates[0]?.urlContextMetadata &&
+        Object.keys(json.candidates[0].urlContextMetadata).length > 0
+      ) {
         metaParts.push({
           type: 'meta',
           title: 'URL Context Metadata',

@@ -17,11 +17,11 @@ providers:
       tools:
         - functionDeclarations:
             - name: calculator
-              description: "A calculator"
+              description: 'A calculator'
               parameters:
                 type: string
-                description: "The expression to evaluate"
+                description: 'The expression to evaluate'
 
 prompts:
-  - "What is the square root of 29?"
-  - "What events are happening in NYC on August 25th, 2025?"
+  - 'What is the square root of 29?'
+  - 'What events are happening in NYC on August 25th, 2025?'
