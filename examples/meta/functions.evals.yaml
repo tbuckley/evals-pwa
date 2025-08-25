@@ -6,6 +6,8 @@ providers:
           includeThoughts: true
       tools:
         - codeExecution: {}
+        - googleSearch: {}
+        - urlContext: {}
 
   - id: gemini:gemini-2.5-pro
     config:
@@ -22,3 +24,4 @@ providers:
 
 prompts:
   - "What is the square root of 29?"
+  - "What events are happening in NYC on August 25th, 2025?"

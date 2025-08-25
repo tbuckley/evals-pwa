@@ -95,9 +95,10 @@ export const generateContentResponseSchema = z.object({
       // tokenCount: z.number().int()
       // index: z.number().int()
 
-      // safetyRatings: z.unknown(), // TODO declare
-      // citationMetadata: z.unknown(), // TODO declare
-      // groundingAttributions: z.array(z.unknown()) // TODO declare
+      safetyRatings: z.unknown().optional(),
+      citationMetadata: z.unknown().optional(),
+      groundingMetadata: z.unknown().optional(),
+      urlContextMetadata: z.unknown().optional(),
     }),
   ),
   // promptFeedback: z.unknown(), // TODO declare
@@ -285,7 +286,9 @@ export class GeminiProvider implements ModelProvider {
   extractOutput(response: unknown): ExtractedOutputPart[] {
     const parts = this.getResponseParts(response);
 
-    return parts.map((part): ExtractedOutputPart => {
+    const json = generateContentResponseSchema.parse(response);
+
+    const extractedParts = parts.map((part): ExtractedOutputPart => {
       if ('text' in part) {
         if (part.thought) {
           return { type: 'meta', message: part.text };
@@ -305,6 +308,40 @@ export class GeminiProvider implements ModelProvider {
       }
       return { type: 'meta', message: JSON.stringify(part, null, 2) };
     });
+
+    const metaParts: ExtractedOutputPart[] = [];
+    if (json.candidates[0]?.safetyRatings) {
+      metaParts.push({
+        type: 'meta',
+        message: JSON.stringify(json.candidates[0].safetyRatings, null, 2),
+      });
+    }
+    if (json.candidates[0]?.citationMetadata) {
+      metaParts.push({
+        type: 'meta',
+        message: JSON.stringify(json.candidates[0].citationMetadata, null, 2),
+      });
+    }
+    if (json.candidates[0]?.groundingMetadata) {
+      metaParts.push({
+        type: 'meta',
+        message: JSON.stringify(json.candidates[0].groundingMetadata, null, 2),
+      });
+    }
+    if (json.candidates[0]?.urlContextMetadata) {
+      metaParts.push({
+        type: 'meta',
+        message: JSON.stringify(json.candidates[0].urlContextMetadata, null, 2),
+      });
+    }
+    if (json.candidates[0]?.finishReason) {
+      metaParts.push({
+        type: 'meta',
+        message: json.candidates[0].finishReason,
+      });
+    }
+
+    return [...extractedParts, ...metaParts];
   }
 
   extractTokenUsage(response: unknown): TokenUsage {
