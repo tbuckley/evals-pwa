@@ -112,7 +112,9 @@ export class AnthropicProvider implements ModelProvider {
   ];
 
   async run(conversation: ConversationPrompt, context: RunContext) {
-    const messages = await conversationToAnthropic(conversation);
+    const sessionMessages = (context.session?.state ?? []) as Message[];
+    const newMessages = await conversationToAnthropic(conversation);
+    const messages = [...sessionMessages, ...newMessages];
     const systemContent = await conversationToSystemContent(conversation);
     const extensions: { system?: Part[] } = {};
     if (systemContent) {
@@ -178,8 +180,17 @@ export class AnthropicProvider implements ModelProvider {
           message = applyStreamedResponse(message, resp);
           yield text;
         }
+        if (!message) throw new Error(`Failed to run model: no response`);
 
-        return message;
+        return {
+          response: message,
+          session: {
+            state: [
+              ...messages,
+              { role: message.role, content: message.content },
+            ] satisfies Message[],
+          },
+        };
       },
     };
   }

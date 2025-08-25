@@ -110,7 +110,7 @@ export class WebLlm implements ModelProvider {
           for await (const chunk of chunks) {
             if (context.abortSignal.aborted) {
               return {
-                reply,
+                response: { reply },
               };
             }
             const delta = chunk.choices[0]?.delta.content ?? '';
@@ -121,9 +121,11 @@ export class WebLlm implements ModelProvider {
             }
           }
           return {
-            reply,
-            usage,
-          } as Response;
+            response: {
+              reply,
+              usage,
+            } as Response,
+          };
         } finally {
           if (cacheEntry) {
             cacheEntry.refCount--;

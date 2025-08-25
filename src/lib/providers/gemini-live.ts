@@ -1,7 +1,6 @@
 import type {
   ConversationPrompt,
   ModelProvider,
-  ModelUpdate,
   MultiPartPrompt,
   NormalizedProviderConfig,
   RunContext,
@@ -18,152 +17,8 @@ import {
   Session,
   type LiveConnectParameters,
 } from '@google/genai';
-
-const GEMINI_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
-
-export class GeminiLiveProvider implements ModelProvider {
-  constructor(
-    public model: string,
-    public apiKey: string,
-    public config: NormalizedProviderConfig = {},
-  ) {}
-
-  get id(): string {
-    return `gemini-live:${this.model}`;
-  }
-
-  get requestSemaphore(): Semaphore {
-    return GEMINI_SEMAPHORE;
-  }
-
-  mimeTypes = [
-    // Image
-    'image/png',
-    'image/jpeg',
-    'image/webp',
-    'image/heic',
-    'image/heif',
-
-    // Video
-    'video/mp4',
-    'video/mpeg',
-    'video/mov',
-    'video/avi',
-    'video/x-flv',
-    'video/mpg',
-    'video/webm',
-    'video/wmv',
-    'video/3gpp',
-
-    // Audio
-    'audio/wav',
-    'audio/mp3',
-    'audio/aiff',
-    'audio/aac',
-    'audio/ogg',
-    'audio/flac',
-
-    // Document
-    'application/pdf',
-  ];
-
-  async run(conversation: ConversationPrompt, _context: RunContext) {
-    const systemInstructionParts: string[] = [];
-    for (const message of conversation) {
-      if (message.role === 'system') {
-        for (const part of message.content) {
-          if ('text' in part) {
-            systemInstructionParts.push(part.text);
-          }
-        }
-      }
-    }
-    const systemInstruction = systemInstructionParts.join('\n');
-    const turns = await conversationToTurns(conversation);
-
-    const request = {
-      model: this.model,
-      config: this.config,
-      systemInstruction,
-      turns,
-    };
-
-    const runModel = async function* (
-      this: GeminiLiveProvider,
-    ): AsyncGenerator<ModelUpdate, { parts: Part[] } | undefined, void> {
-      const live = new LiveApiWrapper(this.apiKey, {
-        model: this.model,
-        config: {
-          responseModalities: [Modality.AUDIO, Modality.TEXT],
-          systemInstruction: systemInstruction || undefined,
-          ...this.config,
-        },
-      });
-
-      yield { type: 'append', output: 'processing...' };
-
-      const responseParts: Part[] = [];
-
-      // Send the conversation history
-      for (const message of turns) {
-        if (message.role === 'user') {
-          console.log('Sending turn...', message);
-          await live.sendTurn(message.turn);
-          console.log('Finished turn', message);
-        } else {
-          // Ignore message, just wait for a turn
-          console.log('Awaiting reply');
-          const reply = await live.assistantTurnComplete();
-          responseParts.push(...reply);
-          console.log('Receive reply');
-        }
-      }
-
-      const finalParts = await live.assistantTurnComplete();
-      responseParts.push(...finalParts);
-      await live.close();
-
-      return {
-        parts: responseParts,
-      };
-    };
-
-    return {
-      request,
-      runModel: runModel.bind(this),
-    };
-  }
-  extractOutput(response: unknown): (string | Blob)[] {
-    const genResponse = response as { parts: Part[] };
-    return genResponse.parts
-      .filter((p) => 'text' in p || 'inlineData' in p)
-      .map((p): string | Blob => {
-        if ('text' in p) {
-          return p.text ?? '';
-        }
-        if ('inlineData' in p) {
-          // Convert base64 to blob
-          const byteCharacters = atob(p.inlineData?.data ?? '');
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          return new Blob([byteArray], { type: p.inlineData?.mimeType ?? '' });
-        }
-        throw new Error('Invalid part');
-      });
-  }
-
-  extractTokenUsage(_response: unknown): TokenUsage {
-    // This needs to be implemented.
-    return {
-      inputTokens: 0,
-      outputTokens: 0,
-      totalTokens: 0,
-    };
-  }
-}
+import { z } from 'zod';
+import { partSchema } from './gemini';
 
 export class LiveApiWrapper {
   private session: Session | undefined;
@@ -198,7 +53,7 @@ export class LiveApiWrapper {
           console.log(`[${uuid}] Gemini Live API connected`);
         },
         onmessage: (message) => {
-          console.log(`[${uuid}] Gemini Live API message:`, message);
+          // console.log(`[${uuid}] Gemini Live API message:`, message);
           if ('setupComplete' in message) {
             this.resolveSetupComplete();
           } else {
@@ -290,7 +145,11 @@ export class LiveApiWrapper {
 
         // Detect an end from the server
         if ('serverContent' in message && message.serverContent?.turnComplete) {
-          turnOver = true;
+          // TODO: Sometimes we get interrupted with zero content
+          // Should we instead have a timeout before we mark the turn as complete?
+          if (fullResponseParts.length > 0 || audioBuffers.length > 0) {
+            turnOver = true;
+          }
         }
       } else {
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -315,7 +174,188 @@ export class LiveApiWrapper {
   }
 }
 
-type ConversationTurn = { role: 'user'; turn: Turn } | { role: 'assistant' };
+const turnSchema = z.object({
+  parts: z.array(partSchema),
+  audio: z.array(z.string()),
+});
+
+type Turn = z.infer<typeof turnSchema>;
+
+const conversationTurnSchema = z.discriminatedUnion('role', [
+  z.object({ role: z.literal('user'), turn: turnSchema }),
+  z.object({ role: z.literal('assistant') }),
+]);
+
+type ConversationTurn = z.infer<typeof conversationTurnSchema>;
+
+const sessionStateSchema = z.object({
+  live: z.instanceof(LiveApiWrapper),
+  turns: z.array(conversationTurnSchema),
+});
+
+const GEMINI_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
+
+export class GeminiLiveProvider implements ModelProvider {
+  constructor(
+    public model: string,
+    public apiKey: string,
+    public config: NormalizedProviderConfig = {},
+  ) {}
+
+  get id(): string {
+    return `gemini-live:${this.model}`;
+  }
+
+  get requestSemaphore(): Semaphore {
+    return GEMINI_SEMAPHORE;
+  }
+
+  mimeTypes = [
+    // Image
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+    'image/heic',
+    'image/heif',
+
+    // Video
+    'video/mp4',
+    'video/mpeg',
+    'video/mov',
+    'video/avi',
+    'video/x-flv',
+    'video/mpg',
+    'video/webm',
+    'video/wmv',
+    'video/3gpp',
+
+    // Audio
+    'audio/wav',
+    'audio/mp3',
+    'audio/aiff',
+    'audio/aac',
+    'audio/ogg',
+    'audio/flac',
+
+    // Document
+    'application/pdf',
+  ];
+
+  async run(conversation: ConversationPrompt, context: RunContext) {
+    const parsedSession = sessionStateSchema.safeParse(context.session?.state);
+
+    const systemInstructionParts: string[] = [];
+    for (const message of conversation) {
+      if (message.role === 'system') {
+        for (const part of message.content) {
+          if ('text' in part) {
+            systemInstructionParts.push(part.text);
+          }
+        }
+      }
+    }
+    const systemInstruction = systemInstructionParts.join('\n');
+    const prevTurns = parsedSession.data?.turns ?? [];
+    const turns = await conversationToTurns(conversation);
+
+    const request = {
+      model: this.model,
+      config: this.config,
+      systemInstruction,
+      turns: [...prevTurns, ...turns],
+    };
+
+    const runModel = async function* (this: GeminiLiveProvider) {
+      const live =
+        parsedSession.data?.live ??
+        new LiveApiWrapper(this.apiKey, {
+          model: this.model,
+          config: {
+            responseModalities: [Modality.AUDIO, Modality.TEXT],
+            systemInstruction: systemInstruction || undefined,
+            ...this.config,
+          },
+        });
+
+      yield { type: 'append', output: 'processing...' } as const;
+
+      const responseParts: Part[] = [];
+
+      // Send the conversation history
+      for (const message of turns) {
+        if (message.role === 'user') {
+          console.log('Sending turn...', message);
+          await live.sendTurn(message.turn);
+          console.log('Finished turn', message);
+        } else {
+          // Ignore message, just wait for a turn
+          console.log('Awaiting reply');
+          const reply = await live.assistantTurnComplete();
+          responseParts.push(...reply);
+          console.log('Received reply');
+        }
+      }
+
+      console.log('Awaiting final reply');
+      const finalParts = await live.assistantTurnComplete();
+      responseParts.push(...finalParts);
+      console.log('Received final reply', responseParts);
+
+      const fullTurns: ConversationTurn[] = [...prevTurns, ...turns, { role: 'assistant' }];
+
+      return {
+        response: {
+          parts: responseParts,
+        },
+        session: {
+          state: {
+            live,
+            turns: fullTurns,
+          },
+          close: async () => {
+            await live.close();
+          },
+          skipCache: true, // Because this is a real-time session
+        },
+      };
+    };
+
+    return {
+      request,
+      runModel: runModel.bind(this),
+    };
+  }
+  extractOutput(response: unknown): (string | Blob)[] {
+    const genResponse = response as { parts: Part[] };
+    return genResponse.parts
+      .filter((p) => 'text' in p || 'inlineData' in p)
+      .map((p): string | Blob => {
+        if ('text' in p) {
+          return p.text ?? '';
+        }
+        if ('inlineData' in p) {
+          // Convert base64 to blob
+          const byteCharacters = atob(p.inlineData?.data ?? '');
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          return new Blob([byteArray], { type: p.inlineData?.mimeType ?? '' });
+        }
+        throw new Error('Invalid part');
+      });
+  }
+
+  extractTokenUsage(_response: unknown): TokenUsage {
+    // This needs to be implemented.
+    return {
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+    };
+  }
+}
 
 async function conversationToTurns(prompt: ConversationPrompt): Promise<ConversationTurn[]> {
   const parts = prompt
@@ -329,13 +369,8 @@ async function conversationToTurns(prompt: ConversationPrompt): Promise<Conversa
   return Promise.all(parts);
 }
 
-interface Turn {
-  parts: Part[];
-  audio: string[];
-}
-
 async function prepareTurn(prompt: MultiPartPrompt): Promise<Turn> {
-  const parts: Part[] = [];
+  const parts: Turn['parts'] = [];
   const audio: string[] = [];
 
   const audioParts: File[] = [];

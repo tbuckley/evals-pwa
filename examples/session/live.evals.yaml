@@ -1,0 +1,48 @@
+providers:
+  - id: gemini:gemini-2.5-flash-preview-tts
+    labels: ['tts']
+    config:
+      generationConfig:
+        responseModalities: ['AUDIO']
+        speechConfig:
+          voiceConfig:
+            prebuiltVoiceConfig:
+              voiceName: 'Kore'
+  - id: gemini-live:gemini-2.5-flash-preview-native-audio-dialog
+    labels: ['tom']
+    config:
+      responseModalities: ['AUDIO']
+      systemInstruction: 'You speak in a heavy Boston accent.'
+  - id: gemini-live:gemini-2.5-flash-preview-native-audio-dialog
+    labels: ['doug']
+    config:
+      responseModalities: ['AUDIO']
+      systemInstruction: 'You speak in an Australian accent.'
+
+prompts:
+  - $pipeline:
+      - id: tts
+        providerLabel: tts
+        prompt: 'Say in an Australian accent: {{start}}'
+        outputAs: dougMessage
+      - id: fake-tom
+        if: | # This checks if we should keep running the loop
+          function execute(vars) {
+            return vars.$history.length < 4;
+          }
+        deps: ['dougMessage']
+        session: tom
+        providerLabel: tom
+        prompt: '{{dougMessage}}'
+        outputAs: tomMessage
+      - id: fake-doug
+        deps: ['tomMessage']
+        session: doug
+        providerLabel: doug
+        prompt: '{{tomMessage}}'
+        outputAs: dougMessage
+
+tests:
+  - description: Audio file
+    vars:
+      start: 'How are you today?'

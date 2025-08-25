@@ -1,0 +1,33 @@
+providers:
+  - id: gemini:gemini-2.5-flash
+    config:
+      generationConfig:
+        thinkingConfig:
+          thinkingBudget: 1000
+  - id: openai:gpt-5-mini
+  - id: anthropic:claude-sonnet-4-20250514
+
+prompts:
+  - $pipeline:
+      - id: fake-tom
+        if: | # This checks if we should keep running the loop
+          function execute(vars) {
+            return vars.$history.length < 4;
+          }
+        deps: ['dougMessage']
+        session: tom
+        prompt:
+          - system: 'You speak in a heavy Boston accent.'
+          - user: '{{dougMessage}}'
+        outputAs: tomMessage
+      - id: fake-doug
+        deps: ['tomMessage']
+        session: doug
+        prompt:
+          - system: 'You speak in an Australian accent.'
+          - user: '{{tomMessage}}'
+        outputAs: dougMessage
+
+tests:
+  - vars:
+      dougMessage: "G'day mate, how are you?"

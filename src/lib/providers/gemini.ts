@@ -156,17 +156,20 @@ export class GeminiProvider implements ModelProvider {
   ];
 
   async run(conversation: ConversationPrompt, context: RunContext) {
-    const contents = await conversationToGemini(conversation);
+    const sessionContents = (context.session?.state ?? []) as Content[];
+    const latestContents = await conversationToGemini(conversation);
     const systemContent = await conversationToSystemContent(conversation);
     const extensions: { systemInstruction?: Content } = {};
     if (systemContent) {
       extensions.systemInstruction = systemContent;
     }
 
+    const contents = [...sessionContents, ...latestContents];
     const request = {
       ...this.config,
       ...extensions,
-      contents,
+      // TODO: is it necessary to remove the roles?
+      contents: removeUnnecessaryRoles(contents),
     } as const;
 
     const { apiKey, model } = this;
@@ -240,7 +243,14 @@ export class GeminiProvider implements ModelProvider {
         parsed.candidates[0].content.parts ??= [];
 
         parsed.candidates[0].content.parts = fullResponse;
-        return parsed;
+        parsed.candidates[0].content.role = 'model';
+
+        return {
+          response: parsed,
+          session: {
+            state: [...contents, parsed.candidates[0].content] satisfies Content[],
+          },
+        };
       },
     };
   }
@@ -338,10 +348,6 @@ async function conversationToGemini(conversation: ConversationPrompt): Promise<C
     }),
   );
   const messages = contents.filter((c): c is Content => c !== null);
-  if (messages.length === 1) {
-    // Remove the role if there's just one message
-    return [{ parts: messages[0].parts }];
-  }
   return messages;
 }
 
@@ -363,6 +369,14 @@ async function conversationToSystemContent(
     return { parts: systemParts };
   }
   return null;
+}
+
+function removeUnnecessaryRoles(messages: Content[]): Content[] {
+  if (messages.length === 1) {
+    // Remove the role if there's just one message
+    return [{ parts: messages[0].parts }];
+  }
+  return messages;
 }
 
 async function multiPartPromptToGemini(prompt: MultiPartPrompt): Promise<Part[]> {
