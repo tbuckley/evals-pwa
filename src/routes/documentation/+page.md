@@ -179,6 +179,7 @@ interface PipelinePrompt {
   outputAs?: string; // Assign the output to a var
   deps?: string[]; // Dependencies (var names)
   if?: string | CodeReference; // Test if this step should run
+  session?: string; // Append this prompt to any previous messages in the same session
 }
 ```
 
@@ -235,7 +236,7 @@ prompts:
         providerLabel: provider-judge
 ```
 
-Finally, you can also create loops by having a prompt depend on a variable that is output later. But in order to exit the loop, you need a way to run conditions. The `if` option lets you specify JavaScript code to run when the dependencies are ready, and the prompt is only run if the code returns true.
+You can also create loops by having a prompt depend on a variable that is output later. But in order to exit the loop, you need a way to run conditions. The `if` option lets you specify JavaScript code to run when the dependencies are ready, and the prompt is only run if the code returns true.
 
 ```yaml
 prompts:
@@ -249,6 +250,26 @@ prompts:
           }
         prompt: Here is a haiku about {{topic}}, make it better:\n{{haiku}}
         outputAs: haiku
+```
+
+Finally, pipelines let you save chat history using the `session` property. A session maintains conversational state (previous prompts & outputs) for every step that is part of that session. This is useful for creating multi-turn conversations, such as simulating a dialogue between two chatbots. Each step with the same session name will share the same conversation history. (Advanced: multiple steps may share the same session, but branches / accessing the same session in parallel is not supported.)
+
+```yaml
+prompts:
+  - $pipeline:
+      - deps: ['dougMessage'] # Requires a message from doug to run this step
+        session: tom # Saves the chat history as "tom"
+        prompt: '{{dougMessage}}' # Sends doug's latest message to tom
+        outputAs: tomMessage # Outputs as tomMessage to trigger doug's deps
+
+      - if: | # Only allow 4 back-and-forths before we stop
+          function execute(vars) {
+            return vars.$history.length < 4;
+          }
+        deps: ['tomMessage'] # Requires a message from tom to run this step
+        session: doug # Saves the chat history as "doug"
+        prompt: '{{tomMessage}}' # Sends tom's latest message to doug
+        outputAs: dougMessage # Outputs as dougMessage to trigger tom's deps
 ```
 
 #### Handlebars Helpers (Advanced)
@@ -470,7 +491,7 @@ to process it for some reason, see below.
 The run tables offer features such as:
 
 - Showing test variables (ordered by their presence in the tests)
-- Toggling whether variable values for each test are displayed (remembered across sessions)
+- Toggling whether variable values for each test are displayed (remembered across browser sessions)
 - Resizing columns
 - Toggling the variables between the full result (default), just the pass/fail indicator, a max-height view that you can scroll.
 - Copying variables
