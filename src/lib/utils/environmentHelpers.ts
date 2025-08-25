@@ -1,5 +1,6 @@
 import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 import type {
+  ExtractedOutputPart,
   ModelCache,
   ModelRunner,
   ModelSession,
@@ -123,7 +124,7 @@ export async function* maybeUseCache(
 }
 
 export async function modelOutputToTestOutput(
-  output: string | (string | Blob)[],
+  output: string | ExtractedOutputPart[],
 ): Promise<NonNullable<TestResult['output']>> {
   if (Array.isArray(output)) {
     // Convert blobs to file references
@@ -140,7 +141,7 @@ export async function modelOutputToTestOutput(
 }
 
 export async function modelOutputToMultiPartPrompt(
-  output: string | (string | Blob)[],
+  output: string | ExtractedOutputPart[],
 ): Promise<MultiPartPrompt> {
   const testOutput = await modelOutputToTestOutput(output);
   if (typeof testOutput === 'string') {

@@ -124,6 +124,7 @@ const metaProviderOutputPartSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('meta'), message: z.string(), data: z.unknown().optional() }),
   // z.object({ type: z.literal('text'), text: z.string() }),
 ]);
+export type MetaProviderOutputPart = z.infer<typeof metaProviderOutputPartSchema>;
 const providerOutputPartSchema = z.union([
   z.string(),
   z.instanceof(FileReference),
@@ -132,6 +133,7 @@ const providerOutputPartSchema = z.union([
 export type ProviderOutputPart = z.infer<typeof providerOutputPartSchema>;
 const providerOutputSchema = z.union([z.string(), z.array(providerOutputPartSchema)]);
 export type ProviderOutput = z.infer<typeof providerOutputSchema>;
+export type ExtractedOutputPart = string | Blob | MetaProviderOutputPart;
 
 const baseTestOutputSchema = z.object({
   // Required
@@ -252,7 +254,7 @@ export interface ModelProvider {
     prompt: ConversationPrompt,
     context: RunContext,
   ): MaybePromise<{ request: unknown; runModel: ModelRunner }>;
-  extractOutput(response: unknown): MaybePromise<string | (string | Blob)[]>;
+  extractOutput(response: unknown): MaybePromise<string | ExtractedOutputPart[]>;
   extractTokenUsage(response: unknown): TokenUsage;
   mimeTypes?: string[];
   requestSemaphore?: Semaphore;

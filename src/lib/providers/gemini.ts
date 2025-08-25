@@ -1,5 +1,6 @@
 import type {
   ConversationPrompt,
+  ExtractedOutputPart,
   ModelProvider,
   ModelUpdate,
   MultiPartPrompt,
@@ -18,7 +19,7 @@ import { exponentialBackoff, shouldRetryHttpError, HttpError } from '$lib/utils/
 const GEMINI_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
 
 export const partSchema = z.union([
-  z.object({ text: z.string() }),
+  z.object({ text: z.string(), thought: z.boolean().optional() }),
   z.object({
     inlineData: z.object({
       mimeType: z.string(),
@@ -221,7 +222,9 @@ export class GeminiProvider implements ModelProvider {
             if (
               'text' in part &&
               fullResponse.length > 0 &&
-              'text' in fullResponse[fullResponse.length - 1]
+              'text' in fullResponse[fullResponse.length - 1] &&
+              !('thought' in fullResponse[fullResponse.length - 1]) &&
+              !('thought' in part)
             ) {
               (fullResponse[fullResponse.length - 1] as { text: string }).text += part.text;
             } else {
@@ -231,10 +234,13 @@ export class GeminiProvider implements ModelProvider {
 
           const output = extractOutput(lastResponseJson);
           for (const part of output) {
-            if (typeof part === 'string') {
-              yield { type: 'append', output: part } as ModelUpdate;
+            if (part instanceof Blob) {
+              yield {
+                type: 'append',
+                output: await blobToFileReference(part),
+              } satisfies ModelUpdate;
             } else {
-              yield { type: 'append', output: await blobToFileReference(part) } as ModelUpdate;
+              yield { type: 'append', output: part } satisfies ModelUpdate;
             }
           }
         }
@@ -264,12 +270,16 @@ export class GeminiProvider implements ModelProvider {
     return firstCandidateContent.parts;
   }
 
-  extractOutput(response: unknown): (string | Blob)[] {
+  extractOutput(response: unknown): ExtractedOutputPart[] {
     const parts = this.getResponseParts(response);
 
-    return parts.map((part): string | Blob => {
+    return parts.map((part): ExtractedOutputPart => {
       if ('text' in part) {
-        return part.text;
+        if (part.thought) {
+          return { type: 'meta', message: part.text };
+        } else {
+          return part.text;
+        }
       }
       if ('inlineData' in part) {
         const byteArray = decodeB64Blob(part.inlineData.data);
