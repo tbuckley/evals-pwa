@@ -3,6 +3,7 @@
   import { isImageFile, isAudioFile } from '$lib/utils/media';
   import type { ProviderOutputPart } from '$lib/types';
   import { BrainIcon, CircleEllipsisIcon, CodeIcon, SearchIcon } from 'lucide-svelte';
+  import { showMetadataStore } from '$lib/state/settings';
 
   export let output: ProviderOutputPart[] = [];
 </script>
@@ -18,8 +19,8 @@
     </audio>
   {:else if output instanceof FileReference}
     {output.uri}
-  {:else if 'type' in output && output.type === 'meta'}
-    <div class="mb-2 whitespace-normal rounded-lg bg-gray-100 p-2">
+  {:else if 'type' in output && output.type === 'meta' && $showMetadataStore}
+    <div class="mb-2 whitespace-normal rounded-lg bg-gray-200 p-2">
       <div class="flex items-center gap-2">
         {#if output.icon === 'thinking'}
           <BrainIcon class="size-4" />

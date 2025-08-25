@@ -7,6 +7,7 @@
   import {
     showVarsColumnsStore,
     showOnlyFailuresStore,
+    showMetadataStore,
     rowHeightStore,
     headerRowHeightStore,
     summaryRowHeightStore,
@@ -391,6 +392,10 @@
       bind:checked={$showOnlyFailuresStore}
     />
     <Label for="vars-run-{run.id}-{run.timestamp}-failures">Show only failures</Label>
+  </div>
+  <div class="flex items-center gap-1.5">
+    <Checkbox id="vars-run-{run.id}-{run.timestamp}-metadata" bind:checked={$showMetadataStore} />
+    <Label for="vars-run-{run.id}-{run.timestamp}-metadata">Show metadata</Label>
   </div>
   <Button variant="secondary" on:click={downloadCsv}>Download CSV</Button>
 </div>
