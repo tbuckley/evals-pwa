@@ -1,6 +1,7 @@
 import type { LiveRun } from '../types';
 import type { AnnotationManager } from '../state/annotations';
 import { get } from 'svelte/store';
+import { FileReference } from '$lib/storage/FileReference';
 
 export interface CsvExportOptions {
   includeNotes?: boolean;
@@ -98,7 +99,15 @@ export function generateCsvContent(run: LiveRun, options: CsvExportOptions = {})
         resultText = result.output;
       } else if (Array.isArray(result.output)) {
         resultText = result.output
-          .map((item) => (typeof item === 'string' ? item : `![](${item.uri})`))
+          .map((item) => {
+            if (typeof item === 'string') {
+              return item;
+            }
+            if (item instanceof FileReference) {
+              return `![](${item.uri})`;
+            }
+            return JSON.stringify(item);
+          })
           .join('');
       }
       row.push(resultText);

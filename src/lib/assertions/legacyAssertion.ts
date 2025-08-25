@@ -1,5 +1,5 @@
 import type { FileReference } from '$lib/storage/FileReference';
-import type { AssertionResult, CellAssertionProvider } from '$lib/types';
+import type { AssertionResult, CellAssertionProvider, ProviderOutput } from '$lib/types';
 
 export type MaybePromise<T> = T | Promise<T>;
 export interface LegacyAssertionProvider {
@@ -8,7 +8,7 @@ export interface LegacyAssertionProvider {
 }
 export function wrapLegacyAssertion(assertion: LegacyAssertionProvider): CellAssertionProvider {
   return {
-    run: (output: string | (string | FileReference)[]) => {
+    run: (output: ProviderOutput) => {
       if (typeof output === 'string') {
         return assertion.run(output);
       }

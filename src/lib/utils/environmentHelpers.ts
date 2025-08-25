@@ -9,6 +9,7 @@ import type {
 } from '$lib/types';
 import { z } from 'zod';
 import type { Semaphore } from './semaphore';
+import { FileReference } from '$lib/storage/FileReference';
 
 const cacheValueSchemaV1 = z.object({
   latencyMillis: z.number(),
@@ -145,10 +146,14 @@ export async function modelOutputToMultiPartPrompt(
   if (typeof testOutput === 'string') {
     return [{ text: testOutput }];
   }
-  return testOutput.map((part) => {
+  return testOutput.filter(isStringOrFile).map((part) => {
     if (typeof part === 'string') {
       return { text: part };
     }
     return { file: part.file };
   });
+}
+
+function isStringOrFile(val: unknown): val is string | FileReference {
+  return typeof val === 'string' || val instanceof FileReference;
 }
