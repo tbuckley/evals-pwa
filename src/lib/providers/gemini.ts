@@ -245,7 +245,7 @@ export class GeminiProvider implements ModelProvider {
             }
           }
 
-          const output = extractOutput(lastResponseJson);
+          const output = extractOutput(lastResponseJson, false);
           for (const part of output) {
             if (part instanceof Blob) {
               yield {
@@ -283,7 +283,7 @@ export class GeminiProvider implements ModelProvider {
     return firstCandidateContent.parts;
   }
 
-  extractOutput(response: unknown): ExtractedOutputPart[] {
+  extractOutput(response: unknown, final = true): ExtractedOutputPart[] {
     const parts = this.getResponseParts(response);
 
     const json = generateContentResponseSchema.parse(response);
@@ -291,7 +291,7 @@ export class GeminiProvider implements ModelProvider {
     const extractedParts = parts.map((part): ExtractedOutputPart => {
       if ('text' in part) {
         if (part.thought) {
-          return { type: 'meta', message: part.text };
+          return { type: 'meta', title: 'Thought', icon: 'thinking', message: part.text };
         } else {
           return part.text;
         }
@@ -306,39 +306,88 @@ export class GeminiProvider implements ModelProvider {
 
         return new Blob([byteArray], { type: part.inlineData.mimeType });
       }
-      return { type: 'meta', message: JSON.stringify(part, null, 2) };
+      if ('executableCode' in part) {
+        return {
+          type: 'meta',
+          title: 'Code Execution',
+          icon: 'code',
+          message: JSON.stringify(part.executableCode, null, 2),
+        };
+      }
+      if ('codeExecutionResult' in part) {
+        return {
+          type: 'meta',
+          title: 'Code Execution Result',
+          icon: 'code',
+          message: JSON.stringify(part.codeExecutionResult, null, 2),
+        };
+      }
+      if ('functionCall' in part) {
+        return {
+          type: 'meta',
+          title: 'Function Call',
+          icon: 'code',
+          message: JSON.stringify(part.functionCall, null, 2),
+        };
+      }
+      if ('functionResponse' in part) {
+        return {
+          type: 'meta',
+          title: 'Function Response',
+          icon: 'code',
+          message: JSON.stringify(part.functionResponse, null, 2),
+        };
+      }
+      return {
+        type: 'meta',
+        title: 'Unknown',
+        icon: 'other',
+        message: JSON.stringify(part, null, 2),
+      };
     });
 
     const metaParts: ExtractedOutputPart[] = [];
-    if (json.candidates[0]?.safetyRatings) {
-      metaParts.push({
-        type: 'meta',
-        message: JSON.stringify(json.candidates[0].safetyRatings, null, 2),
-      });
-    }
-    if (json.candidates[0]?.citationMetadata) {
-      metaParts.push({
-        type: 'meta',
-        message: JSON.stringify(json.candidates[0].citationMetadata, null, 2),
-      });
-    }
-    if (json.candidates[0]?.groundingMetadata) {
-      metaParts.push({
-        type: 'meta',
-        message: JSON.stringify(json.candidates[0].groundingMetadata, null, 2),
-      });
-    }
-    if (json.candidates[0]?.urlContextMetadata) {
-      metaParts.push({
-        type: 'meta',
-        message: JSON.stringify(json.candidates[0].urlContextMetadata, null, 2),
-      });
-    }
-    if (json.candidates[0]?.finishReason) {
-      metaParts.push({
-        type: 'meta',
-        message: json.candidates[0].finishReason,
-      });
+    if (final) {
+      if (json.candidates[0]?.safetyRatings) {
+        metaParts.push({
+          type: 'meta',
+          title: 'Safety Ratings',
+          icon: 'other',
+          message: JSON.stringify(json.candidates[0].safetyRatings, null, 2),
+        });
+      }
+      if (json.candidates[0]?.citationMetadata) {
+        metaParts.push({
+          type: 'meta',
+          title: 'Citation Metadata',
+          icon: 'search',
+          message: JSON.stringify(json.candidates[0].citationMetadata, null, 2),
+        });
+      }
+      if (json.candidates[0]?.groundingMetadata) {
+        metaParts.push({
+          type: 'meta',
+          title: 'Grounding Metadata',
+          icon: 'search',
+          message: JSON.stringify(json.candidates[0].groundingMetadata, null, 2),
+        });
+      }
+      if (json.candidates[0]?.urlContextMetadata) {
+        metaParts.push({
+          type: 'meta',
+          title: 'URL Context Metadata',
+          icon: 'search',
+          message: JSON.stringify(json.candidates[0].urlContextMetadata, null, 2),
+        });
+      }
+      if (json.candidates[0]?.finishReason) {
+        metaParts.push({
+          type: 'meta',
+          title: 'Finish Reason',
+          icon: 'other',
+          message: json.candidates[0].finishReason,
+        });
+      }
     }
 
     return [...extractedParts, ...metaParts];

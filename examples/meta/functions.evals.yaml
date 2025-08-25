@@ -5,7 +5,7 @@ providers:
         thinkingConfig:
           includeThoughts: true
       tools:
-        - codeExecution: {}
+        # - codeExecution: {}
         - googleSearch: {}
         - urlContext: {}
 

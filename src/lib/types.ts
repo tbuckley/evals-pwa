@@ -121,7 +121,13 @@ const tokenUsageSchema = z.object({
 export type TokenUsage = z.infer<typeof tokenUsageSchema>;
 
 const metaProviderOutputPartSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('meta'), message: z.string(), data: z.unknown().optional() }),
+  z.object({
+    type: z.literal('meta'),
+    title: z.string(),
+    icon: z.enum(['thinking', 'search', 'code', 'other']),
+    message: z.string(),
+    data: z.unknown().optional(),
+  }),
   // z.object({ type: z.literal('text'), text: z.string() }),
 ]);
 export type MetaProviderOutputPart = z.infer<typeof metaProviderOutputPartSchema>;
