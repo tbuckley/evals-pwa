@@ -8,6 +8,8 @@ A [Promptfoo](https://www.promptfoo.dev/docs/intro)-inspired evaluation framewor
 
 _**Want AI to write your evals?** Check out [our llms.txt](/llms.txt). You can copy it into your favorite chatbot to have it generate new evals, answer questions about how it works, or help debug an issue._
 
+_**Looking for a reference for configuration files?** Check [here](/documentation/config)._
+
 First, create a folder where your evaluation data and output will be stored. Create an `evals.yaml` file inside it and add the following:
 
 ```yaml
@@ -52,7 +54,6 @@ Format:
 ```typescript
 interface Config {
   providers: Provider[];
-  config?: any;
   // ...
 }
 type Provider = string | { id: string; config?: any; labels?: string[] };
