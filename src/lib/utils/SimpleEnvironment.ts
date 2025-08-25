@@ -88,6 +88,16 @@ export class SimpleEnvironment implements TestEnvironment {
       const rawOutput = await this.model.extractOutput(response);
       output = await modelOutputToTestOutput(rawOutput);
       tokenUsage = this.model.extractTokenUsage(response);
+
+      // Immediately yield the final output
+      if (typeof output === 'string') {
+        yield { type: 'replace', output };
+      } else {
+        yield { type: 'replace', output: '' };
+        for (const part of output) {
+          yield { type: 'append', output: part };
+        }
+      }
     } catch (e) {
       if (e instanceof Error) {
         return {

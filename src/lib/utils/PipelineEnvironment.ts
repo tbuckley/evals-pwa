@@ -175,6 +175,16 @@ export class PipelineEnvironment implements TestEnvironment {
         const rawOutput = await model.extractOutput(response);
         output = await modelOutputToTestOutput(rawOutput);
         tokenUsage = model.extractTokenUsage(response);
+
+        // Immediately yield the final output
+        if (typeof output === 'string') {
+          modelUpdateGenerator.yield({ type: 'replace', output, internalId: stepId });
+        } else {
+          modelUpdateGenerator.yield({ type: 'replace', output: '', internalId: stepId });
+          for (const part of output) {
+            modelUpdateGenerator.yield({ type: 'append', output: part, internalId: stepId });
+          }
+        }
       } catch (e) {
         if (e instanceof Error) {
           result = {
