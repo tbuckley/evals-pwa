@@ -1,5 +1,6 @@
 import type {
   ConversationPrompt,
+  ExtractedOutputPart,
   ModelProvider,
   ModelUpdate,
   MultiPartPrompt,
@@ -18,7 +19,7 @@ import { exponentialBackoff, shouldRetryHttpError, HttpError } from '$lib/utils/
 const GEMINI_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
 
 export const partSchema = z.union([
-  z.object({ text: z.string() }),
+  z.object({ text: z.string(), thought: z.boolean().optional() }),
   z.object({
     inlineData: z.object({
       mimeType: z.string(),
@@ -41,6 +42,18 @@ export const partSchema = z.union([
     fileData: z.object({
       mimeType: z.string(),
       data: z.string(),
+    }),
+  }),
+  z.object({
+    executableCode: z.object({
+      code: z.string(),
+      language: z.string(),
+    }),
+  }),
+  z.object({
+    codeExecutionResult: z.object({
+      outcome: z.string(),
+      output: z.string(),
     }),
   }),
 ]);
@@ -82,9 +95,10 @@ export const generateContentResponseSchema = z.object({
       // tokenCount: z.number().int()
       // index: z.number().int()
 
-      // safetyRatings: z.unknown(), // TODO declare
-      // citationMetadata: z.unknown(), // TODO declare
-      // groundingAttributions: z.array(z.unknown()) // TODO declare
+      safetyRatings: z.unknown().optional(),
+      citationMetadata: z.unknown().optional(),
+      groundingMetadata: z.unknown().optional(),
+      urlContextMetadata: z.unknown().optional(),
     }),
   ),
   // promptFeedback: z.unknown(), // TODO declare
@@ -221,7 +235,9 @@ export class GeminiProvider implements ModelProvider {
             if (
               'text' in part &&
               fullResponse.length > 0 &&
-              'text' in fullResponse[fullResponse.length - 1]
+              'text' in fullResponse[fullResponse.length - 1] &&
+              !('thought' in fullResponse[fullResponse.length - 1]) &&
+              !('thought' in part)
             ) {
               (fullResponse[fullResponse.length - 1] as { text: string }).text += part.text;
             } else {
@@ -229,12 +245,15 @@ export class GeminiProvider implements ModelProvider {
             }
           }
 
-          const output = extractOutput(lastResponseJson);
+          const output = extractOutput(lastResponseJson, false);
           for (const part of output) {
-            if (typeof part === 'string') {
-              yield { type: 'append', output: part } as ModelUpdate;
+            if (part instanceof Blob) {
+              yield {
+                type: 'append',
+                output: await blobToFileReference(part),
+              } satisfies ModelUpdate;
             } else {
-              yield { type: 'append', output: await blobToFileReference(part) } as ModelUpdate;
+              yield { type: 'append', output: part } satisfies ModelUpdate;
             }
           }
         }
@@ -264,12 +283,18 @@ export class GeminiProvider implements ModelProvider {
     return firstCandidateContent.parts;
   }
 
-  extractOutput(response: unknown): (string | Blob)[] {
+  extractOutput(response: unknown, final = true): ExtractedOutputPart[] {
     const parts = this.getResponseParts(response);
 
-    return parts.map((part): string | Blob => {
+    const json = generateContentResponseSchema.parse(response);
+
+    const extractedParts = parts.map((part): ExtractedOutputPart => {
       if ('text' in part) {
-        return part.text;
+        if (part.thought) {
+          return { type: 'meta', title: 'Thought', icon: 'thinking', message: part.text };
+        } else {
+          return part.text;
+        }
       }
       if ('inlineData' in part) {
         const byteArray = decodeB64Blob(part.inlineData.data);
@@ -281,8 +306,100 @@ export class GeminiProvider implements ModelProvider {
 
         return new Blob([byteArray], { type: part.inlineData.mimeType });
       }
-      throw new Error('Unexpected output format');
+      if ('executableCode' in part) {
+        return {
+          type: 'meta',
+          title: 'Code Execution',
+          icon: 'code',
+          message: JSON.stringify(part.executableCode, null, 2),
+        };
+      }
+      if ('codeExecutionResult' in part) {
+        return {
+          type: 'meta',
+          title: 'Code Execution Result',
+          icon: 'code',
+          message: JSON.stringify(part.codeExecutionResult, null, 2),
+        };
+      }
+      if ('functionCall' in part) {
+        return {
+          type: 'meta',
+          title: 'Function Call',
+          icon: 'code',
+          message: JSON.stringify(part.functionCall, null, 2),
+        };
+      }
+      if ('functionResponse' in part) {
+        return {
+          type: 'meta',
+          title: 'Function Response',
+          icon: 'code',
+          message: JSON.stringify(part.functionResponse, null, 2),
+        };
+      }
+      return {
+        type: 'meta',
+        title: 'Unknown',
+        icon: 'other',
+        message: JSON.stringify(part, null, 2),
+      };
     });
+
+    const metaParts: ExtractedOutputPart[] = [];
+    if (final) {
+      if (json.candidates[0]?.safetyRatings) {
+        metaParts.push({
+          type: 'meta',
+          title: 'Safety Ratings',
+          icon: 'other',
+          message: JSON.stringify(json.candidates[0].safetyRatings, null, 2),
+        });
+      }
+      if (
+        json.candidates[0]?.citationMetadata &&
+        Object.keys(json.candidates[0].citationMetadata).length > 0
+      ) {
+        metaParts.push({
+          type: 'meta',
+          title: 'Citation Metadata',
+          icon: 'search',
+          message: JSON.stringify(json.candidates[0].citationMetadata, null, 2),
+        });
+      }
+      if (
+        json.candidates[0]?.groundingMetadata &&
+        Object.keys(json.candidates[0].groundingMetadata).length > 0
+      ) {
+        metaParts.push({
+          type: 'meta',
+          title: 'Grounding Metadata',
+          icon: 'search',
+          message: JSON.stringify(json.candidates[0].groundingMetadata, null, 2),
+        });
+      }
+      if (
+        json.candidates[0]?.urlContextMetadata &&
+        Object.keys(json.candidates[0].urlContextMetadata).length > 0
+      ) {
+        metaParts.push({
+          type: 'meta',
+          title: 'URL Context Metadata',
+          icon: 'search',
+          message: JSON.stringify(json.candidates[0].urlContextMetadata, null, 2),
+        });
+      }
+      if (json.candidates[0]?.finishReason) {
+        metaParts.push({
+          type: 'meta',
+          title: 'Finish Reason',
+          icon: 'other',
+          message: json.candidates[0].finishReason,
+        });
+      }
+    }
+
+    return [...extractedParts, ...metaParts];
   }
 
   extractTokenUsage(response: unknown): TokenUsage {

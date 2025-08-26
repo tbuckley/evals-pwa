@@ -1,0 +1,27 @@
+providers:
+  - id: gemini:gemini-2.5-pro
+    config:
+      generationConfig:
+        thinkingConfig:
+          includeThoughts: true
+      tools:
+        # - codeExecution: {}
+        - googleSearch: {}
+        - urlContext: {}
+
+  - id: gemini:gemini-2.5-pro
+    config:
+      generationConfig:
+        thinkingConfig:
+          includeThoughts: true
+      tools:
+        - functionDeclarations:
+            - name: calculator
+              description: 'A calculator'
+              parameters:
+                type: string
+                description: 'The expression to evaluate'
+
+prompts:
+  - 'What is the square root of 29?'
+  - 'What events are happening in NYC on August 25th, 2025?'

@@ -39,6 +39,12 @@ export const showOnlyFailuresStore = createLocalStorageStore<boolean>(
   false,
 );
 
+export const showMetadataStore = createLocalStorageStore<boolean>(
+  'showMetadata',
+  boolSchema,
+  false,
+);
+
 export const useCacheStore = createLocalStorageStore<boolean>('useCache', boolSchema, true);
 
 const rowHeightSchema = z.union([

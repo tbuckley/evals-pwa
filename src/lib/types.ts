@@ -120,15 +120,34 @@ const tokenUsageSchema = z.object({
 });
 export type TokenUsage = z.infer<typeof tokenUsageSchema>;
 
+const metaProviderOutputPartSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('meta'),
+    title: z.string(),
+    icon: z.enum(['thinking', 'search', 'code', 'other']),
+    message: z.string(),
+    data: z.unknown().optional(),
+  }),
+  // z.object({ type: z.literal('text'), text: z.string() }),
+]);
+export type MetaProviderOutputPart = z.infer<typeof metaProviderOutputPartSchema>;
+const providerOutputPartSchema = z.union([
+  z.string(),
+  z.instanceof(FileReference),
+  metaProviderOutputPartSchema,
+]);
+export type ProviderOutputPart = z.infer<typeof providerOutputPartSchema>;
+const providerOutputSchema = z.union([z.string(), z.array(providerOutputPartSchema)]);
+export type ProviderOutput = z.infer<typeof providerOutputSchema>;
+export type ExtractedOutputPart = string | Blob | MetaProviderOutputPart;
+
 const baseTestOutputSchema = z.object({
   // Required
   rawPrompt: z.unknown(),
 
   // Success
   rawOutput: z.unknown().optional(),
-  output: z
-    .union([z.string(), z.array(z.union([z.string(), z.instanceof(FileReference)]))])
-    .optional(),
+  output: providerOutputSchema.optional(),
   latencyMillis: z.number().optional(),
   tokenUsage: tokenUsageSchema.optional(),
 
@@ -217,7 +236,7 @@ export interface RunContext {
 export type ModelUpdate =
   | {
       type: 'replace' | 'append';
-      output: string | FileReference;
+      output: ProviderOutputPart;
       internalId?: string; // Unique ID for the update, used for history
     }
   | { type: 'begin-stream' };
@@ -241,7 +260,7 @@ export interface ModelProvider {
     prompt: ConversationPrompt,
     context: RunContext,
   ): MaybePromise<{ request: unknown; runModel: ModelRunner }>;
-  extractOutput(response: unknown): MaybePromise<string | (string | Blob)[]>;
+  extractOutput(response: unknown): MaybePromise<string | ExtractedOutputPart[]>;
   extractTokenUsage(response: unknown): TokenUsage;
   mimeTypes?: string[];
   requestSemaphore?: Semaphore;
@@ -271,7 +290,7 @@ export interface FileLoader {
 export type MaybePromise<T> = T | Promise<T>;
 export interface CellAssertionProvider {
   run: (
-    output: string | (string | FileReference)[],
+    output: ProviderOutput,
     context: {
       provider: TestEnvironment['provider'];
       prompt: TestEnvironment['prompt'];
@@ -298,7 +317,7 @@ export interface LiveResult {
 
   // Success
   history?: (Omit<LiveResult, 'state' | 'history' | 'assertionResults'> & { id: string })[];
-  output?: (string | FileReference)[];
+  output?: ProviderOutputPart[];
   rawOutput?: unknown;
   latencyMillis?: number;
   tokenUsage?: TokenUsage;

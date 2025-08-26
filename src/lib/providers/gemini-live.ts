@@ -16,6 +16,7 @@ import {
   type LiveServerMessage,
   Session,
   type LiveConnectParameters,
+  type PartUnion,
 } from '@google/genai';
 import { z } from 'zod';
 import { partSchema } from './gemini';
@@ -84,7 +85,7 @@ export class LiveApiWrapper {
 
     if (turn.parts.length > 0) {
       this.session?.sendClientContent({
-        turns: turn.parts,
+        turns: turn.parts.filter((p) => !('thought' in p)) as PartUnion[],
         turnComplete: turn.audio.length > 0,
       });
     }

@@ -1,5 +1,6 @@
 import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 import type {
+  ExtractedOutputPart,
   ModelCache,
   ModelRunner,
   ModelSession,
@@ -9,6 +10,7 @@ import type {
 } from '$lib/types';
 import { z } from 'zod';
 import type { Semaphore } from './semaphore';
+import { FileReference } from '$lib/storage/FileReference';
 
 const cacheValueSchemaV1 = z.object({
   latencyMillis: z.number(),
@@ -122,7 +124,7 @@ export async function* maybeUseCache(
 }
 
 export async function modelOutputToTestOutput(
-  output: string | (string | Blob)[],
+  output: string | ExtractedOutputPart[],
 ): Promise<NonNullable<TestResult['output']>> {
   if (Array.isArray(output)) {
     // Convert blobs to file references
@@ -139,16 +141,20 @@ export async function modelOutputToTestOutput(
 }
 
 export async function modelOutputToMultiPartPrompt(
-  output: string | (string | Blob)[],
+  output: string | ExtractedOutputPart[],
 ): Promise<MultiPartPrompt> {
   const testOutput = await modelOutputToTestOutput(output);
   if (typeof testOutput === 'string') {
     return [{ text: testOutput }];
   }
-  return testOutput.map((part) => {
+  return testOutput.filter(isStringOrFile).map((part) => {
     if (typeof part === 'string') {
       return { text: part };
     }
     return { file: part.file };
   });
+}
+
+function isStringOrFile(val: unknown): val is string | FileReference {
+  return typeof val === 'string' || val instanceof FileReference;
 }

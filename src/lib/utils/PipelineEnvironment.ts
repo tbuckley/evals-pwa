@@ -1,4 +1,5 @@
 import { CodeReference, toCodeReference } from '$lib/storage/CodeReference';
+import { FileReference } from '$lib/storage/FileReference';
 import type {
   TestEnvironment,
   ModelProvider,
@@ -641,10 +642,16 @@ const historyMergeFn = makeOrderedMerge<HistoryItem>(function (a, b) {
         return -1;
       } else if (typeof ao === 'object' && typeof bo === 'string') {
         return 1;
-      } else if (typeof ao === 'object' && typeof bo === 'object') {
+      } else if (ao instanceof FileReference && bo instanceof FileReference) {
         // Here we can use the file name since FileReference has an absolute path
         if (ao.uri !== bo.uri) {
           return ao.uri < bo.uri ? -1 : 1;
+        }
+      } else if (typeof ao === 'object' && typeof bo === 'object') {
+        const ja = JSON.stringify(ao);
+        const jb = JSON.stringify(bo);
+        if (ja !== jb) {
+          return ja < jb ? -1 : 1;
         }
       } else {
         throw new Error('Invalid output part');

@@ -1,0 +1,9 @@
+providers:
+  - id: gemini:gemini-2.5-pro
+    config:
+      generationConfig:
+        thinkingConfig:
+          includeThoughts: true
+
+prompts:
+  - 'What is history of the universe?'

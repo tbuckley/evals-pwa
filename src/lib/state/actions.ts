@@ -21,6 +21,7 @@ import {
   type RunContext,
   type TestEnvironment,
   type TestOutput,
+  type ProviderOutputPart,
 } from '$lib/types';
 import { UiError } from '$lib/types/errors';
 import { type FileStorage } from '$lib/types/storage';
@@ -41,7 +42,6 @@ import * as CodeSandbox from '$lib/utils/CodeSandbox';
 import { FileSystemCache } from '$lib/storage/FileSystemCache';
 import { useCacheStore } from './settings';
 import { PipelineEnvironment } from '$lib/utils/PipelineEnvironment';
-import type { FileReference } from '$lib/storage/FileReference';
 import { LabelNotFoundError, permuteLabeled } from '$lib/utils/permuteLabeled';
 import { toast } from 'svelte-sonner';
 
@@ -555,7 +555,7 @@ function createEnvironments(
 function applyModelUpdate(
   state: LiveResult,
   historyId: string | undefined,
-  cb: (output: (string | FileReference)[]) => (string | FileReference)[],
+  cb: (output: ProviderOutputPart[]) => ProviderOutputPart[],
 ): LiveResult {
   if (!historyId) {
     // Apply to output
