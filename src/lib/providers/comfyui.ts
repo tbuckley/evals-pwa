@@ -44,7 +44,10 @@ export class ComfyuiProvider implements ModelProvider {
           files.push(part.file);
           return part.file.name;
         }
-        return part.text;
+        if ('text' in part) {
+          return part.text;
+        }
+        throw new Error('Invalid ComfyUI prompt, must only contain text and files');
       })
       .join('');
 

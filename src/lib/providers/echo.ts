@@ -18,7 +18,10 @@ export class EchoProvider implements ModelProvider {
       if ('text' in part) {
         return part.text;
       }
-      return part.file;
+      if ('file' in part) {
+        return part.file;
+      }
+      throw new Error('Invalid Echo prompt, must only contain text and files');
     });
 
     return {
