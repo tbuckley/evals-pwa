@@ -369,6 +369,7 @@ export class PipelineState<T extends PipelineStep, S> {
   stepDepsStatus: Map<string, StepDepsStatus<S>> = new Map<string, StepDepsStatus<S>>();
   stepDepToIds: Map<string, string[]> = new Map<string, string[]>();
   outputDepToIds: Map<string, string[]> = new Map<string, string[]>();
+  spoofStepIdMap: Map<string, string> = new Map<string, string>();
 
   contextMerge: (a: S, b: S) => S;
 
@@ -407,11 +408,21 @@ export class PipelineState<T extends PipelineStep, S> {
     this.stepIdMap = new Map<string, T>(steps.map((step) => [step.id, step]));
   }
 
-  registerStep(step: T) {
+  registerStep(step: T, spoofStepId?: string) {
+    if (this.stepIdMap.has(step.id)) {
+      throw new Error(`Step ${step.id} already registered`);
+    }
     this.stepIdMap.set(step.id, step);
 
     if (!step.deps) {
       throw new Error('Cannot late-register a step with no dependencies');
+    }
+
+    if (spoofStepId) {
+      if (!this.stepIdMap.has(spoofStepId)) {
+        throw new Error(`Spoofed step ${spoofStepId} not found`);
+      }
+      this.spoofStepIdMap.set(step.id, spoofStepId);
     }
 
     this.stepDepsStatus.set(step.id, createStepDepsStatus([], step.deps));
@@ -536,6 +547,15 @@ export class PipelineState<T extends PipelineStep, S> {
   ): Promise<{ isLeaf: boolean; next: { step: T; context: S }[] }> {
     const nextSteps: { step: T; context: S }[] = [];
     let numDeps = 0;
+
+    const spoofedStepId = this.spoofStepIdMap.get(step.id);
+    if (spoofedStepId) {
+      const spoofedStep = this.stepIdMap.get(spoofedStepId);
+      if (!spoofedStep) {
+        throw new Error(`Spoofed step ${spoofedStepId} not found when marking step as complete`);
+      }
+      step = spoofedStep;
+    }
 
     // Mark any dependencies on this step ID as complete
     const res = this.markStepAsComplete(step.id, context);

@@ -1,5 +1,10 @@
 import { describe, test, expect } from 'vitest';
-import { makeOrderedMerge, orderedMerge, PipelineState } from './PipelineEnvironment';
+import {
+  makeOrderedMerge,
+  orderedMerge,
+  PipelineState,
+  type PipelineStep,
+} from './PipelineEnvironment';
 import { toCodeReference } from '$lib/storage/CodeReference';
 import dedent from 'dedent';
 
@@ -187,10 +192,10 @@ describe('PipelineState', () => {
     });
   });
 
-  test('allow delayed registration of steps', {}, async function () {
-    const step0 = { id: 'step-0', outputAs: 'out0', deps: [] as string[] };
-    const step1 = { id: 'step-1', outputAs: 'out1', deps: [] };
-    const pipeline = new PipelineState([step0, step1], defaultMerge);
+  test('allow delayed registration of steps, triggering same dependencies', {}, async function () {
+    const step0 = { id: 'step-0', outputAs: 'out0' };
+    const step1 = { id: 'step-1', outputAs: 'out1', deps: ['out0'] };
+    const pipeline = new PipelineState<PipelineStep, null>([step0, step1], defaultMerge);
 
     // Create a fake end step for step0
     const delayedStep = { id: 'step-0-end', outputAs: step0.outputAs, deps: ['virtual-step'] };
@@ -198,13 +203,41 @@ describe('PipelineState', () => {
 
     expect(
       await pipeline.markCompleteAndGetNextSteps(
-        { id: 'vstep', outputAs: 'virtual-step', deps: [] },
+        { id: 'vstep', outputAs: 'virtual-step' },
         {},
         null,
       ),
     ).toEqual({
       isLeaf: false,
       next: [{ step: delayedStep, context: null }],
+    });
+    expect(await pipeline.markCompleteAndGetNextSteps(delayedStep, {}, null)).toEqual({
+      isLeaf: false,
+      next: [{ step: step1, context: null }],
+    });
+  });
+  test('allow delayed registration of steps, triggering next ordered step', {}, async function () {
+    const step0 = { id: 'step-0', outputAs: 'out0' };
+    const step1 = { id: 'step-1', outputAs: 'out1' };
+    const pipeline = new PipelineState<PipelineStep, null>([step0, step1], defaultMerge);
+
+    // Create a fake end step for step0
+    const delayedStep = { id: 'step-0-end', outputAs: step0.outputAs, deps: ['virtual-step'] };
+    pipeline.registerStep(delayedStep, step0.id);
+
+    expect(
+      await pipeline.markCompleteAndGetNextSteps(
+        { id: 'vstep', outputAs: 'virtual-step' },
+        {},
+        null,
+      ),
+    ).toEqual({
+      isLeaf: false,
+      next: [{ step: delayedStep, context: null }],
+    });
+    expect(await pipeline.markCompleteAndGetNextSteps(delayedStep, {}, null)).toEqual({
+      isLeaf: false,
+      next: [{ step: step1, context: null }],
     });
   });
 });
