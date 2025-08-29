@@ -152,6 +152,61 @@ describe('PipelineState', () => {
       return new PipelineState([{ id: 'step-0' }, { id: 'step-0' }], defaultMerge);
     }).toThrow('Steps have duplicate IDs');
   });
+
+  test('allows for unregistered steps to be marked complete', {}, async function () {
+    const step0 = { id: 'step-0', outputAs: 'out0', deps: [] };
+    const step1 = { id: 'step-1', outputAs: 'out1', deps: ['out0'] };
+    const fnFoo = { id: 'fn-foo', outputAs: 'foo', deps: ['$fn:foo'] };
+    const pipeline = new PipelineState([step0, step1, fnFoo], defaultMerge);
+    expect(
+      await pipeline.markCompleteAndGetNextSteps(
+        { id: 'fake', outputAs: '$fn:foo', deps: [] },
+        {},
+        null,
+      ),
+    ).toEqual({
+      isLeaf: false,
+      next: [{ step: fnFoo, context: null }],
+    });
+  });
+
+  test('allow registering steps after initialization', {}, async function () {
+    const step0 = { id: 'step-0', outputAs: 'out0', deps: [] };
+    const step1 = { id: 'step-1', outputAs: 'out1', deps: ['out0'] };
+    const fnFoo = { id: 'fn-foo', outputAs: 'foo', deps: ['$fn:foo'] };
+    const pipeline = new PipelineState([step0, step1, fnFoo], defaultMerge);
+    expect(
+      await pipeline.markCompleteAndGetNextSteps(
+        { id: 'fake', outputAs: '$fn:foo', deps: [] },
+        {},
+        null,
+      ),
+    ).toEqual({
+      isLeaf: false,
+      next: [{ step: fnFoo, context: null }],
+    });
+  });
+
+  test('allow delayed registration of steps', {}, async function () {
+    const step0 = { id: 'step-0', outputAs: 'out0', deps: [] as string[] };
+    const step1 = { id: 'step-1', outputAs: 'out1', deps: [] };
+    const pipeline = new PipelineState([step0, step1], defaultMerge);
+
+    // Create a fake end step for step0
+    const delayedStep = { id: 'step-0-end', outputAs: step0.outputAs, deps: ['virtual-step'] };
+    pipeline.registerStep(delayedStep);
+
+    expect(
+      await pipeline.markCompleteAndGetNextSteps(
+        { id: 'vstep', outputAs: 'virtual-step', deps: [] },
+        {},
+        null,
+      ),
+    ).toEqual({
+      isLeaf: false,
+      next: [{ step: delayedStep, context: null }],
+    });
+  });
 });
 
 describe('orderedMerge', () => {

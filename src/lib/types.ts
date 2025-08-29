@@ -120,19 +120,20 @@ const tokenUsageSchema = z.object({
 });
 export type TokenUsage = z.infer<typeof tokenUsageSchema>;
 
-const functionToolSchema = [
-  z.object({
-    type: z.literal('function-call'),
-    name: z.string(),
-    args: z.unknown(),
-    meta: z.unknown(),
-  }),
-  z.object({
-    type: z.literal('function-response'),
-    call: z.string(),
-    response: z.unknown(),
-  }),
-] as const;
+const functionCallSchema = z.object({
+  type: z.literal('function-call'),
+  name: z.string(),
+  args: z.unknown(),
+  meta: z.unknown(),
+});
+const functionResponseSchema = z.object({
+  type: z.literal('function-response'),
+  call: z.string(),
+  response: z.unknown(),
+});
+export type FunctionCall = z.infer<typeof functionCallSchema>;
+export type FunctionResponse = z.infer<typeof functionResponseSchema>;
+export type FunctionTool = FunctionCall | FunctionResponse;
 const metaProviderOutputPartSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('meta'),
@@ -141,10 +142,10 @@ const metaProviderOutputPartSchema = z.discriminatedUnion('type', [
     message: z.string(),
     data: z.unknown().optional(),
   }),
-  ...functionToolSchema,
+  functionCallSchema,
+  functionResponseSchema,
 ]);
 export type MetaProviderOutputPart = z.infer<typeof metaProviderOutputPartSchema>;
-export type FunctionTool = z.infer<(typeof functionToolSchema)[number]>;
 const providerOutputPartSchema = z.union([
   z.string(),
   z.instanceof(FileReference),

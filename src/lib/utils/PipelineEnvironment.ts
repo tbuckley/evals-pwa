@@ -14,6 +14,8 @@ import type {
   NormalizedPipelinePrompt,
   TokenUsage,
   ModelSession,
+  ProviderOutputPart,
+  FunctionCall,
 } from '$lib/types';
 import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
 import { generator } from './generator';
@@ -200,6 +202,32 @@ export class PipelineEnvironment implements TestEnvironment {
         throw e;
       }
 
+      if (Array.isArray(output) && output.some((part) => isFunctionCall(part))) {
+        const functionCalls = output.filter((part) => isFunctionCall(part));
+
+        // Run function calls
+        await Promise.all(
+          functionCalls.map(async (part) => {
+            const { next } = await pipelineState.markCompleteAndGetNextSteps(
+              {
+                id: `${step.id}-function-call`,
+                outputAs: `$fn:${part.name}`,
+                prompt: '',
+              },
+              { ...vars, $args: part.args },
+              pipelineContext,
+            );
+            if (next.length === 0) {
+              throw new Error(`no step found for function call ${part.name}`);
+            }
+            if (next.length > 1) {
+              throw new Error(`multiple steps found for function call ${part.name}`);
+            }
+            taskQueue.enqueue(() => safeRunStep(next[0].step, next[0].context));
+          }),
+        );
+      }
+
       // Add the output to the vars
       // Use step.id for this history since it is only used for prompts/if
       const newHistory = [...pipelineContext.history, { id: step.id, prompt, output }];
@@ -377,6 +405,21 @@ export class PipelineState<T extends PipelineStep, S> {
     }
 
     this.stepIdMap = new Map<string, T>(steps.map((step) => [step.id, step]));
+  }
+
+  registerStep(step: T) {
+    this.stepIdMap.set(step.id, step);
+
+    if (!step.deps) {
+      throw new Error('Cannot late-register a step with no dependencies');
+    }
+
+    this.stepDepsStatus.set(step.id, createStepDepsStatus([], step.deps));
+    for (const dep of step.deps) {
+      const ids = this.outputDepToIds.get(dep) ?? [];
+      ids.push(step.id);
+      this.outputDepToIds.set(dep, ids);
+    }
   }
 
   private getStepsWithNoDeps(): T[] {
@@ -671,4 +714,8 @@ function mergePipelineContext(a: PipelineContext, b: PipelineContext): PipelineC
     history: historyMergeFn(a.history, b.history),
     vars: { ...a.vars, ...b.vars },
   };
+}
+
+function isFunctionCall(part: ProviderOutputPart): part is FunctionCall {
+  return typeof part === 'object' && 'type' in part && part.type === 'function-call';
 }
