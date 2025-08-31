@@ -21,13 +21,13 @@ const generateContentResponseSchema = z.object({
     z.object({
       message: z
         .object({
-          content: z.string().nullable(),
+          content: z.string().nullish(),
           role: z.string(),
         })
         .optional(),
       delta: z
         .object({
-          content: z.string().optional(),
+          content: z.string().nullish(),
         })
         .optional(),
     }),
@@ -176,6 +176,9 @@ export class OpenaiProvider implements ModelProvider {
     const firstChoice = json.choices[0].message?.content;
     if (typeof firstChoice === 'string') {
       return [firstChoice];
+    }
+    if (firstChoice == null) {
+      return [''];
     }
 
     throw new Error('Unexpected output format');
