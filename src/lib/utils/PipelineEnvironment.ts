@@ -126,7 +126,6 @@ export class PipelineEnvironment implements TestEnvironment {
       let prompt: ConversationPrompt;
       if (Object.keys(pipelineContext.vars).some((v) => v.startsWith('$call:'))) {
         // We have function call results
-        // FIXME: remove $call/$env results from being passed on in vars
         const prevOutput = pipelineContext.history.at(-1)?.output;
         if (!prevOutput || !Array.isArray(prevOutput)) {
           throw new Error('Previous output is not an array');
@@ -244,18 +243,21 @@ export class PipelineEnvironment implements TestEnvironment {
         output.some((part) => isFunctionCall(part)) &&
         step.session !== undefined
       ) {
-        delegateMarkCompleteToDependency = `$env:${step.id}-${crypto.randomUUID()}`;
+        // FIXME: use nanoid for shorter UUIDs
+        const uuid = crypto.randomUUID();
+
+        delegateMarkCompleteToDependency = `$env:${step.id}-${uuid}`;
 
         const functionCalls = output.filter((part) => isFunctionCall(part));
         const virtualOutputs = functionCalls.map(
-          (part) => `$call:${step.id}-fn-${part.name}-${crypto.randomUUID()}`,
+          (part, index) => `$call:${step.id}-fn-${index}-${part.name}-${uuid}`,
         );
 
         // Create a step spoofing this step that runs when all functions are complete
-        // FIXME: How can we make this step inherit the current step's context? Add another virtual dependency?
         pipelineState.registerStep(
           {
-            id: `${step.id}-complete-${crypto.randomUUID()}`,
+            // FIXME: remove any previously appended IDs
+            id: `${step.id}:complete-${uuid}`,
             deps: [...virtualOutputs, delegateMarkCompleteToDependency],
             prompt: '', // FIXME: Make prompt optional
 
