@@ -11,7 +11,6 @@ import type {
   NormalizedPipelineStep,
   TestResult,
   NormalizedPipelinePrompt,
-  TokenUsage,
   ModelSession,
   ProviderOutputPart,
   FunctionCall,
@@ -44,6 +43,10 @@ export interface PipelineVars {
   $output: NonNullable<TestResult['output']> | null;
   $history: HistoryItem[];
   [key: string]: unknown;
+}
+interface SessionState {
+  session: ModelSession;
+  provider: ModelProvider;
 }
 
 export class PipelineEnvironment implements TestEnvironment {
@@ -90,7 +93,7 @@ export class PipelineEnvironment implements TestEnvironment {
     const history: TestOutput['history'] = []; // NOTE: IDs must be unique for display
     const start = Date.now();
 
-    const sessionManager = new Map<string, { session: ModelSession; provider: ModelProvider }>();
+    const sessionManager = new Map<string, SessionState>();
 
     const safeRunStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
       const count = stepRunCount.get(step.id) ?? 1;
@@ -162,79 +165,28 @@ export class PipelineEnvironment implements TestEnvironment {
         );
       }
 
-      // BEGIN optional prompt
-
       // Run the prompt (or read from cache)
-      const existingSession = step.session ? sessionManager.get(step.session) : undefined;
-      const { request, runModel } = await model.run(prompt, {
-        ...context,
-        session: existingSession?.provider === model ? existingSession.session : undefined,
-      });
-      const cacheKey = {
-        provider: model.id,
-        request,
-        ...(context.cacheKey ?? {}),
-        // If re-running a step with the same prompt, use a different cache key?
-        ...(count > 1 ? { pipelineCount: count } : {}),
-        // TODO: If multiple steps share a prompt, use different cache keys
-      };
-      const generator = maybeUseCache(this.cache, cacheKey, runModel, model.requestSemaphore, {
-        requireSession: step.session !== undefined,
-      });
-      let nextRes = await generator.next();
-      while (!nextRes.done) {
-        const update = nextRes.value;
-        if (typeof update === 'string') {
-          modelUpdateGenerator.yield({ type: 'append', output: update, internalId: stepId });
-        } else if (update.type !== 'begin-stream') {
-          modelUpdateGenerator.yield({ ...update, internalId: stepId });
-        }
-        nextRes = await generator.next();
-      }
-      const { response, latencyMillis, session } = nextRes.value;
-      const finished = Date.now();
-
-      if (step.session) {
-        if (!session) {
-          throw new Error('Provider does not support sessions');
-        }
-        sessionManager.set(step.session, { session, provider: model });
-      } else {
-        await session?.close?.();
+      const session = step.session ? sessionManager.get(step.session) : undefined;
+      const sessionId = step.session;
+      const { output, tokenUsage, latencyMillis, finished, response, errorResult } = await runModel(
+        model,
+        prompt,
+        this.cache,
+        session,
+        sessionId ? (value: SessionState) => sessionManager.set(sessionId, value) : undefined,
+        context,
+        count,
+        (value: ModelUpdate) => {
+          modelUpdateGenerator.yield({ ...value, internalId: stepId });
+        },
+      );
+      if (errorResult) {
+        history.push({ id: stepId, ...errorResult });
+        result = errorResult;
+        return;
       }
 
-      // Extract the output
-      let output: NonNullable<TestOutput['output']>;
-      let tokenUsage: TokenUsage;
-      try {
-        const rawOutput = await model.extractOutput(response);
-        output = await modelOutputToTestOutput(rawOutput);
-        tokenUsage = model.extractTokenUsage(response);
-
-        // Immediately yield the final output
-        if (typeof output === 'string') {
-          modelUpdateGenerator.yield({ type: 'replace', output, internalId: stepId });
-        } else {
-          modelUpdateGenerator.yield({ type: 'replace', output: '', internalId: stepId });
-          for (const part of output) {
-            modelUpdateGenerator.yield({ type: 'append', output: part, internalId: stepId });
-          }
-        }
-      } catch (e) {
-        if (e instanceof Error) {
-          result = {
-            rawPrompt: prompt,
-            rawOutput: response,
-            error: e.toString(),
-            latencyMillis,
-          };
-          history.push({ id: stepId, ...result });
-          return;
-        }
-        throw e;
-      }
-
-      // END optional prompt
+      console.log('output', output);
 
       // Do not mark as completed, it will be delegated by a virtual step
       let delegateMarkCompleteToDependency: string | null = null;
@@ -585,4 +537,83 @@ function stripFunctionCallResults(vars: VarSet) {
     }
   }
   return vars;
+}
+
+async function runModel(
+  model: ModelProvider,
+  prompt: ConversationPrompt,
+  cache: ModelCache | undefined,
+  session: SessionState | undefined,
+  setSession: ((value: SessionState) => void) | undefined,
+  context: RunContext,
+  count: number,
+  yieldUpdate: (value: ModelUpdate) => void,
+) {
+  const { request, runModel } = await model.run(prompt, {
+    ...context,
+    session: session?.provider === model ? session.session : undefined,
+  });
+  const cacheKey = {
+    provider: model.id,
+    request,
+    ...(context.cacheKey ?? {}),
+    // If re-running a step with the same prompt, use a different cache key?
+    ...(count > 1 ? { pipelineCount: count } : {}),
+    // TODO: If multiple steps share a prompt, use different cache keys
+  };
+  const generator = maybeUseCache(cache, cacheKey, runModel, model.requestSemaphore, {
+    requireSession: !session,
+  });
+  let nextRes = await generator.next();
+  while (!nextRes.done) {
+    const update = nextRes.value;
+    if (typeof update === 'string') {
+      yieldUpdate({ type: 'append', output: update });
+    } else if (update.type !== 'begin-stream') {
+      yieldUpdate(update);
+    }
+    nextRes = await generator.next();
+  }
+  const { response, latencyMillis, session: resSession } = nextRes.value;
+  const finished = Date.now();
+
+  if (setSession) {
+    if (!resSession) {
+      throw new Error('Provider does not support sessions');
+    }
+    setSession({ session: resSession, provider: model });
+  } else {
+    await resSession?.close?.();
+  }
+
+  try {
+    // Extract the output
+    const rawOutput = await model.extractOutput(response);
+    const output = await modelOutputToTestOutput(rawOutput);
+    const tokenUsage = model.extractTokenUsage(response);
+
+    // Immediately yield the final output
+    if (typeof output === 'string') {
+      yieldUpdate({ type: 'replace', output });
+    } else {
+      yieldUpdate({ type: 'replace', output: '' });
+      for (const part of output) {
+        yieldUpdate({ type: 'append', output: part });
+      }
+    }
+
+    return { output, tokenUsage, latencyMillis, finished, response };
+  } catch (e) {
+    if (e instanceof Error) {
+      return {
+        errorResult: {
+          rawPrompt: prompt,
+          rawOutput: response,
+          error: e.toString(),
+          latencyMillis,
+        },
+      };
+    }
+    throw e;
+  }
 }

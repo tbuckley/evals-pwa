@@ -254,7 +254,7 @@ export type ModelUpdate =
       output: ProviderOutputPart;
       internalId?: string; // Unique ID for the update, used for history
     }
-  | { type: 'begin-stream' };
+  | { type: 'begin-stream'; internalId?: string };
 
 // A con
 export interface ModelSession {
