@@ -125,42 +125,15 @@ export class PipelineEnvironment implements TestEnvironment {
         throw new Error(`Model for step ${step.id} not found`);
       }
 
-      console.log('TEST', step, pipelineContext);
-
+      // Generate the prompt
       let prompt: ConversationPrompt;
-      if (Object.keys(pipelineContext.vars).some((v) => v.startsWith('$call:'))) {
-        // We have function call results
-        const prevOutput = pipelineContext.history.at(-1)?.output;
-        if (!prevOutput || !Array.isArray(prevOutput)) {
-          throw new Error('Previous output is not an array');
-        }
-        const calls = prevOutput.filter((o) => isFunctionCall(o));
-        const callResults = step.deps?.filter((d) => d.startsWith('$call:')) ?? [];
-        if (calls.length !== callResults.length) {
-          throw new Error('Function call results and call dependencies do not match');
-        }
-
-        const responses: FunctionResponse[] = [];
-        for (let i = 0; i < calls.length; i++) {
-          responses.push({
-            type: 'function-response',
-            call: calls[i].name,
-            response: { result: pipelineContext.vars[callResults[i]] as unknown }, // FIXME: don't wrap
-          });
-        }
-
-        console.log('responses', responses);
-        prompt = [{ role: 'user', content: responses }];
+      const functionResponses = getFunctionResponses(pipelineContext, step.deps ?? []);
+      if (functionResponses) {
+        prompt = [{ role: 'user', content: functionResponses }];
       } else {
-        // Render the prompt
-        const promptFormatter = new HandlebarsPromptFormatter(step.prompt);
-        prompt = await promptFormatter.format(
-          {
-            ...vars,
-            ...pipelineContext.vars,
-            $history: pipelineContext.history,
-            $output: pipelineContext.history[pipelineContext.history.length - 1]?.output ?? null,
-          },
+        prompt = await renderPrompt(
+          step.prompt,
+          generatePipelineVars(vars, pipelineContext),
           model.mimeTypes,
         );
       }
@@ -186,79 +159,56 @@ export class PipelineEnvironment implements TestEnvironment {
         return;
       }
 
-      console.log('output', output);
-
       // Do not mark as completed, it will be delegated by a virtual step
       let delegateMarkCompleteToDependency: string | null = null;
 
-      if (
-        Array.isArray(output) &&
-        output.some((part) => isFunctionCall(part)) &&
-        step.session !== undefined
-      ) {
-        // FIXME: use nanoid for shorter UUIDs
-        const uuid = crypto.randomUUID();
+      const functionCalls = getFunctionCalls(output);
+      if (functionCalls.length > 0 && step.session !== undefined) {
+        // Create a unique suffix for virtual steps
+        // TODO: consider nanoid for shorter UUIDs
+        const suffix = crypto.randomUUID();
 
-        delegateMarkCompleteToDependency = `$env:${step.id}-${uuid}`;
+        // Share the current pipeline context
+        const ctxDependency = `$ctx:${step.id}-${suffix}`;
+        delegateMarkCompleteToDependency = ctxDependency;
 
-        const functionCalls = output.filter((part) => isFunctionCall(part));
-        const virtualOutputs = functionCalls.map(
-          (part, index) => `$call:${step.id}-fn-${index}-${part.name}-${uuid}`,
-        );
+        // Create virtual outputs for each function call
+        const virtualOutputs = generateFunctionCallVirtualOutputs(step, suffix, functionCalls);
 
         // Create a step spoofing this step that runs when all functions are complete
-        pipelineState.registerStep(
-          {
-            // FIXME: remove any previously appended IDs
-            id: `${step.id}:complete-${uuid}`,
-            deps: [...virtualOutputs, delegateMarkCompleteToDependency],
-            prompt: '', // FIXME: Make prompt optional
-
-            // Inherit any model + post-prompt settings the original step
-            providerLabel: step.providerLabel,
-            session: step.session,
-            outputAs: step.outputAs,
-          },
-          step.id,
+        registerCompletionStep(
+          pipelineState,
+          step,
+          [...virtualOutputs, delegateMarkCompleteToDependency],
+          suffix,
         );
 
         // Run function calls
         await Promise.all(
           functionCalls.map(async (part, index) => {
             const virtualOutput = virtualOutputs[index];
-            const { next } = await pipelineState.markCompleteAndGetNextSteps(
-              {
-                id: `${step.id}-function-call`,
-                outputAs: `$fn:${part.name}`, // Must match dependency for function call
-                prompt: '',
-              },
-              { ...vars, $args: part.args }, // Pass $args to the function call step
-              {
-                ...pipelineContext,
-                vars: stripFunctionCallResults({ ...pipelineContext.vars, $args: part.args }),
-                virtualOutputs: [virtualOutput],
-              },
+            const next = await generateVirtualFunctionCall(
+              pipelineState,
+              part,
+              virtualOutput,
+              vars,
+              pipelineContext,
             );
-            if (next.length === 0) {
-              throw new Error(`no step found for function call ${part.name}`);
-            }
-            if (next.length > 1) {
-              throw new Error(`multiple steps found for function call ${part.name}`);
-            }
-            taskQueue.enqueue(() => safeRunStep(next[0].step, next[0].context));
+            taskQueue.enqueue(() => safeRunStep(next.step, next.context));
           }),
         );
       }
 
-      // Add the output to the vars
+      // Add the output to the vars, and remove any virtual vars
       // Use step.id for this history since it is only used for prompts/if
       const newHistory = [...pipelineContext.history, { id: step.id, prompt, output }];
-      const newVars = { ...pipelineContext.vars };
+      const newPipelineVars = { ...pipelineContext.vars };
       if (step.outputAs && !delegateMarkCompleteToDependency) {
-        newVars[step.outputAs] = output;
+        newPipelineVars[step.outputAs] = output;
       }
-      stripFunctionCallResults(newVars);
+      stripFunctionCallResults(newPipelineVars);
 
+      // Save the step's result to history
       const stepResult: TestOutput = {
         rawPrompt: prompt,
         rawOutput: response,
@@ -268,75 +218,32 @@ export class PipelineEnvironment implements TestEnvironment {
       };
       history.push({ id: stepId, ...stepResult });
 
-      if (delegateMarkCompleteToDependency) {
-        // We're done, delegate to the dependency
-        const { next } = await pipelineState.markCompleteAndGetNextSteps(
-          {
-            id: delegateMarkCompleteToDependency,
-            prompt: '', // FIXME: Make prompt optional
-            outputAs: delegateMarkCompleteToDependency,
-          },
-          {
-            ...vars,
-            ...newVars,
-            $history: newHistory,
-            $output: newHistory[newHistory.length - 1]?.output ?? null,
-          },
-          {
-            ...pipelineContext,
-            history: newHistory,
-            vars: newVars,
-          },
-        );
-        for (const { step, context } of next) {
-          taskQueue.enqueue(() => safeRunStep(step, context));
-        }
-        return;
-      }
-
-      // Mark the step as complete and continue with the next steps
-      const { isLeaf, next } = await pipelineState.markCompleteAndGetNextSteps(
+      const { next, isLeaf } = await getNextSteps(
+        pipelineState,
         step,
+        delegateMarkCompleteToDependency,
         {
           ...vars,
-          ...newVars,
+          ...newPipelineVars,
           $history: newHistory,
-          $output: newHistory[newHistory.length - 1]?.output ?? null,
+          $output: newHistory.at(-1)?.output ?? null,
         },
+
         {
+          ...pipelineContext,
           history: newHistory,
-          vars: newVars,
-          virtualOutputs: pipelineContext.virtualOutputs,
+          vars: newPipelineVars,
         },
       );
-      if (isLeaf && pipelineContext.virtualOutputs.length > 0) {
-        // This is the end of the virtual step, mark the virtual outputs as complete
-        const nextSteps: { step: NormalizedPipelineStep; context: PipelineContext }[] = [];
-        for (const virtualOutput of pipelineContext.virtualOutputs) {
-          const res = await pipelineState.markCompleteAndGetNextSteps(
-            { ...step, outputAs: virtualOutput },
-            {
-              // Only pass the virtual output, no other vars
-              [virtualOutput]: newHistory[newHistory.length - 1]?.output ?? null,
-            },
-            {
-              history: [], // Don't pass the history, preserve the original step's context
-              vars: {
-                // Only pass the virtual output, no other vars
-                [virtualOutput]: newHistory[newHistory.length - 1]?.output ?? null,
-              },
-              virtualOutputs: [], // Reset virtual outputs
-            },
-          );
-          nextSteps.push(...res.next);
-        }
-        for (const { step, context } of nextSteps) {
+
+      if (next.length > 0) {
+        // Run the next steps
+        for (const { step, context } of next) {
           console.log('enqueueing step', step.id);
           taskQueue.enqueue(() => safeRunStep(step, context));
         }
-        return;
-      }
-      if (isLeaf) {
+      } else if (isLeaf) {
+        // This was a leaf node, so assume we're done
         // If this isn't the first result, return an error instead
         if (result !== undefined) {
           if (!result.error) {
@@ -357,6 +264,7 @@ export class PipelineEnvironment implements TestEnvironment {
           return;
         }
 
+        // Save the output as the final result
         result = {
           ...stepResult,
           history,
@@ -369,10 +277,8 @@ export class PipelineEnvironment implements TestEnvironment {
           },
         };
       }
-      for (const { step, context } of next) {
-        console.log('enqueueing step', step.id);
-        taskQueue.enqueue(() => safeRunStep(step, context));
-      }
+      // Otherwise it's not a leaf node but its dependencies require other steps to finish
+      // Do nothing
     };
 
     // Get the starting steps
@@ -616,4 +522,183 @@ async function runModel(
     }
     throw e;
   }
+}
+
+function getFunctionCalls(output: NonNullable<TestResult['output']>): FunctionCall[] {
+  if (typeof output === 'string') {
+    return [];
+  }
+  return output.filter((o) => isFunctionCall(o));
+}
+
+function getFunctionResponses(context: PipelineContext, deps: string[]): FunctionResponse[] | null {
+  if (!Object.keys(context.vars).some((v) => v.startsWith('$call:'))) {
+    return null;
+  }
+
+  // Get the calls from the previous output
+  const prevOutput = context.history.at(-1)?.output;
+  if (!prevOutput || !Array.isArray(prevOutput)) {
+    throw new Error('Received function responses, but previous output is not an array');
+  }
+  const calls = prevOutput.filter((o) => isFunctionCall(o));
+
+  // Get the corresponding results
+  const callResults = deps.filter((d) => d.startsWith('$call:'));
+  if (calls.length !== callResults.length) {
+    throw new Error('Function call results and call dependencies do not match');
+  }
+
+  // Create the responses
+  const responses: FunctionResponse[] = [];
+  for (let i = 0; i < calls.length; i++) {
+    responses.push({
+      type: 'function-response',
+      call: calls[i].name,
+      response: { result: context.vars[callResults[i]] as unknown }, // FIXME: don't wrap
+    });
+  }
+
+  return responses;
+}
+
+function renderPrompt(prompt: string, vars: VarSet, mimeTypes?: string[]) {
+  const promptFormatter = new HandlebarsPromptFormatter(prompt);
+  return promptFormatter.format(vars, mimeTypes);
+}
+
+function generatePipelineVars(vars: VarSet, pipelineContext: PipelineContext) {
+  return {
+    ...vars,
+    ...pipelineContext.vars,
+    $history: pipelineContext.history,
+    $output: pipelineContext.history.at(-1)?.output ?? null,
+  };
+}
+
+function generateFunctionCallVirtualOutputs(
+  step: NormalizedPipelineStep,
+  uuid: string,
+  calls: FunctionCall[],
+): string[] {
+  return calls.map((part, index) => `$call:${step.id}-fn-${index}-${part.name}-${uuid}`);
+}
+
+async function generateVirtualFunctionCall(
+  pipelineState: PipelineState<NormalizedPipelineStep, PipelineContext>,
+  part: FunctionCall,
+  virtualOutput: string,
+  globalVars: VarSet,
+  pipelineContext: PipelineContext,
+) {
+  const { next } = await pipelineState.markCompleteAndGetNextSteps(
+    {
+      id: virtualOutput, // Doesn't really matter, just should not match a real step ID
+      outputAs: `$fn:${part.name}`, // Must match dependency for function call
+      prompt: '',
+    },
+    // Pass global vars + $args for if-testing
+    // Skip pipeline vars, since functions should focus on their arguments
+    { ...globalVars, $args: part.args },
+    {
+      ...pipelineContext,
+      // Pass the current pipeline vars + $args
+      // FIXME: should we not pass pipelineContext vars here? Align with above
+      vars: stripFunctionCallResults({ ...pipelineContext.vars, $args: part.args }),
+      virtualOutputs: [virtualOutput],
+    },
+  );
+  if (next.length === 0) {
+    throw new Error(`no step found for function call ${part.name}`);
+  }
+  if (next.length > 1) {
+    throw new Error(`multiple steps found for function call ${part.name}`);
+  }
+  return next[0];
+}
+
+function registerCompletionStep(
+  pipelineState: PipelineState<NormalizedPipelineStep, PipelineContext>,
+  step: NormalizedPipelineStep,
+  deps: string[],
+  uuid: string,
+) {
+  // Remove any previously appended IDs
+  const prefix = step.id.split(':')[0];
+  const id = `${prefix}:complete-${uuid}`;
+  pipelineState.registerStep(
+    {
+      id,
+      deps,
+      prompt: '', // FIXME: Make prompt optional
+
+      // Inherit any model + post-prompt settings the original step
+      providerLabel: step.providerLabel,
+      session: step.session,
+      outputAs: step.outputAs,
+    },
+    step.id,
+  );
+}
+
+async function getNextSteps(
+  pipelineState: PipelineState<NormalizedPipelineStep, PipelineContext>,
+  step: NormalizedPipelineStep,
+  delegateMarkCompleteToDependency: string | null,
+  vars: VarSet,
+  pipelineContext: PipelineContext,
+) {
+  // If we should delegate step completion to a dependency, just pass our current context
+  if (delegateMarkCompleteToDependency) {
+    const { next } = await pipelineState.markCompleteAndGetNextSteps(
+      {
+        id: delegateMarkCompleteToDependency,
+        prompt: '', // FIXME: Make prompt optional
+        outputAs: delegateMarkCompleteToDependency,
+      },
+      vars,
+      pipelineContext,
+    );
+    return { next, isLeaf: false }; // isLeaf must be false since there's a dependency
+  }
+
+  // Otherwise, mark the step as complete and continue with the next steps
+  const { isLeaf, next } = await pipelineState.markCompleteAndGetNextSteps(
+    step,
+    vars,
+    pipelineContext,
+  );
+
+  // If it's not a leaf node, return the next steps
+  if (!isLeaf) {
+    return { next, isLeaf };
+  }
+
+  // If it's a leaf and there are virtual outputs, mark the virtual outputs as complete
+  if (pipelineContext.virtualOutputs.length > 0) {
+    const output = pipelineContext.history.at(-1)?.output;
+    const nextSteps: { step: NormalizedPipelineStep; context: PipelineContext }[] = [];
+    for (const virtualOutput of pipelineContext.virtualOutputs) {
+      const res = await pipelineState.markCompleteAndGetNextSteps(
+        { ...step, outputAs: virtualOutput },
+        {
+          // Only pass the virtual output, no other vars
+          [virtualOutput]: output ?? null,
+        },
+        {
+          history: [], // Don't pass the history, preserve the original step's context
+          vars: {
+            // Only pass the virtual output, no other vars
+            [virtualOutput]: output ?? null,
+          },
+          virtualOutputs: [], // Reset virtual outputs
+        },
+      );
+      nextSteps.push(...res.next);
+    }
+    return { next: nextSteps, isLeaf: false }; // TODO: merge isLeaf values?
+  }
+
+  // Otherwise it's a normal leaf node, pass it on
+  return { next, isLeaf };
 }
