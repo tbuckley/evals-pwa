@@ -1,6 +1,7 @@
 import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 import type {
   ExtractedOutputPart,
+  FunctionTool,
   ModelCache,
   ModelRunner,
   ModelSession,
@@ -147,14 +148,24 @@ export async function modelOutputToMultiPartPrompt(
   if (typeof testOutput === 'string') {
     return [{ text: testOutput }];
   }
-  return testOutput.filter(isStringOrFile).map((part) => {
+  return testOutput.filter(isStringOrFileOrFunctionTool).map((part) => {
     if (typeof part === 'string') {
       return { text: part };
     }
-    return { file: part.file };
+    if (part instanceof FileReference) {
+      return { file: part.file };
+    }
+    return part;
   });
 }
 
-function isStringOrFile(val: unknown): val is string | FileReference {
-  return typeof val === 'string' || val instanceof FileReference;
+function isStringOrFileOrFunctionTool(
+  val: NonNullable<TestResult['output']>[number],
+): val is string | FileReference | FunctionTool {
+  return (
+    typeof val === 'string' ||
+    val instanceof FileReference ||
+    val.type === 'function-call' ||
+    val.type === 'function-response'
+  );
 }

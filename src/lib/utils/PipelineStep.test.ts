@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { makeOrderedMerge, orderedMerge, PipelineState } from './PipelineEnvironment';
+import { PipelineState, type PipelineStep } from './PipelineState';
+import { makeOrderedMerge } from './orderedMerge';
 import { toCodeReference } from '$lib/storage/CodeReference';
 import dedent from 'dedent';
 
@@ -152,33 +153,87 @@ describe('PipelineState', () => {
       return new PipelineState([{ id: 'step-0' }, { id: 'step-0' }], defaultMerge);
     }).toThrow('Steps have duplicate IDs');
   });
-});
 
-describe('orderedMerge', () => {
-  test('merges two sorted arrays', {}, function () {
-    const a = [1, 3, 5];
-    const b = [2, 4, 6];
-    expect(orderedMerge(a, b, (a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6]);
+  test('allows for unregistered steps to be marked complete', {}, async function () {
+    const step0 = { id: 'step-0', outputAs: 'out0', deps: [] };
+    const step1 = { id: 'step-1', outputAs: 'out1', deps: ['out0'] };
+    const fnFoo = { id: 'fn-foo', outputAs: 'foo', deps: ['$fn:foo'] };
+    const pipeline = new PipelineState([step0, step1, fnFoo], defaultMerge);
+    expect(
+      await pipeline.markCompleteAndGetNextSteps(
+        { id: 'fake', outputAs: '$fn:foo', deps: [] },
+        {},
+        null,
+      ),
+    ).toEqual({
+      isLeaf: false,
+      next: [{ step: fnFoo, context: null }],
+    });
   });
 
-  test('removes initial duplicates', {}, function () {
-    const a = [1, 2, 3, 4];
-    const b = [1, 2, 5, 6];
-    expect(orderedMerge(a, b, (a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6]);
+  test('allow registering steps after initialization', {}, async function () {
+    const step0 = { id: 'step-0', outputAs: 'out0', deps: [] };
+    const step1 = { id: 'step-1', outputAs: 'out1', deps: ['out0'] };
+    const fnFoo = { id: 'fn-foo', outputAs: 'foo', deps: ['$fn:foo'] };
+    const pipeline = new PipelineState([step0, step1, fnFoo], defaultMerge);
+    expect(
+      await pipeline.markCompleteAndGetNextSteps(
+        { id: 'fake', outputAs: '$fn:foo', deps: [] },
+        {},
+        null,
+      ),
+    ).toEqual({
+      isLeaf: false,
+      next: [{ step: fnFoo, context: null }],
+    });
   });
 
-  test('is commutative', {}, function () {
-    const a = [1, 2, 3, 5];
-    const b = [1, 2, 4, 6];
-    expect(orderedMerge(a, b, (a, b) => a - b)).toEqual(orderedMerge(b, a, (a, b) => a - b));
-  });
+  test('allow delayed registration of steps, triggering same dependencies', {}, async function () {
+    const step0 = { id: 'step-0', outputAs: 'out0' };
+    const step1 = { id: 'step-1', outputAs: 'out1', deps: ['out0'] };
+    const pipeline = new PipelineState<PipelineStep, null>([step0, step1], defaultMerge);
 
-  test('is idempotent', {}, function () {
-    const a = [1, 2, 3, 5];
-    const b = [2, 3, 4, 6];
-    const mergeFn = (a: number, b: number) => a - b;
-    expect(orderedMerge(a, orderedMerge(a, b, mergeFn), mergeFn)).toEqual(
-      orderedMerge(a, b, mergeFn),
-    );
+    // Create a fake end step for step0
+    const delayedStep = { id: 'step-0-end', outputAs: step0.outputAs, deps: ['virtual-step'] };
+    pipeline.registerStep(delayedStep);
+
+    expect(
+      await pipeline.markCompleteAndGetNextSteps(
+        { id: 'vstep', outputAs: 'virtual-step' },
+        {},
+        null,
+      ),
+    ).toEqual({
+      isLeaf: false,
+      next: [{ step: delayedStep, context: null }],
+    });
+    expect(await pipeline.markCompleteAndGetNextSteps(delayedStep, {}, null)).toEqual({
+      isLeaf: false,
+      next: [{ step: step1, context: null }],
+    });
+  });
+  test('allow delayed registration of steps, triggering next ordered step', {}, async function () {
+    const step0 = { id: 'step-0', outputAs: 'out0' };
+    const step1 = { id: 'step-1', outputAs: 'out1' };
+    const pipeline = new PipelineState<PipelineStep, null>([step0, step1], defaultMerge);
+
+    // Create a fake end step for step0
+    const delayedStep = { id: 'step-0-end', outputAs: step0.outputAs, deps: ['virtual-step'] };
+    pipeline.registerStep(delayedStep, step0.id);
+
+    expect(
+      await pipeline.markCompleteAndGetNextSteps(
+        { id: 'vstep', outputAs: 'virtual-step' },
+        {},
+        null,
+      ),
+    ).toEqual({
+      isLeaf: false,
+      next: [{ step: delayedStep, context: null }],
+    });
+    expect(await pipeline.markCompleteAndGetNextSteps(delayedStep, {}, null)).toEqual({
+      isLeaf: false,
+      next: [{ step: step1, context: null }],
+    });
   });
 });
