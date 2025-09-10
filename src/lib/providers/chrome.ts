@@ -1,4 +1,10 @@
-import type { ConversationPrompt, ModelProvider, ModelUpdate, TokenUsage } from '$lib/types';
+import type {
+  ConversationPrompt,
+  ModelProvider,
+  ModelUpdate,
+  RunContext,
+  TokenUsage,
+} from '$lib/types';
 import { generator } from '$lib/utils/generator';
 import { conversationToSinglePrompt } from './legacyProvider';
 
@@ -20,15 +26,19 @@ interface CreateOptions {
   monitor?: (m: EventTarget) => void;
 }
 
+interface PromptOptions {
+  signal?: AbortSignal;
+}
+
 interface PromptSession {
-  prompt(prompt: string): Promise<string>;
-  promptStreaming(prompt: string): AsyncGenerator<string>;
+  prompt(prompt: string, options?: PromptOptions): Promise<string>;
+  promptStreaming(prompt: string, options?: PromptOptions): AsyncGenerator<string>;
 }
 
 export class ChromeProvider implements ModelProvider {
   readonly id = 'chrome:ai';
 
-  run(conversation: ConversationPrompt) {
+  run(conversation: ConversationPrompt, context: RunContext) {
     const prompt = conversationToSinglePrompt(conversation);
     const input = prompt.map((part) => ('text' in part ? part.text : '')).join('\n');
 
@@ -72,7 +82,7 @@ export class ChromeProvider implements ModelProvider {
         yield { type: 'replace', output: '' } as ModelUpdate;
 
         let reply = '';
-        for await (const chunk of session.promptStreaming(input)) {
+        for await (const chunk of session.promptStreaming(input, { signal: context.abortSignal })) {
           yield chunk;
           reply += chunk;
         }
