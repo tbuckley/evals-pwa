@@ -1,34 +1,24 @@
-import type { ConversationPrompt, ModelProvider, ModelUpdate, TokenUsage } from '$lib/types';
+import type {
+  ConversationPrompt,
+  ModelProvider,
+  ModelUpdate,
+  RunContext,
+  TokenUsage,
+} from '$lib/types';
 import { generator } from '$lib/utils/generator';
 import { conversationToSinglePrompt } from './legacyProvider';
 
 declare global {
-  interface Window {
-    // https://developer.chrome.com/docs/ai/prompt-api
-    LanguageModel?: {
-      availability?: () =>
-        | Promise<'no' | 'readily' | 'after-download'>
-        | 'no'
-        | 'readily'
-        | 'after-download';
-      create: (opts?: CreateOptions) => Promise<PromptSession>;
-    };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  interface ReadableStream<R = any> {
+    [Symbol.asyncIterator](): AsyncIterableIterator<R>;
   }
-}
-
-interface CreateOptions {
-  monitor?: (m: EventTarget) => void;
-}
-
-interface PromptSession {
-  prompt(prompt: string): Promise<string>;
-  promptStreaming(prompt: string): AsyncGenerator<string>;
 }
 
 export class ChromeProvider implements ModelProvider {
   readonly id = 'chrome:ai';
 
-  run(conversation: ConversationPrompt) {
+  run(conversation: ConversationPrompt, context: RunContext) {
     const prompt = conversationToSinglePrompt(conversation);
     const input = prompt.map((part) => ('text' in part ? part.text : '')).join('\n');
 
@@ -40,19 +30,19 @@ export class ChromeProvider implements ModelProvider {
       request,
       runModel: async function* () {
         yield '';
-        if (!window.LanguageModel) {
+        if (!('languageModel' in window)) {
           throw new Error('window.LanguageModel not supported in this browser');
         }
 
-        const availability = await window.LanguageModel.availability?.();
-        if (availability === 'no') {
+        const availability = await LanguageModel.availability();
+        if (availability === 'unavailable') {
           throw new Error('Language model is unavailable on this browser');
         }
         const progress = generator<ProgressEvent, null>();
-        const create = window.LanguageModel.create({
+        const create = LanguageModel.create({
           monitor(m) {
             m.addEventListener('downloadprogress', (e) => {
-              progress.yield(e as ProgressEvent);
+              progress.yield(e);
             });
           },
         }).then((session) => {
@@ -72,7 +62,9 @@ export class ChromeProvider implements ModelProvider {
         yield { type: 'replace', output: '' } as ModelUpdate;
 
         let reply = '';
-        for await (const chunk of session.promptStreaming(input)) {
+        for await (const chunk of session.promptStreaming(input, {
+          signal: context.abortSignal,
+        })) {
           yield chunk;
           reply += chunk;
         }
