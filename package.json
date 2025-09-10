@@ -49,6 +49,7 @@
     "@google/genai": "^1.13.0",
     "@mlc-ai/web-llm": "^0.2.68",
     "@sveltejs/adapter-static": "^3.0.5",
+    "@types/dom-chromium-ai": "^0.0.9",
     "@types/wicg-file-system-access": "^2023.10.5",
     "@vitest/browser": "^2.1.4",
     "clsx": "^2.1.1",
