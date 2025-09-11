@@ -6,9 +6,9 @@ import type {
   RunContext,
   TokenUsage,
 } from '$lib/types';
-import { assert } from '$lib/utils/asserts';
+import { cast } from '$lib/utils/asserts';
 import { generator } from '$lib/utils/generator';
-import { conversationToSinglePrompt } from './legacyProvider';
+import { fileToBase64 } from '$lib/utils/media';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -32,9 +32,7 @@ function convertContent(content: MultiPartPrompt): LanguageModelMessageContent[]
   });
 }
 
-export function convertConversation(
-  conversation: ConversationPrompt,
-): [LanguageModelSystemMessage, ...LanguageModelMessage[]] | LanguageModelMessage[] {
+function convertConversation(conversation: ConversationPrompt) {
   const systemPart = conversation.find((part) => part.role === 'system');
   const systemMessage: LanguageModelSystemMessage | null = systemPart
     ? {
@@ -53,7 +51,42 @@ export function convertConversation(
       } satisfies LanguageModelMessage;
     })
     .filter((m) => m !== null);
-  return systemMessage ? [systemMessage, ...messages] : messages;
+  return { systemMessage, messages };
+}
+
+async function createContentKey(content: string | LanguageModelMessageContent[]) {
+  if (Array.isArray(content)) {
+    return Promise.all(
+      content.map(async (part) => {
+        let value = part.value;
+        if (value instanceof File) {
+          value = await fileToBase64(value);
+        }
+        return {
+          type: part.type,
+          value,
+        };
+      }),
+    );
+  }
+  return content;
+}
+
+async function createKey(
+  systemMessage: LanguageModelSystemMessage | null,
+  messages: LanguageModelMessage[],
+) {
+  messages = await Promise.all(
+    messages.map(async (message) => ({
+      content: await createContentKey(message.content),
+      role: message.role,
+      prefix: message.prefix,
+    })),
+  );
+  return {
+    systemMessage,
+    messages,
+  };
 }
 
 export class ChromeProvider implements ModelProvider {
@@ -71,15 +104,16 @@ export class ChromeProvider implements ModelProvider {
     'audio/flac',
   ];
 
-  run(conversation: ConversationPrompt, context: RunContext) {
-    const initialPrompts = convertConversation(conversation);
-    const request = JSON.stringify(initialPrompts);
+  async run(conversation: ConversationPrompt, context: RunContext) {
+    const { systemMessage, messages } = convertConversation(conversation);
+    const request = await createKey(systemMessage, messages);
+    const prompt = cast(messages.pop());
 
     return {
       request,
       runModel: async function* () {
         yield '';
-        if (!('languageModel' in window)) {
+        if (!('LanguageModel' in window)) {
           throw new Error('window.LanguageModel not supported in this browser');
         }
 
@@ -87,12 +121,10 @@ export class ChromeProvider implements ModelProvider {
         if (availability === 'unavailable') {
           throw new Error('Language model is unavailable on this browser');
         }
-        const prompt = initialPrompts.pop();
-        assert(prompt && prompt.role !== 'system');
         const progress = generator<ProgressEvent, null>();
         const create = LanguageModel.create({
           expectedInputs: [{ type: 'text' }, { type: 'audio' }, { type: 'image' }],
-          initialPrompts,
+          initialPrompts: systemMessage ? [systemMessage, ...messages] : messages,
           monitor(m) {
             m.addEventListener('downloadprogress', (e) => {
               progress.yield(e);
