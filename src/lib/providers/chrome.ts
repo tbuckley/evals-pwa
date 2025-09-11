@@ -6,7 +6,6 @@ import type {
   RunContext,
   TokenUsage,
 } from '$lib/types';
-import { cast } from '$lib/utils/asserts';
 import { generator } from '$lib/utils/generator';
 import { fileToBase64 } from '$lib/utils/media';
 
@@ -34,12 +33,12 @@ function convertContent(content: MultiPartPrompt): LanguageModelMessageContent[]
 
 function convertConversation(conversation: ConversationPrompt) {
   const systemPart = conversation.find((part) => part.role === 'system');
-  const systemMessage: LanguageModelSystemMessage | null = systemPart
+  const systemMessage: LanguageModelSystemMessage | undefined = systemPart
     ? {
         role: 'system',
         content: convertContent(systemPart.content),
       }
-    : null;
+    : undefined;
   const messages = conversation
     .map((part) => {
       if (part.role === 'system') return null;
@@ -72,21 +71,21 @@ async function createContentKey(content: string | LanguageModelMessageContent[])
   return content;
 }
 
-async function createKey(
-  systemMessage: LanguageModelSystemMessage | null,
-  messages: LanguageModelMessage[],
-) {
+async function createKey(messages: (LanguageModelSystemMessage | LanguageModelMessage)[]) {
   messages = await Promise.all(
     messages.map(async (message) => ({
+      ...message,
       content: await createContentKey(message.content),
-      role: message.role,
-      prefix: message.prefix,
     })),
   );
   return {
-    systemMessage,
     messages,
   };
+}
+
+interface SessionState {
+  messages: (LanguageModelSystemMessage | LanguageModelMessage)[];
+  model: LanguageModel;
 }
 
 export class ChromeProvider implements ModelProvider {
@@ -105,55 +104,80 @@ export class ChromeProvider implements ModelProvider {
   ];
 
   async run(conversation: ConversationPrompt, context: RunContext) {
+    const state = context.session?.state as SessionState | undefined;
+    let model = state?.model;
+
     const { systemMessage, messages } = convertConversation(conversation);
-    const request = await createKey(systemMessage, messages);
-    const prompt = cast(messages.pop());
+    if (state && systemMessage) {
+      // TODO: support this, I think w would need to start a new `model` and
+      // populate initial messages.
+      throw new Error('Changing system message not implemented.');
+    }
+    const newState = {
+      model,
+      messages: [
+        ...(state?.messages ?? []),
+        ...(systemMessage ? [systemMessage] : []),
+        ...messages,
+      ],
+    };
+    const request = await createKey(newState.messages);
 
     return {
       request,
       runModel: async function* () {
         yield '';
-        if (!('LanguageModel' in window)) {
-          throw new Error('window.LanguageModel not supported in this browser');
-        }
+        if (!model) {
+          if (!('LanguageModel' in window)) {
+            throw new Error('window.LanguageModel not supported in this browser');
+          }
 
-        const availability = await LanguageModel.availability();
-        if (availability === 'unavailable') {
-          throw new Error('Language model is unavailable on this browser');
-        }
-        const progress = generator<ProgressEvent, null>();
-        const create = LanguageModel.create({
-          expectedInputs: [{ type: 'text' }, { type: 'audio' }, { type: 'image' }],
-          initialPrompts: systemMessage ? [systemMessage, ...messages] : messages,
-          monitor(m) {
-            m.addEventListener('downloadprogress', (e) => {
-              progress.yield(e);
-            });
-          },
-        }).then((session) => {
-          progress.return(null);
-          return session;
-        });
+          const availability = await LanguageModel.availability();
+          if (availability === 'unavailable') {
+            throw new Error('Language model is unavailable on this browser');
+          }
+          const progress = generator<ProgressEvent, null>();
+          const create = LanguageModel.create({
+            expectedInputs: [{ type: 'text' }, { type: 'audio' }, { type: 'image' }],
+            initialPrompts: systemMessage ? [systemMessage] : [],
+            monitor(m) {
+              m.addEventListener('downloadprogress', (e) => {
+                progress.yield(e);
+              });
+            },
+          }).then((session) => {
+            progress.return(null);
+            return session;
+          });
 
-        for await (const e of progress.generator) {
-          yield {
-            type: 'replace',
-            output: `Downloaded ${e.loaded} of ${e.total} bytes.`,
-          } as ModelUpdate;
-        }
+          for await (const e of progress.generator) {
+            yield {
+              type: 'replace',
+              output: `Downloaded ${e.loaded} of ${e.total} bytes.`,
+            } as ModelUpdate;
+          }
 
-        const session = await create;
+          model = await create;
+        }
 
         yield { type: 'replace', output: '' } as ModelUpdate;
 
         let reply = '';
-        for await (const chunk of session.promptStreaming([prompt], {
+        for await (const chunk of model.promptStreaming(messages, {
           signal: context.abortSignal,
         })) {
           yield chunk;
           reply += chunk;
         }
-        return { response: reply };
+        return {
+          response: reply,
+          session: {
+            state: {
+              ...newState,
+              model,
+            } satisfies SessionState,
+          },
+        };
       },
     };
   }
