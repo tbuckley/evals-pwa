@@ -134,7 +134,7 @@ const functionResponseSchema = z.object({
 export type FunctionCall = z.infer<typeof functionCallSchema>;
 export type FunctionResponse = z.infer<typeof functionResponseSchema>;
 export type FunctionTool = FunctionCall | FunctionResponse;
-const metaProviderOutputPartSchema = z.discriminatedUnion('type', [
+export const metaProviderOutputPartSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('meta'),
     title: z.string(),
