@@ -120,7 +120,21 @@ const tokenUsageSchema = z.object({
 });
 export type TokenUsage = z.infer<typeof tokenUsageSchema>;
 
-const metaProviderOutputPartSchema = z.discriminatedUnion('type', [
+const functionCallSchema = z.object({
+  type: z.literal('function-call'),
+  name: z.string(),
+  args: z.unknown(),
+  meta: z.unknown(),
+});
+const functionResponseSchema = z.object({
+  type: z.literal('function-response'),
+  call: z.string(),
+  response: z.unknown(),
+});
+export type FunctionCall = z.infer<typeof functionCallSchema>;
+export type FunctionResponse = z.infer<typeof functionResponseSchema>;
+export type FunctionTool = FunctionCall | FunctionResponse;
+export const metaProviderOutputPartSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('meta'),
     title: z.string(),
@@ -128,7 +142,8 @@ const metaProviderOutputPartSchema = z.discriminatedUnion('type', [
     message: z.string(),
     data: z.unknown().optional(),
   }),
-  // z.object({ type: z.literal('text'), text: z.string() }),
+  functionCallSchema,
+  functionResponseSchema,
 ]);
 export type MetaProviderOutputPart = z.infer<typeof metaProviderOutputPartSchema>;
 const providerOutputPartSchema = z.union([
@@ -218,7 +233,7 @@ export interface StorageProvider {
   ): Promise<void>;
 }
 
-export type PromptPart = { text: string } | { file: File };
+export type PromptPart = { text: string } | { file: File } | FunctionTool;
 export type MultiPartPrompt = PromptPart[];
 export interface RolePromptPart {
   role: 'user' | 'assistant' | 'system';
@@ -239,7 +254,7 @@ export type ModelUpdate =
       output: ProviderOutputPart;
       internalId?: string; // Unique ID for the update, used for history
     }
-  | { type: 'begin-stream' };
+  | { type: 'begin-stream'; internalId?: string };
 
 // A con
 export interface ModelSession {
