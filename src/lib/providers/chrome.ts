@@ -2,11 +2,13 @@ import type {
   ConversationPrompt,
   ModelProvider,
   ModelUpdate,
+  MultiPartPrompt,
   RunContext,
   TokenUsage,
 } from '$lib/types';
+import { cast } from '$lib/utils/asserts';
 import { generator } from '$lib/utils/generator';
-import { conversationToSinglePrompt } from './legacyProvider';
+import { fileToBase64 } from '$lib/utils/media';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,22 +17,103 @@ declare global {
   }
 }
 
+function convertContent(content: MultiPartPrompt): LanguageModelMessageContent[] {
+  return content.map((part) => {
+    if ('text' in part) {
+      return { type: 'text', value: part.text };
+    }
+
+    const file = part.file;
+    if (file.type.startsWith('image/') || file.type.startsWith('audio/')) {
+      return { type: 'image', value: file };
+    }
+
+    return { type: 'text', value: `[file:${file.name}]` } as LanguageModelMessageContent;
+  });
+}
+
+function convertConversation(conversation: ConversationPrompt) {
+  const systemPart = conversation.find((part) => part.role === 'system');
+  const systemMessage: LanguageModelSystemMessage | null = systemPart
+    ? {
+        role: 'system',
+        content: convertContent(systemPart.content),
+      }
+    : null;
+  const messages = conversation
+    .map((part) => {
+      if (part.role === 'system') return null;
+      const contents = convertContent(part.content);
+
+      return {
+        role: part.role === 'assistant' ? 'assistant' : 'user',
+        content: contents,
+      } satisfies LanguageModelMessage;
+    })
+    .filter((m) => m !== null);
+  return { systemMessage, messages };
+}
+
+async function createContentKey(content: string | LanguageModelMessageContent[]) {
+  if (Array.isArray(content)) {
+    return Promise.all(
+      content.map(async (part) => {
+        let value = part.value;
+        if (value instanceof File) {
+          value = await fileToBase64(value);
+        }
+        return {
+          type: part.type,
+          value,
+        };
+      }),
+    );
+  }
+  return content;
+}
+
+async function createKey(
+  systemMessage: LanguageModelSystemMessage | null,
+  messages: LanguageModelMessage[],
+) {
+  messages = await Promise.all(
+    messages.map(async (message) => ({
+      content: await createContentKey(message.content),
+      role: message.role,
+      prefix: message.prefix,
+    })),
+  );
+  return {
+    systemMessage,
+    messages,
+  };
+}
+
 export class ChromeProvider implements ModelProvider {
   readonly id = 'chrome:ai';
 
-  run(conversation: ConversationPrompt, context: RunContext) {
-    const prompt = conversationToSinglePrompt(conversation);
-    const input = prompt.map((part) => ('text' in part ? part.text : '')).join('\n');
+  mimeTypes = [
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+    'image/gif',
 
-    const request = {
-      input,
-    };
+    'audio/wav',
+    'audio/mp3',
+    'audio/ogg',
+    'audio/flac',
+  ];
+
+  async run(conversation: ConversationPrompt, context: RunContext) {
+    const { systemMessage, messages } = convertConversation(conversation);
+    const request = await createKey(systemMessage, messages);
+    const prompt = cast(messages.pop());
 
     return {
       request,
       runModel: async function* () {
         yield '';
-        if (!('languageModel' in window)) {
+        if (!('LanguageModel' in window)) {
           throw new Error('window.LanguageModel not supported in this browser');
         }
 
@@ -40,6 +123,8 @@ export class ChromeProvider implements ModelProvider {
         }
         const progress = generator<ProgressEvent, null>();
         const create = LanguageModel.create({
+          expectedInputs: [{ type: 'text' }, { type: 'audio' }, { type: 'image' }],
+          initialPrompts: systemMessage ? [systemMessage, ...messages] : messages,
           monitor(m) {
             m.addEventListener('downloadprogress', (e) => {
               progress.yield(e);
@@ -62,7 +147,7 @@ export class ChromeProvider implements ModelProvider {
         yield { type: 'replace', output: '' } as ModelUpdate;
 
         let reply = '';
-        for await (const chunk of session.promptStreaming(input, {
+        for await (const chunk of session.promptStreaming([prompt], {
           signal: context.abortSignal,
         })) {
           yield chunk;
