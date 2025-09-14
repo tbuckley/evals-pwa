@@ -144,7 +144,7 @@ describe('PipelineEnvironment', () => {
           },
           {
             id: 'step-1',
-            session: 'caller-2', // FIXME: need a dynamic session for this?
+            session: true,
             deps: ['$fn:foo'],
             prompt: `[
                 {"type": "function-call", "name": "bar", "args": {"val": "{{$args.val}} world"}}
@@ -198,5 +198,51 @@ describe('PipelineEnvironment', () => {
 
     expect(output.error).toBeUndefined();
     expect(output.output).toEqual(['{"result":["hello world!"]} the end']);
+  });
+
+  test('calls session-based functions with separate sessions', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'step-0',
+            session: 'caller',
+            prompt: `[
+                {"type": "function-call", "name": "foo", "args": {"val": "hello"}}
+            ]`,
+            outputAs: 'foo',
+          },
+          {
+            id: 'step-1',
+            session: 'caller-2',
+            prompt: `[
+                {"type": "function-call", "name": "foo", "args": {"val": "world"}}
+            ]`,
+            outputAs: 'bar',
+          },
+          {
+            id: 'step-2',
+            prompt: '{{foo}}{{bar}}',
+          },
+          {
+            id: 'fn-1',
+            session: true,
+            deps: ['$fn:foo'],
+            prompt: `[
+                {"type": "function-call", "name": "bar", "args": {"val": "{{$args.val}}..."}}
+            ]`,
+          },
+          {
+            id: 'fn-2',
+            deps: ['$fn:bar'],
+            prompt: '{{$args.val}}!',
+          },
+        ],
+      },
+      {},
+    );
+
+    expect(output.error).toBeUndefined();
+    expect(output.output).toEqual(['{"result":["hello...!"]}{"result":["world...!"]}']);
   });
 });

@@ -122,6 +122,23 @@ export class PipelineEnvironment implements TestEnvironment {
       stepRunCount.set(step.id, count + 1);
       const stepId = step.id + (count > 1 ? ` #${count}` : '');
 
+      const newPipelineVars = { ...pipelineContext.vars };
+
+      // Get the session ID
+      let sessionId: string | undefined;
+      if (typeof step.session === 'string') {
+        sessionId = step.session;
+      } else if (typeof step.session === 'boolean') {
+        // First, check if there is an existing session for this step
+        const sessionKey = `$session:${step.id}`;
+        if (typeof pipelineContext.vars[sessionKey] === 'string') {
+          sessionId = pipelineContext.vars[sessionKey];
+        } else {
+          sessionId = crypto.randomUUID();
+          newPipelineVars[sessionKey] = sessionId; // Pass to future steps
+        }
+      }
+
       const model = step.providerLabel
         ? this.models.labeled?.[step.providerLabel]
         : this.models.default;
@@ -143,8 +160,8 @@ export class PipelineEnvironment implements TestEnvironment {
       }
 
       // Run the prompt (or read from cache)
-      const session = step.session ? sessionManager.get(step.session) : undefined;
-      const sessionId = step.session;
+      const session = sessionId ? sessionManager.get(sessionId) : undefined;
+
       const { output, tokenUsage, latencyMillis, finished, response, errorResult } = await runModel(
         model,
         prompt,
@@ -207,7 +224,6 @@ export class PipelineEnvironment implements TestEnvironment {
       // Add the output to the vars, and remove any virtual vars
       // Use step.id for this history since it is only used for prompts/if
       const newHistory = [...pipelineContext.history, { id: step.id, prompt, output }];
-      const newPipelineVars = { ...pipelineContext.vars };
       if (step.outputAs && !delegateMarkCompleteToDependency) {
         newPipelineVars[step.outputAs] = output;
       }

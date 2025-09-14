@@ -36,7 +36,7 @@ export interface NormalizedPipelineStep {
   if?: string | CodeReference;
   deps?: string[];
   providerLabel?: string;
-  session?: string;
+  session?: string | boolean;
 }
 export interface NormalizedPipelinePrompt {
   $pipeline: NormalizedPipelineStep[];
