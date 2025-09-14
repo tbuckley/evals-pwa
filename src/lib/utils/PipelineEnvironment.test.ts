@@ -105,7 +105,7 @@ describe('PipelineEnvironment', () => {
     expect(output.error).toBeUndefined();
   });
 
-  test('handles function calls', {}, async function () {
+  test('handles function calls and parses JSON output', {}, async function () {
     const output = await runPipeline(
       {
         $pipeline: [
@@ -120,7 +120,7 @@ describe('PipelineEnvironment', () => {
           {
             id: 'step-1',
             deps: ['$fn:foo'],
-            prompt: '{{$args.val}}',
+            prompt: '{"out": "{{$args.val}}" }',
           },
         ],
       },
@@ -128,7 +128,7 @@ describe('PipelineEnvironment', () => {
     );
 
     expect(output.error).toBeUndefined();
-    expect(output.output).toEqual(['foo:{"result":["hello"]}foo:{"result":["world"]}']);
+    expect(output.output).toEqual(['{"out":"hello"}{"out":"world"}']);
   });
 
   test('handles nested function calls', {}, async function () {
@@ -161,7 +161,7 @@ describe('PipelineEnvironment', () => {
     );
 
     expect(output.error).toBeUndefined();
-    expect(output.output).toEqual(['foo:{"result":["bar:{\\"result\\":[\\"hello world!\\"]}"]}']);
+    expect(output.output).toEqual(['{"result":["hello world!"]}']);
   });
 
   test('support multi-step function without polluting pipeline vars', {}, async function () {
@@ -197,6 +197,6 @@ describe('PipelineEnvironment', () => {
     );
 
     expect(output.error).toBeUndefined();
-    expect(output.output).toEqual(['foo:{"result":["hello world!"]} the end']);
+    expect(output.output).toEqual(['{"result":["hello world!"]} the end']);
   });
 });

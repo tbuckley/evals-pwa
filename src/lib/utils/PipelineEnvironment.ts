@@ -560,11 +560,41 @@ function getFunctionResponses(context: PipelineContext, deps: string[]): Functio
     responses.push({
       type: 'function-response',
       call: calls[i].name,
-      response: { result: context.vars[callResults[i]] as unknown }, // FIXME: don't wrap
+      response: parseFunctionResponse(context.vars[callResults[i]]),
     });
   }
 
   return responses;
+}
+
+function parseFunctionResponse(val: unknown): Record<string, unknown> {
+  if (typeof val === 'object' && !Array.isArray(val) && val !== null) {
+    return val as Record<string, unknown>;
+  }
+  const stringVal = getOutputAsString(val);
+  if (stringVal) {
+    // Try parsing as JSON
+
+    try {
+      const parsed = JSON.parse(stringVal) as unknown;
+      if (typeof parsed === 'object' && !Array.isArray(parsed) && parsed !== null) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // pass
+    }
+  }
+
+  return { result: val };
+}
+function getOutputAsString(val: unknown): string | null {
+  if (typeof val === 'string') {
+    return val;
+  }
+  if (Array.isArray(val) && val.length === 1 && typeof val[0] === 'string') {
+    return val[0];
+  }
+  return null;
 }
 
 function renderPrompt(prompt: string, vars: VarSet, mimeTypes?: string[]) {

@@ -36,7 +36,7 @@ export class EchoProvider implements ModelProvider {
         return part.file;
       }
       if (part.type === 'function-response') {
-        return part.call + ':' + JSON.stringify(part.response ?? {});
+        return JSON.stringify(part.response ?? {});
       }
       throw new Error('Invalid Echo prompt, must only contain text and files');
     });
