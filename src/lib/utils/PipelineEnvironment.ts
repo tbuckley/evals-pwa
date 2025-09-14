@@ -92,6 +92,10 @@ export class PipelineEnvironment implements TestEnvironment {
     let result: TestOutput | undefined;
     const history: TestOutput['history'] = []; // NOTE: IDs must be unique for display
     const start = Date.now();
+    const spoofedSteps: Map<string, NormalizedPipelineStep> = new Map<
+      string,
+      NormalizedPipelineStep
+    >();
 
     const sessionManager = new Map<string, SessionState>();
 
@@ -176,12 +180,13 @@ export class PipelineEnvironment implements TestEnvironment {
         const virtualOutputs = generateFunctionCallVirtualOutputs(step, suffix, functionCalls);
 
         // Create a step spoofing this step that runs when all functions are complete
-        registerCompletionStep(
+        const completionStepId = registerCompletionStep(
           pipelineState,
           step,
           [...virtualOutputs, delegateMarkCompleteToDependency],
           suffix,
         );
+        spoofedSteps.set(completionStepId, step);
 
         // Run function calls
         await Promise.all(
@@ -220,7 +225,7 @@ export class PipelineEnvironment implements TestEnvironment {
 
       const { next, isLeaf } = await getNextSteps(
         pipelineState,
-        step,
+        spoofedSteps.get(step.id) ?? step,
         delegateMarkCompleteToDependency,
         {
           ...vars,
@@ -626,19 +631,17 @@ function registerCompletionStep(
   // Remove any previously appended IDs
   const prefix = step.id.split(':')[0];
   const id = `${prefix}:complete-${uuid}`;
-  pipelineState.registerStep(
-    {
-      id,
-      deps,
-      prompt: '', // FIXME: Make prompt optional
+  pipelineState.registerStep({
+    id,
+    deps,
+    prompt: '', // FIXME: Make prompt optional
 
-      // Inherit any model + post-prompt settings the original step
-      providerLabel: step.providerLabel,
-      session: step.session,
-      outputAs: step.outputAs,
-    },
-    step.id,
-  );
+    // Inherit any model + post-prompt settings the original step
+    providerLabel: step.providerLabel,
+    session: step.session,
+    outputAs: step.outputAs,
+  });
+  return id;
 }
 
 async function getNextSteps(

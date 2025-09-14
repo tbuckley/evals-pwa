@@ -219,7 +219,7 @@ describe('PipelineState', () => {
 
     // Create a fake end step for step0
     const delayedStep = { id: 'step-0-end', outputAs: step0.outputAs, deps: ['virtual-step'] };
-    pipeline.registerStep(delayedStep, step0.id);
+    pipeline.registerStep(delayedStep);
 
     expect(
       await pipeline.markCompleteAndGetNextSteps(
@@ -231,7 +231,8 @@ describe('PipelineState', () => {
       isLeaf: false,
       next: [{ step: delayedStep, context: null }],
     });
-    expect(await pipeline.markCompleteAndGetNextSteps(delayedStep, {}, null)).toEqual({
+    // Assume that the app will then map delayedStep to step0
+    expect(await pipeline.markCompleteAndGetNextSteps(step0, {}, null)).toEqual({
       isLeaf: false,
       next: [{ step: step1, context: null }],
     });

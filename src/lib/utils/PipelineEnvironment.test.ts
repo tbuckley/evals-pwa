@@ -130,4 +130,37 @@ describe('PipelineEnvironment', () => {
     expect(output.error).toBeUndefined();
     expect(output.output).toEqual(['foo:{"result":["hello"]}foo:{"result":["world"]}']);
   });
+
+  test('handles nested function calls', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'step-0',
+            session: 'caller',
+            prompt: `[
+                {"type": "function-call", "name": "foo", "args": {"val": "hello"}}
+            ]`,
+          },
+          {
+            id: 'step-1',
+            session: 'caller-2', // FIXME: need a dynamic session for this?
+            deps: ['$fn:foo'],
+            prompt: `[
+                {"type": "function-call", "name": "bar", "args": {"val": "{{$args.val}} world"}}
+            ]`,
+          },
+          {
+            id: 'step-2',
+            deps: ['$fn:bar'],
+            prompt: '{{$args.val}}!',
+          },
+        ],
+      },
+      {},
+    );
+
+    expect(output.error).toBeUndefined();
+    expect(output.output).toEqual(['foo:{"result":["bar:{\\"result\\":[\\"hello world!\\"]}"]}']);
+  });
 });
