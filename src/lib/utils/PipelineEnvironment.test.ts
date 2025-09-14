@@ -163,4 +163,40 @@ describe('PipelineEnvironment', () => {
     expect(output.error).toBeUndefined();
     expect(output.output).toEqual(['foo:{"result":["bar:{\\"result\\":[\\"hello world!\\"]}"]}']);
   });
+
+  test('support multi-step function without polluting pipeline vars', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'step-0',
+            session: 'caller',
+            prompt: `[
+                {"type": "function-call", "name": "foo", "args": {"val": "hello"}}
+            ]`,
+          },
+          {
+            id: 'step-1',
+            prompt: '{{$output}} {{bar}}',
+          },
+          {
+            id: 'fn-1',
+            deps: ['$fn:foo'],
+            prompt: '{{$args.val}} world',
+            outputAs: 'bar',
+          },
+          {
+            id: 'fn-2',
+            prompt: '{{bar}}!',
+          },
+        ],
+      },
+      {
+        bar: 'the end',
+      },
+    );
+
+    expect(output.error).toBeUndefined();
+    expect(output.output).toEqual(['foo:{"result":["hello world!"]} the end']);
+  });
 });
