@@ -648,13 +648,11 @@ async function generateVirtualFunctionCall(
       outputAs: `$fn:${part.name}`, // Must match dependency for function call
       prompt: '',
     },
-    // Pass global vars + $args for if-testing
-    // Skip pipeline vars, since functions should focus on their arguments
-    { ...globalVars, $args: part.args },
+    // Pass global vars + pipeline vars + $args for if-testing
+    stripFunctionCallResults({ ...globalVars, ...pipelineContext.vars, $args: part.args }),
     {
       ...pipelineContext,
       // Pass the current pipeline vars + $args
-      // FIXME: should we not pass pipelineContext vars here? Align with above
       vars: stripFunctionCallResults({ ...pipelineContext.vars, $args: part.args }),
       virtualOutputs: [virtualOutput],
     },
