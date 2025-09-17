@@ -1,24 +1,28 @@
-import { CodeReference, toCodeReference } from '$lib/storage/CodeReference';
 import { FileReference } from '$lib/storage/FileReference';
-import type {
-  TestEnvironment,
-  ModelProvider,
-  TestOutput,
-  VarSet,
-  RunContext,
-  ModelUpdate,
-  ConversationPrompt,
-  ModelCache,
-  NormalizedPipelineStep,
-  TestResult,
-  NormalizedPipelinePrompt,
-  TokenUsage,
-  ModelSession,
+import {
+  type TestEnvironment,
+  type ModelProvider,
+  type TestOutput,
+  type VarSet,
+  type RunContext,
+  type ModelUpdate,
+  type ConversationPrompt,
+  type ModelCache,
+  type NormalizedPipelineStep,
+  type TestResult,
+  type NormalizedPipelinePrompt,
+  type ModelSession,
+  type ProviderOutputPart,
+  type FunctionCall,
+  type FunctionResponse,
+  providerOutputSchema,
 } from '$lib/types';
 import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
 import { generator } from './generator';
 import { HandlebarsPromptFormatter } from './HandlebarsPromptFormatter';
+import { makeOrderedMerge } from './orderedMerge';
 import { ParallelTaskQueue } from './ParallelTaskQueue';
+import { PipelineState } from './PipelineState';
 
 export interface ModelConfig {
   default: ModelProvider | null;
@@ -40,6 +44,10 @@ export interface PipelineVars {
   $output: NonNullable<TestResult['output']> | null;
   $history: HistoryItem[];
   [key: string]: unknown;
+}
+interface SessionState {
+  session: ModelSession;
+  provider: ModelProvider;
 }
 
 export class PipelineEnvironment implements TestEnvironment {
@@ -85,8 +93,12 @@ export class PipelineEnvironment implements TestEnvironment {
     let result: TestOutput | undefined;
     const history: TestOutput['history'] = []; // NOTE: IDs must be unique for display
     const start = Date.now();
+    const spoofedSteps: Map<string, NormalizedPipelineStep> = new Map<
+      string,
+      NormalizedPipelineStep
+    >();
 
-    const sessionManager = new Map<string, { session: ModelSession; provider: ModelProvider }>();
+    const sessionManager = new Map<string, SessionState>();
 
     const safeRunStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
       const count = stepRunCount.get(step.id) ?? 1;
@@ -111,6 +123,23 @@ export class PipelineEnvironment implements TestEnvironment {
       stepRunCount.set(step.id, count + 1);
       const stepId = step.id + (count > 1 ? ` #${count}` : '');
 
+      const newPipelineVars = { ...pipelineContext.vars };
+
+      // Get the session ID
+      let sessionId: string | undefined;
+      if (typeof step.session === 'string') {
+        sessionId = step.session;
+      } else if (typeof step.session === 'boolean') {
+        // First, check if there is an existing session for this step
+        const sessionKey = `$session:${step.id}`;
+        if (typeof pipelineContext.vars[sessionKey] === 'string') {
+          sessionId = pipelineContext.vars[sessionKey];
+        } else {
+          sessionId = crypto.randomUUID();
+          newPipelineVars[sessionKey] = sessionId; // Pass to future steps
+        }
+      }
+
       const model = step.providerLabel
         ? this.models.labeled?.[step.providerLabel]
         : this.models.default;
@@ -118,96 +147,90 @@ export class PipelineEnvironment implements TestEnvironment {
         throw new Error(`Model for step ${step.id} not found`);
       }
 
-      // Render the prompt
-      const promptFormatter = new HandlebarsPromptFormatter(step.prompt);
-      const prompt = await promptFormatter.format(
-        {
-          ...vars,
-          ...pipelineContext.vars,
-          $history: pipelineContext.history,
-          $output: pipelineContext.history[pipelineContext.history.length - 1]?.output ?? null,
-        },
-        model.mimeTypes,
-      );
+      // Generate the prompt
+      let prompt: ConversationPrompt;
+      const functionResponses = getFunctionResponses(pipelineContext, step.deps ?? []);
+      if (functionResponses) {
+        prompt = [{ role: 'user', content: functionResponses }];
+      } else {
+        prompt = await renderPrompt(
+          step.prompt,
+          generatePipelineVars(vars, pipelineContext),
+          model.mimeTypes,
+        );
+      }
 
       // Run the prompt (or read from cache)
-      const existingSession = step.session ? sessionManager.get(step.session) : undefined;
-      const { request, runModel } = await model.run(prompt, {
-        ...context,
-        session: existingSession?.provider === model ? existingSession.session : undefined,
-      });
-      const cacheKey = {
-        provider: model.id,
-        request,
-        ...(context.cacheKey ?? {}),
-        // If re-running a step with the same prompt, use a different cache key?
-        ...(count > 1 ? { pipelineCount: count } : {}),
-        // TODO: If multiple steps share a prompt, use different cache keys
-      };
-      const generator = maybeUseCache(this.cache, cacheKey, runModel, model.requestSemaphore, {
-        requireSession: step.session !== undefined,
-      });
-      let nextRes = await generator.next();
-      while (!nextRes.done) {
-        const update = nextRes.value;
-        if (typeof update === 'string') {
-          modelUpdateGenerator.yield({ type: 'append', output: update, internalId: stepId });
-        } else if (update.type !== 'begin-stream') {
-          modelUpdateGenerator.yield({ ...update, internalId: stepId });
-        }
-        nextRes = await generator.next();
-      }
-      const { response, latencyMillis, session } = nextRes.value;
-      const finished = Date.now();
+      const session = sessionId ? sessionManager.get(sessionId) : undefined;
 
-      if (step.session) {
-        if (!session) {
-          throw new Error('Provider does not support sessions');
-        }
-        sessionManager.set(step.session, { session, provider: model });
-      } else {
-        await session?.close?.();
+      const { output, tokenUsage, latencyMillis, finished, response, errorResult } = await runModel(
+        model,
+        prompt,
+        this.cache,
+        session,
+        sessionId ? (value: SessionState) => sessionManager.set(sessionId, value) : undefined,
+        context,
+        count,
+        (value: ModelUpdate) => {
+          modelUpdateGenerator.yield({ ...value, internalId: stepId });
+        },
+      );
+      if (errorResult) {
+        history.push({ id: stepId, ...errorResult });
+        result = errorResult;
+        return;
       }
 
-      // Extract the output
-      let output: NonNullable<TestOutput['output']>;
-      let tokenUsage: TokenUsage;
-      try {
-        const rawOutput = await model.extractOutput(response);
-        output = await modelOutputToTestOutput(rawOutput);
-        tokenUsage = model.extractTokenUsage(response);
+      // Do not mark as completed, it will be delegated by a virtual step
+      let delegateMarkCompleteToDependency: string | null = null;
 
-        // Immediately yield the final output
-        if (typeof output === 'string') {
-          modelUpdateGenerator.yield({ type: 'replace', output, internalId: stepId });
-        } else {
-          modelUpdateGenerator.yield({ type: 'replace', output: '', internalId: stepId });
-          for (const part of output) {
-            modelUpdateGenerator.yield({ type: 'append', output: part, internalId: stepId });
-          }
-        }
-      } catch (e) {
-        if (e instanceof Error) {
-          result = {
-            rawPrompt: prompt,
-            rawOutput: response,
-            error: e.toString(),
-            latencyMillis,
-          };
-          history.push({ id: stepId, ...result });
-          return;
-        }
-        throw e;
+      const functionCalls = getFunctionCalls(output);
+      if (functionCalls.length > 0 && step.session !== undefined) {
+        // Create a unique suffix for virtual steps
+        // TODO: consider nanoid for shorter UUIDs
+        const suffix = crypto.randomUUID();
+
+        // Share the current pipeline context
+        const ctxDependency = `$ctx:${step.id}-${suffix}`;
+        delegateMarkCompleteToDependency = ctxDependency;
+
+        // Create virtual outputs for each function call
+        const virtualOutputs = generateFunctionCallVirtualOutputs(step, suffix, functionCalls);
+
+        // Create a step spoofing this step that runs when all functions are complete
+        const completionStepId = registerCompletionStep(
+          pipelineState,
+          step,
+          [...virtualOutputs, delegateMarkCompleteToDependency],
+          suffix,
+        );
+        spoofedSteps.set(completionStepId, step);
+
+        // Run function calls
+        await Promise.all(
+          functionCalls.map(async (part, index) => {
+            const virtualOutput = virtualOutputs[index];
+            const next = await generateVirtualFunctionCall(
+              pipelineState,
+              part,
+              virtualOutput,
+              vars,
+              pipelineContext,
+            );
+            taskQueue.enqueue(() => safeRunStep(next.step, next.context));
+          }),
+        );
       }
 
-      // Add the output to the vars
+      // Add the output to the vars, and remove any virtual vars
       // Use step.id for this history since it is only used for prompts/if
       const newHistory = [...pipelineContext.history, { id: step.id, prompt, output }];
-      const newVars = { ...pipelineContext.vars };
-      if (step.outputAs) {
-        newVars[step.outputAs] = output;
+      if (step.outputAs && !delegateMarkCompleteToDependency) {
+        newPipelineVars[step.outputAs] = stripOutputMetadata(output);
       }
+      stripFunctionCallResults(newPipelineVars);
 
+      // Save the step's result to history
       const stepResult: TestOutput = {
         rawPrompt: prompt,
         rawOutput: response,
@@ -217,18 +240,32 @@ export class PipelineEnvironment implements TestEnvironment {
       };
       history.push({ id: stepId, ...stepResult });
 
-      // Mark the step as complete and continue with the next steps
-      const { isLeaf, next } = await pipelineState.markCompleteAndGetNextSteps(
-        step,
+      const { next, isLeaf } = await getNextSteps(
+        pipelineState,
+        spoofedSteps.get(step.id) ?? step,
+        delegateMarkCompleteToDependency,
         {
           ...vars,
-          ...newVars,
+          ...newPipelineVars,
           $history: newHistory,
-          $output: newHistory[newHistory.length - 1]?.output ?? null,
+          $output: stripOutputMetadata(newHistory.at(-1)?.output ?? null),
         },
-        { history: newHistory, vars: newVars },
+
+        {
+          ...pipelineContext,
+          history: newHistory,
+          vars: newPipelineVars,
+        },
       );
-      if (isLeaf) {
+
+      if (next.length > 0) {
+        // Run the next steps
+        for (const { step, context } of next) {
+          console.log('enqueueing step', step.id);
+          taskQueue.enqueue(() => safeRunStep(step, context));
+        }
+      } else if (isLeaf) {
+        // This was a leaf node, so assume we're done
         // If this isn't the first result, return an error instead
         if (result !== undefined) {
           if (!result.error) {
@@ -249,6 +286,7 @@ export class PipelineEnvironment implements TestEnvironment {
           return;
         }
 
+        // Save the output as the final result
         result = {
           ...stepResult,
           history,
@@ -261,23 +299,21 @@ export class PipelineEnvironment implements TestEnvironment {
           },
         };
       }
-      for (const { step, context } of next) {
-        console.log('enqueueing step', step.id);
-        taskQueue.enqueue(() => safeRunStep(step, context));
-      }
+      // Otherwise it's not a leaf node but its dependencies require other steps to finish
+      // Do nothing
     };
 
     // Get the starting steps
     const startingSteps = await pipelineState.getStartingSteps(
       { ...vars, $history: [], $output: null },
-      { history: [], vars: {} },
+      { history: [], vars: {}, virtualOutputs: [] },
     );
     if (startingSteps.length === 0) {
       throw new Error('No valid starting steps found');
     }
 
     for (const step of startingSteps) {
-      taskQueue.enqueue(() => safeRunStep(step, { history: [], vars: {} }));
+      taskQueue.enqueue(() => safeRunStep(step, { history: [], vars: {}, virtualOutputs: [] }));
     }
 
     taskQueue
@@ -310,264 +346,6 @@ export class PipelineEnvironment implements TestEnvironment {
 
     return yield* modelUpdateGenerator.generator;
   }
-}
-
-export interface PipelineStep {
-  id: string;
-  deps?: string[];
-  if?: string | CodeReference;
-  outputAs?: string;
-}
-
-interface StepDepsStatus<S> {
-  steps: Map<string, S>;
-  originalSteps: string[];
-  outputs: Map<string, S>;
-  originalOutputs: string[];
-}
-
-function createStepDepsStatus<S>(stepIds: string[], outputs: string[]): StepDepsStatus<S> {
-  return {
-    steps: new Map(),
-    originalSteps: stepIds,
-    outputs: new Map(),
-    originalOutputs: outputs,
-  };
-}
-
-export class PipelineState<T extends PipelineStep, S> {
-  stepIdMap: Map<string, T> = new Map<string, T>();
-
-  stepDepsStatus: Map<string, StepDepsStatus<S>> = new Map<string, StepDepsStatus<S>>();
-  stepDepToIds: Map<string, string[]> = new Map<string, string[]>();
-  outputDepToIds: Map<string, string[]> = new Map<string, string[]>();
-
-  contextMerge: (a: S, b: S) => S;
-
-  constructor(steps: T[], contextMerge: (a: S, b: S) => S) {
-    this.contextMerge = contextMerge;
-
-    // Register step dependencies
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
-      if (!step.deps) {
-        // The first step becomes a starting state, other steps depend on the previous
-        const prevStepId = i > 0 ? [steps[i - 1].id] : [];
-        this.stepDepsStatus.set(step.id, createStepDepsStatus(prevStepId, []));
-        for (const dep of prevStepId) {
-          const ids = this.stepDepToIds.get(dep) ?? [];
-          ids.push(step.id);
-          this.stepDepToIds.set(dep, ids);
-        }
-      } else {
-        // Register deps as output dependencies
-        this.stepDepsStatus.set(step.id, createStepDepsStatus([], step.deps));
-        for (const dep of step.deps) {
-          const ids = this.outputDepToIds.get(dep) ?? [];
-          ids.push(step.id);
-          this.outputDepToIds.set(dep, ids);
-        }
-      }
-    }
-
-    // Validate that all steps have unique IDs
-    const uniqueIds = new Set(steps.map((step) => step.id));
-    if (uniqueIds.size !== steps.length) {
-      throw new Error('Steps have duplicate IDs');
-    }
-
-    this.stepIdMap = new Map<string, T>(steps.map((step) => [step.id, step]));
-  }
-
-  private getStepsWithNoDeps(): T[] {
-    return [...this.stepIdMap.values()].filter((step) => {
-      const deps = this.stepDepsStatus.get(step.id);
-      if (!deps) {
-        throw new Error(`Dependencies for step ${step.id} not found`);
-      }
-      return (
-        deps.steps.size === deps.originalSteps.length &&
-        deps.outputs.size === deps.originalOutputs.length
-      );
-    });
-  }
-
-  private async testStep(step: T, vars: VarSet): Promise<boolean> {
-    if (!step.if) {
-      return true;
-    }
-
-    // Evaluate the if statement
-    const code = await toCodeReference(step.if);
-    const execute = await code.bind();
-    const result = await execute(vars);
-    if (typeof result !== 'boolean') {
-      throw new Error(`Step ${step.id} if statement returned non-boolean`);
-    }
-    return result;
-  }
-
-  private markStepAsComplete(
-    stepId: string,
-    context: S,
-  ): { next: { step: T; context: S }[]; numDeps: number } {
-    const next: { step: T; context: S }[] = [];
-    let numDeps = 0;
-    this.stepDepToIds.get(stepId)?.forEach((id) => {
-      numDeps += 1;
-      const stepStatus = this.stepDepsStatus.get(id);
-      if (!stepStatus) {
-        throw new Error(`Dependencies for step ${id} not found`);
-      }
-      stepStatus.steps.set(stepId, context);
-      if (
-        stepStatus.steps.size === stepStatus.originalSteps.length &&
-        stepStatus.outputs.size === stepStatus.originalOutputs.length
-      ) {
-        const step = this.stepIdMap.get(id);
-        if (!step) {
-          throw new Error(`Step ${id} not found`);
-        }
-        const context = [...stepStatus.steps.values(), ...stepStatus.outputs.values()].reduce(
-          this.contextMerge,
-        );
-        next.push({ step, context });
-      }
-    });
-    return { next, numDeps };
-  }
-
-  private markOutputAsComplete(
-    outputAs: string,
-    context: S,
-  ): { next: { step: T; context: S }[]; numDeps: number } {
-    const next: { step: T; context: S }[] = [];
-    let numDeps = 0;
-    this.outputDepToIds.get(outputAs)?.forEach((id) => {
-      numDeps += 1;
-      const stepStatus = this.stepDepsStatus.get(id);
-      if (!stepStatus) {
-        throw new Error(`Dependencies for step ${id} not found`);
-      }
-      stepStatus.outputs.set(outputAs, context);
-      if (
-        stepStatus.steps.size === stepStatus.originalSteps.length &&
-        stepStatus.outputs.size === stepStatus.originalOutputs.length
-      ) {
-        const step = this.stepIdMap.get(id);
-        if (!step) {
-          throw new Error(`Step ${id} not found`);
-        }
-        const context = [...stepStatus.steps.values(), ...stepStatus.outputs.values()].reduce(
-          this.contextMerge,
-        );
-        next.push({ step, context });
-      }
-    });
-    return { next, numDeps };
-  }
-
-  async getStartingSteps(latestVars: VarSet, initialContext: S): Promise<T[]> {
-    // Include any steps that have no dependencies
-    const candidates = this.getStepsWithNoDeps();
-
-    // Include any steps triggered by the initial vars
-    for (const varName in latestVars) {
-      const res = this.markOutputAsComplete(varName, initialContext);
-      candidates.push(...res.next.map(({ step }) => step));
-    }
-
-    const validSteps = await Promise.all(
-      candidates.map(async (step) => ({
-        step,
-        valid: await this.testStep(step, latestVars),
-      })),
-    );
-    return validSteps.filter((result) => result.valid).map((result) => result.step);
-  }
-
-  async markCompleteAndGetNextSteps(
-    step: T,
-    latestVars: VarSet,
-    context: S,
-  ): Promise<{ isLeaf: boolean; next: { step: T; context: S }[] }> {
-    const nextSteps: { step: T; context: S }[] = [];
-    let numDeps = 0;
-
-    // Mark any dependencies on this step ID as complete
-    const res = this.markStepAsComplete(step.id, context);
-    nextSteps.push(...res.next);
-    numDeps += res.numDeps;
-
-    // Mark any dependencies on this step output as complete
-    if (step.outputAs) {
-      const res = this.markOutputAsComplete(step.outputAs, context);
-      nextSteps.push(...res.next);
-      numDeps += res.numDeps;
-    }
-
-    // Reset the statuses for any steps
-    nextSteps.forEach(({ step }) => {
-      const stepStatus = this.stepDepsStatus.get(step.id);
-      if (stepStatus) {
-        stepStatus.steps = new Map();
-        stepStatus.outputs = new Map();
-      }
-    });
-
-    // Check that all steps are available with if statements
-    const nextStepsValid = await Promise.all(
-      nextSteps.map(async (step) => ({
-        step,
-        valid: await this.testStep(step.step, latestVars),
-      })),
-    );
-    const availableSteps = nextStepsValid
-      .filter((result) => result.valid)
-      .map((result) => result.step);
-
-    const isLeaf = numDeps === 0 || (numDeps === nextSteps.length && availableSteps.length === 0);
-
-    return { isLeaf, next: availableSteps };
-  }
-}
-
-export function makeOrderedMerge<T>(cmp: (a: T, b: T) => number) {
-  return (a: T[], b: T[]) => orderedMerge(a, b, cmp);
-}
-
-export function orderedMerge<T>(a: T[], b: T[], cmp: (a: T, b: T) => number): T[] {
-  // merge(a, b) == merge(b, a) == merge(a, merge(a, b))
-  // ABC + ABD -> ABCD
-  // ABCD + ABD -> ABCD
-
-  const merged: T[] = [];
-
-  let ai = 0;
-  let bi = 0;
-  while (ai < a.length && bi < b.length) {
-    const result = cmp(a[ai], b[bi]);
-    if (result === 0) {
-      // Identical, add just one
-      merged.push(a[ai]);
-      ai++;
-      bi++;
-    } else if (result < 0) {
-      // a is less than b, add a
-      merged.push(a[ai]);
-      ai++;
-    } else {
-      // b is less than a, add b
-      merged.push(b[bi]);
-      bi++;
-    }
-  }
-
-  // Add any remaining items
-  merged.push(...a.slice(ai));
-  merged.push(...b.slice(bi));
-
-  return merged;
 }
 
 // This just needs some way to consistently compare history items, or return 0 if identical
@@ -665,10 +443,318 @@ const historyMergeFn = makeOrderedMerge<HistoryItem>(function (a, b) {
 interface PipelineContext {
   history: HistoryItem[];
   vars: VarSet;
+  virtualOutputs: string[]; // Virtual steps to mark as complete when the pipeline ends
 }
 function mergePipelineContext(a: PipelineContext, b: PipelineContext): PipelineContext {
   return {
     history: historyMergeFn(a.history, b.history),
     vars: { ...a.vars, ...b.vars },
+    virtualOutputs: [...a.virtualOutputs, ...b.virtualOutputs],
   };
+}
+
+function isFunctionCall(part: ProviderOutputPart): part is FunctionCall {
+  return typeof part === 'object' && 'type' in part && part.type === 'function-call';
+}
+
+function stripFunctionCallResults(vars: VarSet) {
+  for (const key of Object.keys(vars)) {
+    if (key.startsWith('$call:')) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete vars[key];
+    }
+  }
+  return vars;
+}
+
+async function runModel(
+  model: ModelProvider,
+  prompt: ConversationPrompt,
+  cache: ModelCache | undefined,
+  session: SessionState | undefined,
+  setSession: ((value: SessionState) => void) | undefined,
+  context: RunContext,
+  count: number,
+  yieldUpdate: (value: ModelUpdate) => void,
+) {
+  const { request, runModel } = await model.run(prompt, {
+    ...context,
+    session: session?.provider === model ? session.session : undefined,
+  });
+  const cacheKey = {
+    provider: model.id,
+    request,
+    ...(context.cacheKey ?? {}),
+    // If re-running a step with the same prompt, use a different cache key?
+    ...(count > 1 ? { pipelineCount: count } : {}),
+    // TODO: If multiple steps share a prompt, use different cache keys
+  };
+  const generator = maybeUseCache(cache, cacheKey, runModel, model.requestSemaphore, {
+    requireSession: setSession !== undefined, // If setSession is defined, we expect a session
+  });
+  let nextRes = await generator.next();
+  while (!nextRes.done) {
+    const update = nextRes.value;
+    if (typeof update === 'string') {
+      yieldUpdate({ type: 'append', output: update });
+    } else if (update.type !== 'begin-stream') {
+      yieldUpdate(update);
+    }
+    nextRes = await generator.next();
+  }
+  const { response, latencyMillis, session: resSession } = nextRes.value;
+  const finished = Date.now();
+
+  if (setSession) {
+    if (!resSession) {
+      throw new Error('Provider does not support sessions');
+    }
+    setSession({ session: resSession, provider: model });
+  } else {
+    await resSession?.close?.();
+  }
+
+  try {
+    // Extract the output
+    const rawOutput = await model.extractOutput(response);
+    const output = await modelOutputToTestOutput(rawOutput);
+    const tokenUsage = model.extractTokenUsage(response);
+
+    // Immediately yield the final output
+    if (typeof output === 'string') {
+      yieldUpdate({ type: 'replace', output });
+    } else {
+      yieldUpdate({ type: 'replace', output: '' });
+      for (const part of output) {
+        yieldUpdate({ type: 'append', output: part });
+      }
+    }
+
+    return { output, tokenUsage, latencyMillis, finished, response };
+  } catch (e) {
+    if (e instanceof Error) {
+      return {
+        errorResult: {
+          rawPrompt: prompt,
+          rawOutput: response,
+          error: e.toString(),
+          latencyMillis,
+        },
+      };
+    }
+    throw e;
+  }
+}
+
+function getFunctionCalls(output: NonNullable<TestResult['output']>): FunctionCall[] {
+  if (typeof output === 'string') {
+    return [];
+  }
+  return output.filter((o) => isFunctionCall(o));
+}
+
+function getFunctionResponses(context: PipelineContext, deps: string[]): FunctionResponse[] | null {
+  if (!Object.keys(context.vars).some((v) => v.startsWith('$call:'))) {
+    return null;
+  }
+
+  // Get the calls from the previous output
+  const prevOutput = context.history.at(-1)?.output;
+  if (!prevOutput || !Array.isArray(prevOutput)) {
+    throw new Error('Received function responses, but previous output is not an array');
+  }
+  const calls = prevOutput.filter((o) => isFunctionCall(o));
+
+  // Get the corresponding results
+  const callResults = deps.filter((d) => d.startsWith('$call:'));
+  if (calls.length !== callResults.length) {
+    throw new Error('Function call results and call dependencies do not match');
+  }
+
+  // Create the responses
+  const responses: FunctionResponse[] = [];
+  for (let i = 0; i < calls.length; i++) {
+    responses.push({
+      type: 'function-response',
+      call: calls[i].name,
+      response: parseFunctionResponse(stripOutputMetadata(context.vars[callResults[i]])),
+    });
+  }
+
+  return responses;
+}
+
+function parseFunctionResponse(val: unknown): unknown {
+  // If it's a string-like output, try parsing as JSON
+  const stringVal = getOutputAsString(val);
+  if (stringVal) {
+    try {
+      const parsed = JSON.parse(stringVal) as unknown;
+      return parsed;
+    } catch {
+      return stringVal;
+    }
+  }
+
+  // Otherwise just return the object
+  return val;
+}
+function getOutputAsString(val: unknown): string | null {
+  if (typeof val === 'string') {
+    return val;
+  }
+  if (Array.isArray(val) && val.length === 1 && typeof val[0] === 'string') {
+    return val[0];
+  }
+  return null;
+}
+function stripOutputMetadata(val: unknown): unknown {
+  // Get only string/file parts, ignoring function calls/responses and metadata
+  const parsed = providerOutputSchema.safeParse(val);
+  if (!parsed.success) {
+    return val;
+  }
+  if (!Array.isArray(parsed.data)) {
+    return parsed.data;
+  }
+  return parsed.data.filter((p) => {
+    return typeof p === 'string' || p instanceof FileReference;
+  });
+}
+
+function renderPrompt(prompt: string, vars: VarSet, mimeTypes?: string[]) {
+  const promptFormatter = new HandlebarsPromptFormatter(prompt);
+  return promptFormatter.format(vars, mimeTypes);
+}
+
+function generatePipelineVars(vars: VarSet, pipelineContext: PipelineContext) {
+  return {
+    ...vars,
+    ...pipelineContext.vars,
+    $history: pipelineContext.history,
+    $output: stripOutputMetadata(pipelineContext.history.at(-1)?.output ?? null),
+  };
+}
+
+function generateFunctionCallVirtualOutputs(
+  step: NormalizedPipelineStep,
+  uuid: string,
+  calls: FunctionCall[],
+): string[] {
+  return calls.map((part, index) => `$call:${step.id}-fn-${index}-${part.name}-${uuid}`);
+}
+
+async function generateVirtualFunctionCall(
+  pipelineState: PipelineState<NormalizedPipelineStep, PipelineContext>,
+  part: FunctionCall,
+  virtualOutput: string,
+  globalVars: VarSet,
+  pipelineContext: PipelineContext,
+) {
+  const { next } = await pipelineState.markCompleteAndGetNextSteps(
+    {
+      id: virtualOutput, // Doesn't really matter, just should not match a real step ID
+      outputAs: `$fn:${part.name}`, // Must match dependency for function call
+      prompt: '',
+    },
+    // Pass global vars + pipeline vars + $args for if-testing
+    stripFunctionCallResults({ ...globalVars, ...pipelineContext.vars, $args: part.args }),
+    {
+      ...pipelineContext,
+      // Pass the current pipeline vars + $args
+      vars: stripFunctionCallResults({ ...pipelineContext.vars, $args: part.args }),
+      virtualOutputs: [virtualOutput],
+    },
+  );
+  if (next.length === 0) {
+    throw new Error(`no step found for function call ${part.name}`);
+  }
+  if (next.length > 1) {
+    throw new Error(`multiple steps found for function call ${part.name}`);
+  }
+  return next[0];
+}
+
+function registerCompletionStep(
+  pipelineState: PipelineState<NormalizedPipelineStep, PipelineContext>,
+  step: NormalizedPipelineStep,
+  deps: string[],
+  uuid: string,
+) {
+  // Remove any previously appended IDs
+  const prefix = step.id.split(':')[0];
+  const id = `${prefix}:complete-${uuid}`;
+  pipelineState.registerStep({
+    id,
+    deps,
+    prompt: '', // FIXME: Make prompt optional
+
+    // Inherit any model + post-prompt settings the original step
+    providerLabel: step.providerLabel,
+    session: step.session,
+    outputAs: step.outputAs,
+  });
+  return id;
+}
+
+async function getNextSteps(
+  pipelineState: PipelineState<NormalizedPipelineStep, PipelineContext>,
+  step: NormalizedPipelineStep,
+  delegateMarkCompleteToDependency: string | null,
+  vars: VarSet,
+  pipelineContext: PipelineContext,
+) {
+  // If we should delegate step completion to a dependency, just pass our current context
+  if (delegateMarkCompleteToDependency) {
+    const { next } = await pipelineState.markCompleteAndGetNextSteps(
+      {
+        id: delegateMarkCompleteToDependency,
+        prompt: '', // FIXME: Make prompt optional
+        outputAs: delegateMarkCompleteToDependency,
+      },
+      vars,
+      pipelineContext,
+    );
+    return { next, isLeaf: false }; // isLeaf must be false since there's a dependency
+  }
+
+  // Otherwise, mark the step as complete and continue with the next steps
+  const { isLeaf, next } = await pipelineState.markCompleteAndGetNextSteps(
+    step,
+    vars,
+    pipelineContext,
+  );
+
+  // If it's not a leaf node, return the next steps
+  if (!isLeaf) {
+    return { next, isLeaf };
+  }
+
+  // If it's a leaf and there are virtual outputs, mark the virtual outputs as complete
+  if (pipelineContext.virtualOutputs.length > 0) {
+    const output = pipelineContext.history.at(-1)?.output;
+    const nextSteps: { step: NormalizedPipelineStep; context: PipelineContext }[] = [];
+    for (const virtualOutput of pipelineContext.virtualOutputs) {
+      const res = await pipelineState.markCompleteAndGetNextSteps(
+        { ...step, outputAs: virtualOutput },
+        {
+          // Only pass the virtual output, no other vars
+          [virtualOutput]: output ?? null,
+        },
+        {
+          history: [], // Don't pass the history, preserve the original step's context
+          vars: {
+            // Only pass the virtual output, no other vars
+            [virtualOutput]: output ?? null,
+          },
+          virtualOutputs: [], // Reset virtual outputs
+        },
+      );
+      nextSteps.push(...res.next);
+    }
+    return { next: nextSteps, isLeaf: false }; // TODO: merge isLeaf values?
+  }
+
+  // Otherwise it's a normal leaf node, pass it on
+  return { next, isLeaf };
 }

@@ -51,7 +51,7 @@ export const fsPipelinePromptSchema = z
           outputAs: z.string().optional(),
           if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
           deps: z.array(z.string()).optional(),
-          session: z.string().optional(),
+          session: z.union([z.string(), z.boolean()]).optional(),
         }),
       ]),
     ),

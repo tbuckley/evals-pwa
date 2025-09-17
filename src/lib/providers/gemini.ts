@@ -324,18 +324,17 @@ export class GeminiProvider implements ModelProvider {
       }
       if ('functionCall' in part) {
         return {
-          type: 'meta',
-          title: 'Function Call',
-          icon: 'code',
-          message: JSON.stringify(part.functionCall, null, 2),
+          type: 'function-call',
+          name: part.functionCall.name,
+          args: part.functionCall.args,
+          meta: null,
         };
       }
       if ('functionResponse' in part) {
         return {
-          type: 'meta',
-          title: 'Function Response',
-          icon: 'code',
-          message: JSON.stringify(part.functionResponse, null, 2),
+          type: 'function-response',
+          call: part.functionResponse.name,
+          response: part.functionResponse.response,
         };
       }
       return {
@@ -511,9 +510,31 @@ async function multiPartPromptToGemini(prompt: MultiPartPrompt): Promise<Part[]>
           data: b64.slice(firstComma + 1),
         },
       });
+    } else if (part.type === 'function-call') {
+      parts.push({
+        functionCall: {
+          name: part.name,
+          args: part.args as Record<string, unknown>,
+        },
+      });
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    } else if (part.type === 'function-response') {
+      parts.push({
+        functionResponse: {
+          name: part.call,
+          response: maybeWrapFunctionResponse(part.response),
+        },
+      });
     } else {
       throw new Error('Unsupported part type');
     }
   }
   return parts;
+}
+
+function maybeWrapFunctionResponse(val: unknown): Record<string, unknown> {
+  if (typeof val === 'object' && !Array.isArray(val) && val !== null) {
+    return val as Record<string, unknown>;
+  }
+  return { result: val };
 }

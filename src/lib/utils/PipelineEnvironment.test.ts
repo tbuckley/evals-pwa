@@ -1,184 +1,255 @@
 import { describe, test, expect } from 'vitest';
-import { makeOrderedMerge, orderedMerge, PipelineState } from './PipelineEnvironment';
-import { toCodeReference } from '$lib/storage/CodeReference';
-import dedent from 'dedent';
+import { PipelineEnvironment } from './PipelineEnvironment';
+import { EchoProvider } from '$lib/providers/echo';
+import type { NormalizedPipelinePrompt, VarSet } from '$lib/types';
 
-function defaultMerge<T>(a: T, _b: T) {
-  return a;
+async function runPipeline(pipeline: NormalizedPipelinePrompt, vars: VarSet) {
+  const env = new PipelineEnvironment({
+    models: {
+      default: new EchoProvider('echo'),
+    },
+    pipeline,
+  });
+
+  const abortController = new AbortController();
+  const generator = env.run(vars, { abortSignal: abortController.signal });
+
+  let next = await generator.next();
+  while (!next.done) {
+    next = await generator.next();
+  }
+  return next.value;
 }
 
-describe('PipelineState', () => {
-  test('starts with the first step if no deps', {}, async function () {
-    const pipeline = new PipelineState(
-      [{ id: 'step-0' }, { id: 'step-1' }, { id: 'step-2' }],
-      defaultMerge,
+const finishMeta = {
+  type: 'meta',
+  title: 'Finish Reason',
+  icon: 'other',
+  message: 'SUCCESS',
+};
+
+describe('PipelineEnvironment', () => {
+  test('handles multiple step pipelines', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          { id: 'step-0', prompt: 'Hello {{target}}' },
+          { id: 'step-1', prompt: '{{$output}}!' },
+          { id: 'step-2', prompt: '{{$output}} Hi {{target}}.' },
+        ],
+      },
+      { target: 'world' },
     );
-    expect(await pipeline.getStartingSteps({}, null)).toEqual([{ id: 'step-0' }]);
+
+    expect(output.output).toEqual(['Hello world! Hi world.', finishMeta]);
+    expect(output.error).toBeUndefined();
   });
 
-  test('starts with any step with no deps', {}, async function () {
-    const step0 = { id: 'step-0', deps: ['out1', 'out2'] };
-    const step1 = { id: 'step-1', outputAs: 'out1', deps: [] };
-    const step2 = { id: 'step-2', outputAs: 'out2', deps: [] };
-    const pipeline = new PipelineState([step0, step1, step2], defaultMerge);
-    expect(await pipeline.getStartingSteps({}, null)).toEqual([step1, step2]);
-  });
-
-  test('starts with any step where all deps are satisfied', {}, async function () {
-    const step0 = { id: 'step-0', deps: [] };
-    const step1 = { id: 'step-1', outputAs: 'out1', deps: ['foo'] };
-    const step2 = { id: 'step-2', outputAs: 'out2', deps: ['out1', 'out2'] };
-    const pipeline = new PipelineState([step0, step1, step2], defaultMerge);
-    expect(await pipeline.getStartingSteps({ foo: 'bar' }, null)).toEqual([step0, step1]);
-  });
-
-  test('starts with any step with no deps and valid if statement', {}, async function () {
-    const ifFooBar = await toCodeReference(dedent`
-        function execute(vars) {
-            return vars.foo === 'bar';
-        }
-    `);
-    const ifFooBaz = await toCodeReference(dedent`
-        function execute(vars) {
-            return vars.foo === 'baz';
-        }
-    `);
-    const step0 = { id: 'step-0', deps: ['out1', 'out2'] };
-    const step1 = { id: 'step-1', if: ifFooBar, outputAs: 'out1', deps: [] };
-    const step2 = { id: 'step-2', if: ifFooBaz, outputAs: 'out2', deps: [] };
-    const pipeline = new PipelineState([step0, step1, step2], defaultMerge);
-
-    expect(await pipeline.getStartingSteps({ foo: 'bar' }, null)).toEqual([step1]);
-    expect(await pipeline.getStartingSteps({ foo: 'baz' }, null)).toEqual([step2]);
-  });
-
-  test('goes through steps in order if no deps', {}, async function () {
-    const pipeline = new PipelineState(
-      [{ id: 'first' }, { id: 'second' }, { id: 'third' }],
-      defaultMerge,
+  test('handles parallel steps', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          { id: 'step-0', deps: [], prompt: 'A={{a}}', outputAs: 'a_' },
+          { id: 'step-1', deps: [], prompt: 'B={{b}}', outputAs: 'b_' },
+          { id: 'step-2', deps: ['a_', 'b_'], prompt: 'C={{a_}} + {{b_}}' },
+        ],
+      },
+      { a: 'foo', b: 'bar' },
     );
-    expect(await pipeline.getStartingSteps({}, null)).toEqual([{ id: 'first' }]);
-    expect(await pipeline.markCompleteAndGetNextSteps({ id: 'first' }, {}, null)).toEqual({
-      isLeaf: false,
-      next: [{ step: { id: 'second' }, context: null }],
-    });
-    expect(await pipeline.markCompleteAndGetNextSteps({ id: 'second' }, {}, null)).toEqual({
-      isLeaf: false,
-      next: [{ step: { id: 'third' }, context: null }],
-    });
-    expect(await pipeline.markCompleteAndGetNextSteps({ id: 'third' }, {}, null)).toEqual({
-      isLeaf: true,
-      next: [],
-    });
+
+    expect(output.output).toEqual(['C=A=foo + B=bar', finishMeta]);
+    expect(output.error).toBeUndefined();
   });
 
-  test('steps with multiple deps wait for them to complete', {}, async function () {
-    const step0 = { id: 'step-0', deps: ['out1', 'out2'] };
-    const step1 = { id: 'step-1', outputAs: 'out1', deps: [] };
-    const step2 = { id: 'step-2', outputAs: 'out2', deps: [] };
-    const pipeline = new PipelineState([step0, step1, step2], defaultMerge);
-
-    expect(await pipeline.markCompleteAndGetNextSteps(step1, {}, null)).toEqual({
-      isLeaf: false,
-      next: [],
-    });
-    expect(await pipeline.markCompleteAndGetNextSteps(step2, {}, null)).toEqual({
-      isLeaf: false,
-      next: [{ step: step0, context: null }],
-    });
-    expect(await pipeline.markCompleteAndGetNextSteps(step0, {}, null)).toEqual({
-      isLeaf: true,
-      next: [],
-    });
-  });
-
-  test('exits loops', {}, async function () {
-    const code = await toCodeReference(dedent`
-        function execute(vars) {
-            return vars.steps < 3;
-        }
-    `);
-    const step0 = { id: 'step-0', outputAs: 'out0' };
-    const step1 = { id: 'step-1', if: code, outputAs: 'out0', deps: ['out0'] };
-    const pipeline = new PipelineState([step0, step1], defaultMerge);
-
-    expect(await pipeline.markCompleteAndGetNextSteps(step0, { steps: 0 }, null)).toEqual({
-      isLeaf: false,
-      next: [{ step: step1, context: null }],
-    });
-    expect(await pipeline.markCompleteAndGetNextSteps(step1, { steps: 1 }, null)).toEqual({
-      isLeaf: false,
-      next: [{ step: step1, context: null }],
-    });
-    expect(await pipeline.markCompleteAndGetNextSteps(step1, { steps: 2 }, null)).toEqual({
-      isLeaf: false,
-      next: [{ step: step1, context: null }],
-    });
-    expect(await pipeline.markCompleteAndGetNextSteps(step1, { steps: 3 }, null)).toEqual({
-      isLeaf: true,
-      next: [],
-    });
-  });
-
-  test(
-    'remembers only the final context for a dependency before triggering a step',
-    {},
-    async function () {
-      const step0 = { id: 'step-0', outputAs: 'out0', deps: [] };
-      const step1 = { id: 'step-1', outputAs: 'out1', deps: [] };
-      const step2 = { id: 'step-2', deps: ['out0', 'out1'] };
-      const pipeline = new PipelineState(
-        [step0, step1, step2],
-        makeOrderedMerge<number>((a, b) => a - b),
-      );
-
-      expect(await pipeline.markCompleteAndGetNextSteps(step0, {}, [1])).toEqual({
-        isLeaf: false,
-        next: [],
-      });
-      expect(await pipeline.markCompleteAndGetNextSteps(step0, {}, [2])).toEqual({
-        isLeaf: false,
-        next: [],
-      });
-      expect(await pipeline.markCompleteAndGetNextSteps(step1, {}, [3])).toEqual({
-        isLeaf: false,
-        next: [{ step: step2, context: [2, 3] }],
-      });
-    },
-  );
-
-  test('throws an error if steps have duplicate IDs', {}, function () {
-    expect(function () {
-      return new PipelineState([{ id: 'step-0' }, { id: 'step-0' }], defaultMerge);
-    }).toThrow('Steps have duplicate IDs');
-  });
-});
-
-describe('orderedMerge', () => {
-  test('merges two sorted arrays', {}, function () {
-    const a = [1, 3, 5];
-    const b = [2, 4, 6];
-    expect(orderedMerge(a, b, (a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6]);
-  });
-
-  test('removes initial duplicates', {}, function () {
-    const a = [1, 2, 3, 4];
-    const b = [1, 2, 5, 6];
-    expect(orderedMerge(a, b, (a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6]);
-  });
-
-  test('is commutative', {}, function () {
-    const a = [1, 2, 3, 5];
-    const b = [1, 2, 4, 6];
-    expect(orderedMerge(a, b, (a, b) => a - b)).toEqual(orderedMerge(b, a, (a, b) => a - b));
-  });
-
-  test('is idempotent', {}, function () {
-    const a = [1, 2, 3, 5];
-    const b = [2, 3, 4, 6];
-    const mergeFn = (a: number, b: number) => a - b;
-    expect(orderedMerge(a, orderedMerge(a, b, mergeFn), mergeFn)).toEqual(
-      orderedMerge(a, b, mergeFn),
+  test('handles loops', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'step-0',
+            deps: ['b'],
+            if: 'function execute(vars) {return vars.b?.[0]?.length < 5;}',
+            prompt: '{{b}}A',
+            outputAs: 'a',
+          },
+          { id: 'step-1', deps: ['a'], prompt: '{{a}}B', outputAs: 'b' },
+        ],
+      },
+      { a: '>' },
     );
+
+    expect(output.output).toEqual(['>BABAB', finishMeta]);
+    expect(output.error).toBeUndefined();
+  });
+
+  test('handles sessions', {}, async function () {
+    const output = await runPipeline(
+      {
+        // A: (0) >A - (2) >A>ABA - (4) >A>ABA>AB>A>ABABA
+        // B: (1) >AB - (3) >AB>A>ABAB - (5) >AB>A>ABAB>A>ABA>AB>A>ABABAB
+        $pipeline: [
+          {
+            id: 'tom',
+            session: 'tom',
+            if: 'function execute(vars) {return vars.$history.length < 5;}',
+            deps: ['dougMessage'],
+            prompt: '{{dougMessage}}A',
+            outputAs: 'tomMessage',
+          },
+          {
+            id: 'doug',
+            session: 'doug',
+            deps: ['tomMessage'],
+            prompt: '{{tomMessage}}B',
+            outputAs: 'dougMessage',
+          },
+        ],
+      },
+      { dougMessage: '>' },
+    );
+
+    expect(output.output).toEqual(['>AB>A>ABAB>A>ABA>AB>A>ABABAB', finishMeta]);
+    expect(output.error).toBeUndefined();
+  });
+
+  test('handles function calls and parses JSON output', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'step-0',
+            session: 'caller',
+            prompt: `[
+                {"type": "function-call", "name": "foo", "args": {"val": "hello"}},
+                {"type": "function-call", "name": "foo", "args": {"val": "world"}}
+            ]`,
+          },
+          {
+            id: 'step-1',
+            deps: ['$fn:foo'],
+            prompt: '{"out": "{{$args.val}}" }',
+          },
+        ],
+      },
+      {},
+    );
+
+    expect(output.error).toBeUndefined();
+    expect(output.output).toEqual(['{"out":"hello"}{"out":"world"}', finishMeta]);
+  });
+
+  test('handles nested function calls', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'step-0',
+            session: 'caller',
+            prompt: `[
+                {"type": "function-call", "name": "foo", "args": {"val": "hello"}}
+            ]`,
+          },
+          {
+            id: 'step-1',
+            session: true,
+            deps: ['$fn:foo'],
+            prompt: `[
+                {"type": "function-call", "name": "bar", "args": {"val": "{{$args.val}} world"}}
+            ]`,
+          },
+          {
+            id: 'step-2',
+            deps: ['$fn:bar'],
+            prompt: '{{$args.val}}!',
+          },
+        ],
+      },
+      {},
+    );
+
+    expect(output.error).toBeUndefined();
+    expect(output.output).toEqual(['"hello world!"', finishMeta]);
+  });
+
+  test('support multi-step function without polluting pipeline vars', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'step-0',
+            session: 'caller',
+            prompt: `[
+                {"type": "function-call", "name": "foo", "args": {"val": "hello"}}
+            ]`,
+          },
+          {
+            id: 'step-1',
+            prompt: '{{$output}} {{bar}}',
+          },
+          {
+            id: 'fn-1',
+            deps: ['$fn:foo'],
+            prompt: '{{$args.val}} world',
+            outputAs: 'bar',
+          },
+          {
+            id: 'fn-2',
+            prompt: '{{bar}}!',
+          },
+        ],
+      },
+      {
+        bar: 'the end',
+      },
+    );
+
+    expect(output.error).toBeUndefined();
+    expect(output.output).toEqual(['"hello world!" the end', finishMeta]);
+  });
+
+  test('calls session-based functions with separate sessions', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'step-0',
+            session: 'caller',
+            prompt: `[
+                {"type": "function-call", "name": "foo", "args": {"val": "hello"}}
+            ]`,
+            outputAs: 'foo',
+          },
+          {
+            id: 'step-1',
+            session: 'caller-2',
+            prompt: `[
+                {"type": "function-call", "name": "foo", "args": {"val": "world"}}
+            ]`,
+            outputAs: 'bar',
+          },
+          {
+            id: 'step-2',
+            prompt: '{{foo}}{{bar}}',
+          },
+          {
+            id: 'fn-1',
+            session: true,
+            deps: ['$fn:foo'],
+            prompt: `[
+                {"type": "function-call", "name": "bar", "args": {"val": "{{$args.val}}..."}}
+            ]`,
+          },
+          {
+            id: 'fn-2',
+            deps: ['$fn:bar'],
+            prompt: '{{$args.val}}!',
+          },
+        ],
+      },
+      {},
+    );
+
+    expect(output.error).toBeUndefined();
+    expect(output.output).toEqual(['"hello...!""world...!"', finishMeta]);
   });
 });

@@ -35,5 +35,23 @@
       </div>
       <div class="whitespace-pre-wrap">{output.message.trim()}</div>
     </div>
+  {:else if 'type' in output && output.type === 'function-call' && $showMetadataStore}
+    <div class="mb-2 whitespace-normal rounded-lg bg-gray-200 p-2">
+      <div class="flex items-center gap-2">
+        <CodeIcon class="size-4" />
+        <div class="font-bold">Function Call</div>
+      </div>
+      <div>{output.name}</div>
+      <div class="whitespace-pre-wrap">{JSON.stringify(output.args, null, 2)}</div>
+    </div>
+  {:else if 'type' in output && output.type === 'function-response' && $showMetadataStore}
+    <div class="mb-2 whitespace-normal rounded-lg bg-gray-200 p-2">
+      <div class="flex items-center gap-2">
+        <CodeIcon class="size-4" />
+        <div class="font-bold">Function Response</div>
+      </div>
+      <div>{output.call}</div>
+      <div class="whitespace-pre-wrap">{JSON.stringify(output.response, null, 2)}</div>
+    </div>
   {/if}
 {/each}
