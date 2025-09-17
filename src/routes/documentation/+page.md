@@ -64,7 +64,7 @@ Currently supported model providers:
 - [x] Gemini -- prefix with `gemini:`, e.g. `gemini:gemini-2.5-pro`. Requires `GEMINI_API_KEY` in your environment.
 - [x] Gemini Live -- prefix with `gemini-live:`, e.g. `gemini-live:gemini-2.5-flash-preview-native-audio-dialog`. Requires `GEMINI_API_KEY` in your environment.
 - [x] OpenAI -- prefix with `openai:`, e.g. `openai:gpt-4o`. Requires `OPENAI_API_KEY` in your environment.
-- [x] [Chrome](https://goo.gle/chrome-ai-dev-preview) -- use `chrome:ai`.
+- [x] [Chrome](https://goo.gle/chrome-ai-dev-preview) -- use `chrome:ai`. Supports `config.responseConstraint` to constrain responses with a JSON Schema.
 - [x] Ollama -- prefix with `ollama:`, e.g. `ollama:gemma-2:2b`. Requires `OLLAMA_ENDPOINT` (e.g. `http://localhost:11434`) in your environment, or the `apiBaseUrl` config option.
 - [x] [WebLLM](https://github.com/mlc-ai/web-llm) -- prefix with `web-llm:`, e.g. `web-llm:gemma-2-2b-it-q4f32_1-MLC`. See [here](https://github.com/mlc-ai/web-llm/blob/main/src/config.ts#L309) for a list of supported model IDs. Requires [WebGPU](https://caniuse.com/webgpu).
 - [x] Anthropic -- prefix with `anthropic:`, e.g. `anthropic:claude-3-5-sonnet-latest`. Requires `ANTHROPIC_API_KEY` in your environment.
@@ -85,6 +85,13 @@ providers:
     config:
       generationConfig:
         responseMimeType: application/json
+  - id: chrome:ai
+    config:
+      responseConstraint:
+        type: object
+        properties:
+          rating: { type: number }
+        required: ['rating']
 ```
 
 You may also specify a `mimeTypes: string[]` in the `config` to override the model's default supported mime-types.

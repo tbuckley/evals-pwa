@@ -3,11 +3,14 @@ import type {
   ModelProvider,
   ModelUpdate,
   MultiPartPrompt,
+  NormalizedProviderConfig,
   RunContext,
   TokenUsage,
 } from '$lib/types';
+import { normalizedProviderConfigSchema } from '$lib/types';
 import { generator } from '$lib/utils/generator';
 import { fileToBase64 } from '$lib/utils/media';
+import { z } from 'zod';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,6 +91,15 @@ interface SessionState {
   model: LanguageModel;
 }
 
+const configSchema = normalizedProviderConfigSchema
+  .extend({
+    responseConstraint: z.unknown().optional(),
+  })
+  .passthrough();
+export type ChromeConfig = NormalizedProviderConfig & {
+  responseConstraint?: unknown;
+};
+
 export class ChromeProvider implements ModelProvider {
   readonly id = 'chrome:ai';
 
@@ -102,6 +114,16 @@ export class ChromeProvider implements ModelProvider {
     'audio/ogg',
     'audio/flac',
   ];
+
+  private responseConstraint?: unknown;
+
+  constructor(config: ChromeConfig = {}) {
+    const { mimeTypes, responseConstraint } = configSchema.parse(config);
+    if (mimeTypes) {
+      this.mimeTypes = mimeTypes;
+    }
+    this.responseConstraint = responseConstraint;
+  }
 
   async run(conversation: ConversationPrompt, context: RunContext) {
     const state = context.session?.state as SessionState | undefined;
@@ -121,7 +143,11 @@ export class ChromeProvider implements ModelProvider {
         ...messages,
       ],
     };
+    const responseConstraint = this.responseConstraint;
     const request = await createKey(newState.messages);
+    if (responseConstraint !== undefined) {
+      (request as Record<string, unknown>).responseConstraint = responseConstraint;
+    }
 
     return {
       request,
@@ -163,9 +189,13 @@ export class ChromeProvider implements ModelProvider {
         yield { type: 'replace', output: '' } as ModelUpdate;
 
         let reply = '';
-        for await (const chunk of model.promptStreaming(messages, {
+        const options: { signal: AbortSignal; responseConstraint?: unknown } = {
           signal: context.abortSignal,
-        })) {
+        };
+        if (responseConstraint !== undefined) {
+          options.responseConstraint = responseConstraint;
+        }
+        for await (const chunk of model.promptStreaming(messages, options)) {
           yield chunk;
           reply += chunk;
         }
