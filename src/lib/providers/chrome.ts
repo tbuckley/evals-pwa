@@ -3,11 +3,14 @@ import type {
   ModelProvider,
   ModelUpdate,
   MultiPartPrompt,
+  NormalizedProviderConfig,
   RunContext,
   TokenUsage,
 } from '$lib/types';
+import { normalizedProviderConfigSchema } from '$lib/types';
 import { generator } from '$lib/utils/generator';
 import { fileToBase64 } from '$lib/utils/media';
+import { z } from 'zod';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -91,6 +94,17 @@ interface SessionState {
   model: LanguageModel;
 }
 
+const configSchema = normalizedProviderConfigSchema
+  .extend({
+    responseConstraint: z.record(z.unknown()).optional(),
+    omitResponseConstraintInput: z.boolean().optional(),
+  })
+  .passthrough();
+export type ChromeConfig = NormalizedProviderConfig & {
+  responseConstraint?: Record<string, unknown>;
+  omitResponseConstraintInput?: boolean;
+};
+
 export class ChromeProvider implements ModelProvider {
   readonly id = 'chrome:ai';
 
@@ -105,6 +119,22 @@ export class ChromeProvider implements ModelProvider {
     'audio/ogg',
     'audio/flac',
   ];
+
+  private promptOptions?: LanguageModelPromptOptions;
+
+  constructor(config: ChromeConfig = {}) {
+    const { mimeTypes, responseConstraint, omitResponseConstraintInput } =
+      configSchema.parse(config);
+    if (mimeTypes) {
+      this.mimeTypes = mimeTypes;
+    }
+    if (responseConstraint !== undefined || omitResponseConstraintInput !== undefined) {
+      this.promptOptions = {
+        responseConstraint,
+        omitResponseConstraintInput,
+      };
+    }
+  }
 
   async run(conversation: ConversationPrompt, context: RunContext) {
     const state = context.session?.state as SessionState | undefined;
@@ -125,8 +155,11 @@ export class ChromeProvider implements ModelProvider {
       ],
     };
     const request = await createKey(newState.messages);
+    const promptOptions = this.promptOptions;
+    (request as Record<string, unknown>).promptOptions = { ...promptOptions };
 
     return {
+      options: this.promptOptions,
       request,
       runModel: async function* () {
         yield '';
@@ -166,9 +199,11 @@ export class ChromeProvider implements ModelProvider {
         yield { type: 'replace', output: '' } as ModelUpdate;
 
         let reply = '';
-        for await (const chunk of model.promptStreaming(messages, {
+        const options: LanguageModelPromptOptions = {
+          ...promptOptions,
           signal: context.abortSignal,
-        })) {
+        };
+        for await (const chunk of model.promptStreaming(messages, options)) {
           yield chunk;
           reply += chunk;
         }

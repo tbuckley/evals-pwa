@@ -53,7 +53,7 @@ export class ProviderManager {
     } else if (providerId === 'echo') {
       return new EchoProvider(modelName);
     } else if (providerId === 'chrome' && modelName === 'ai') {
-      return new ChromeProvider();
+      return new ChromeProvider(config);
     } else if (providerId === 'web-llm') {
       return new WebLlm(modelName);
     } else if (providerId === 'ollama') {
