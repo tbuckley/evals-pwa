@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { describe, expect, test } from 'vitest';
 import { OpenaiProvider } from './openai';
 

@@ -96,11 +96,11 @@ interface SessionState {
 
 const configSchema = normalizedProviderConfigSchema
   .extend({
-    responseConstraint: z.unknown().optional(),
+    responseConstraint: z.record(z.unknown()).optional(),
   })
   .passthrough();
 export type ChromeConfig = NormalizedProviderConfig & {
-  responseConstraint?: unknown;
+  responseConstraint?: Record<string, unknown>;
 };
 
 export class ChromeProvider implements ModelProvider {
@@ -118,7 +118,7 @@ export class ChromeProvider implements ModelProvider {
     'audio/flac',
   ];
 
-  private responseConstraint?: unknown;
+  private responseConstraint?: Record<string, unknown>;
 
   constructor(config: ChromeConfig = {}) {
     const { mimeTypes, responseConstraint } = configSchema.parse(config);
@@ -192,7 +192,7 @@ export class ChromeProvider implements ModelProvider {
         yield { type: 'replace', output: '' } as ModelUpdate;
 
         let reply = '';
-        const options: { signal: AbortSignal; responseConstraint?: unknown } = {
+        const options: LanguageModelPromptOptions = {
           signal: context.abortSignal,
         };
         if (responseConstraint !== undefined) {
