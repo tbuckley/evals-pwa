@@ -21,6 +21,13 @@ async function runPipeline(pipeline: NormalizedPipelinePrompt, vars: VarSet) {
   return next.value;
 }
 
+const finishMeta = {
+  type: 'meta',
+  title: 'Finish Reason',
+  icon: 'other',
+  message: 'SUCCESS',
+};
+
 describe('PipelineEnvironment', () => {
   test('handles multiple step pipelines', {}, async function () {
     const output = await runPipeline(
@@ -34,7 +41,7 @@ describe('PipelineEnvironment', () => {
       { target: 'world' },
     );
 
-    expect(output.output).toEqual(['Hello world! Hi world.']);
+    expect(output.output).toEqual(['Hello world! Hi world.', finishMeta]);
     expect(output.error).toBeUndefined();
   });
 
@@ -50,7 +57,7 @@ describe('PipelineEnvironment', () => {
       { a: 'foo', b: 'bar' },
     );
 
-    expect(output.output).toEqual(['C=A=foo + B=bar']);
+    expect(output.output).toEqual(['C=A=foo + B=bar', finishMeta]);
     expect(output.error).toBeUndefined();
   });
 
@@ -71,7 +78,7 @@ describe('PipelineEnvironment', () => {
       { a: '>' },
     );
 
-    expect(output.output).toEqual(['>BABAB']);
+    expect(output.output).toEqual(['>BABAB', finishMeta]);
     expect(output.error).toBeUndefined();
   });
 
@@ -101,7 +108,7 @@ describe('PipelineEnvironment', () => {
       { dougMessage: '>' },
     );
 
-    expect(output.output).toEqual(['>AB>A>ABAB>A>ABA>AB>A>ABABAB']);
+    expect(output.output).toEqual(['>AB>A>ABAB>A>ABA>AB>A>ABABAB', finishMeta]);
     expect(output.error).toBeUndefined();
   });
 
@@ -128,7 +135,7 @@ describe('PipelineEnvironment', () => {
     );
 
     expect(output.error).toBeUndefined();
-    expect(output.output).toEqual(['{"out":"hello"}{"out":"world"}']);
+    expect(output.output).toEqual(['{"out":"hello"}{"out":"world"}', finishMeta]);
   });
 
   test('handles nested function calls', {}, async function () {
@@ -161,7 +168,7 @@ describe('PipelineEnvironment', () => {
     );
 
     expect(output.error).toBeUndefined();
-    expect(output.output).toEqual(['{"result":["hello world!"]}']);
+    expect(output.output).toEqual(['"hello world!"', finishMeta]);
   });
 
   test('support multi-step function without polluting pipeline vars', {}, async function () {
@@ -197,7 +204,7 @@ describe('PipelineEnvironment', () => {
     );
 
     expect(output.error).toBeUndefined();
-    expect(output.output).toEqual(['{"result":["hello world!"]} the end']);
+    expect(output.output).toEqual(['"hello world!" the end', finishMeta]);
   });
 
   test('calls session-based functions with separate sessions', {}, async function () {
@@ -243,6 +250,6 @@ describe('PipelineEnvironment', () => {
     );
 
     expect(output.error).toBeUndefined();
-    expect(output.output).toEqual(['{"result":["hello...!"]}{"result":["world...!"]}']);
+    expect(output.output).toEqual(['"hello...!""world...!"', finishMeta]);
   });
 });

@@ -152,7 +152,7 @@ const providerOutputPartSchema = z.union([
   metaProviderOutputPartSchema,
 ]);
 export type ProviderOutputPart = z.infer<typeof providerOutputPartSchema>;
-const providerOutputSchema = z.union([z.string(), z.array(providerOutputPartSchema)]);
+export const providerOutputSchema = z.union([z.string(), z.array(providerOutputPartSchema)]);
 export type ProviderOutput = z.infer<typeof providerOutputSchema>;
 export type ExtractedOutputPart = string | Blob | MetaProviderOutputPart;
 

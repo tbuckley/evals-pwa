@@ -1,20 +1,21 @@
 import { FileReference } from '$lib/storage/FileReference';
-import type {
-  TestEnvironment,
-  ModelProvider,
-  TestOutput,
-  VarSet,
-  RunContext,
-  ModelUpdate,
-  ConversationPrompt,
-  ModelCache,
-  NormalizedPipelineStep,
-  TestResult,
-  NormalizedPipelinePrompt,
-  ModelSession,
-  ProviderOutputPart,
-  FunctionCall,
-  FunctionResponse,
+import {
+  type TestEnvironment,
+  type ModelProvider,
+  type TestOutput,
+  type VarSet,
+  type RunContext,
+  type ModelUpdate,
+  type ConversationPrompt,
+  type ModelCache,
+  type NormalizedPipelineStep,
+  type TestResult,
+  type NormalizedPipelinePrompt,
+  type ModelSession,
+  type ProviderOutputPart,
+  type FunctionCall,
+  type FunctionResponse,
+  providerOutputSchema,
 } from '$lib/types';
 import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
 import { generator } from './generator';
@@ -225,7 +226,7 @@ export class PipelineEnvironment implements TestEnvironment {
       // Use step.id for this history since it is only used for prompts/if
       const newHistory = [...pipelineContext.history, { id: step.id, prompt, output }];
       if (step.outputAs && !delegateMarkCompleteToDependency) {
-        newPipelineVars[step.outputAs] = output;
+        newPipelineVars[step.outputAs] = stripOutputMetadata(output);
       }
       stripFunctionCallResults(newPipelineVars);
 
@@ -247,7 +248,7 @@ export class PipelineEnvironment implements TestEnvironment {
           ...vars,
           ...newPipelineVars,
           $history: newHistory,
-          $output: newHistory.at(-1)?.output ?? null,
+          $output: stripOutputMetadata(newHistory.at(-1)?.output ?? null),
         },
 
         {
@@ -576,32 +577,27 @@ function getFunctionResponses(context: PipelineContext, deps: string[]): Functio
     responses.push({
       type: 'function-response',
       call: calls[i].name,
-      response: parseFunctionResponse(context.vars[callResults[i]]),
+      response: parseFunctionResponse(stripOutputMetadata(context.vars[callResults[i]])),
     });
   }
 
   return responses;
 }
 
-function parseFunctionResponse(val: unknown): Record<string, unknown> {
-  if (typeof val === 'object' && !Array.isArray(val) && val !== null) {
-    return val as Record<string, unknown>;
-  }
+function parseFunctionResponse(val: unknown): unknown {
+  // If it's a string-like output, try parsing as JSON
   const stringVal = getOutputAsString(val);
   if (stringVal) {
-    // Try parsing as JSON
-
     try {
       const parsed = JSON.parse(stringVal) as unknown;
-      if (typeof parsed === 'object' && !Array.isArray(parsed) && parsed !== null) {
-        return parsed as Record<string, unknown>;
-      }
+      return parsed;
     } catch {
-      // pass
+      return stringVal;
     }
   }
 
-  return { result: val };
+  // Otherwise just return the object
+  return val;
 }
 function getOutputAsString(val: unknown): string | null {
   if (typeof val === 'string') {
@@ -611,6 +607,19 @@ function getOutputAsString(val: unknown): string | null {
     return val[0];
   }
   return null;
+}
+function stripOutputMetadata(val: unknown): unknown {
+  // Get only string/file parts, ignoring function calls/responses and metadata
+  const parsed = providerOutputSchema.safeParse(val);
+  if (!parsed.success) {
+    return val;
+  }
+  if (!Array.isArray(parsed.data)) {
+    return parsed.data;
+  }
+  return parsed.data.filter((p) => {
+    return typeof p === 'string' || p instanceof FileReference;
+  });
 }
 
 function renderPrompt(prompt: string, vars: VarSet, mimeTypes?: string[]) {
@@ -623,7 +632,7 @@ function generatePipelineVars(vars: VarSet, pipelineContext: PipelineContext) {
     ...vars,
     ...pipelineContext.vars,
     $history: pipelineContext.history,
-    $output: pipelineContext.history.at(-1)?.output ?? null,
+    $output: stripOutputMetadata(pipelineContext.history.at(-1)?.output ?? null),
   };
 }
 

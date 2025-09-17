@@ -522,7 +522,7 @@ async function multiPartPromptToGemini(prompt: MultiPartPrompt): Promise<Part[]>
       parts.push({
         functionResponse: {
           name: part.call,
-          response: part.response as Record<string, unknown>,
+          response: maybeWrapFunctionResponse(part.response),
         },
       });
     } else {
@@ -530,4 +530,11 @@ async function multiPartPromptToGemini(prompt: MultiPartPrompt): Promise<Part[]>
     }
   }
   return parts;
+}
+
+function maybeWrapFunctionResponse(val: unknown): Record<string, unknown> {
+  if (typeof val === 'object' && !Array.isArray(val) && val !== null) {
+    return val as Record<string, unknown>;
+  }
+  return { result: val };
 }

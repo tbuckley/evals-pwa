@@ -76,7 +76,15 @@ export class EchoProvider implements ModelProvider {
 
   extractOutput(response: unknown): (string | Blob | ExtractedOutputPart)[] {
     const validated = validSchema.parse(response);
-    return validated.prompt;
+    return [
+      ...validated.prompt,
+      {
+        type: 'meta',
+        title: 'Finish Reason',
+        icon: 'other',
+        message: 'SUCCESS',
+      },
+    ];
   }
 
   extractTokenUsage(): TokenUsage {
