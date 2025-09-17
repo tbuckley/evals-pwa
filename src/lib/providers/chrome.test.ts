@@ -21,7 +21,10 @@ describe('ChromeProvider', () => {
       properties: { rating: { type: 'number' } },
       required: ['rating'],
     };
-    const provider = new ChromeProvider({ responseConstraint: schema });
+    const provider = new ChromeProvider({
+      responseConstraint: schema,
+      omitResponseConstraintInput: true,
+    });
 
     const promptOptions: (LanguageModelPromptOptions | undefined)[] = [];
     const promptStreaming = vi.fn<MockLanguageModel['promptStreaming']>((_messages, options) => {
@@ -82,5 +85,8 @@ describe('ChromeProvider', () => {
     expect(promptOptions).toHaveLength(1);
     const [options] = promptOptions;
     expect(options?.responseConstraint).toStrictEqual(schema);
+    const omitResponseConstraintInput = (options as Record<string, unknown> | undefined)
+      ?.omitResponseConstraintInput;
+    expect(omitResponseConstraintInput).toBe(true);
   });
 });

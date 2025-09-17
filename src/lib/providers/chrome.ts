@@ -97,10 +97,12 @@ interface SessionState {
 const configSchema = normalizedProviderConfigSchema
   .extend({
     responseConstraint: z.record(z.unknown()).optional(),
+    omitResponseConstraintInput: z.boolean().optional(),
   })
   .passthrough();
 export type ChromeConfig = NormalizedProviderConfig & {
   responseConstraint?: Record<string, unknown>;
+  omitResponseConstraintInput?: boolean;
 };
 
 export class ChromeProvider implements ModelProvider {
@@ -118,14 +120,20 @@ export class ChromeProvider implements ModelProvider {
     'audio/flac',
   ];
 
-  private responseConstraint?: Record<string, unknown>;
+  private promptOptions?: LanguageModelPromptOptions;
 
   constructor(config: ChromeConfig = {}) {
-    const { mimeTypes, responseConstraint } = configSchema.parse(config);
+    const { mimeTypes, responseConstraint, omitResponseConstraintInput } =
+      configSchema.parse(config);
     if (mimeTypes) {
       this.mimeTypes = mimeTypes;
     }
-    this.responseConstraint = responseConstraint;
+    if (responseConstraint !== undefined || omitResponseConstraintInput !== undefined) {
+      this.promptOptions = {
+        responseConstraint,
+        omitResponseConstraintInput,
+      };
+    }
   }
 
   async run(conversation: ConversationPrompt, context: RunContext) {
@@ -146,13 +154,12 @@ export class ChromeProvider implements ModelProvider {
         ...messages,
       ],
     };
-    const responseConstraint = this.responseConstraint;
     const request = await createKey(newState.messages);
-    if (responseConstraint !== undefined) {
-      (request as Record<string, unknown>).responseConstraint = responseConstraint;
-    }
+    const promptOptions = this.promptOptions;
+    (request as Record<string, unknown>).promptOptions = { ...promptOptions };
 
     return {
+      options: this.promptOptions,
       request,
       runModel: async function* () {
         yield '';
@@ -193,11 +200,9 @@ export class ChromeProvider implements ModelProvider {
 
         let reply = '';
         const options: LanguageModelPromptOptions = {
+          ...promptOptions,
           signal: context.abortSignal,
         };
-        if (responseConstraint !== undefined) {
-          options.responseConstraint = responseConstraint;
-        }
         for await (const chunk of model.promptStreaming(messages, options)) {
           yield chunk;
           reply += chunk;
