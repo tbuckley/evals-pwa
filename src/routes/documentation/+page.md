@@ -273,7 +273,7 @@ prompts:
         outputAs: dougMessage # Outputs as dougMessage to trigger tom's deps
 ```
 
-Finally, when using pipelines session steps also support function calling. When a step calls function `foo`, the step with dependency `$fn:foo` will be called. Any arguments will be passed as vars via the `$args` object. This function step will inherit vars from the original step, but any vars it creats will not be passed back.
+Finally, when using pipelines session steps also support function calling. When a step calls function `foo`, the step with dependency `$fn:foo` will be called. Any arguments will be passed as vars via the `$args` object. This function step will inherit vars from the original step, but any vars it creates will not be passed back.
 
 The function response must be an object. If the output of a step is a valid JSON object, it will be parsed and used as the response. Otherwise it will be wrapped as `{"result": output}`
 

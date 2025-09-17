@@ -490,7 +490,7 @@ async function runModel(
     // TODO: If multiple steps share a prompt, use different cache keys
   };
   const generator = maybeUseCache(cache, cacheKey, runModel, model.requestSemaphore, {
-    requireSession: !session,
+    requireSession: setSession !== undefined, // If setSession is defined, we expect a session
   });
   let nextRes = await generator.next();
   while (!nextRes.done) {
