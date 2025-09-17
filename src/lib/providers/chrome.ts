@@ -24,6 +24,9 @@ function convertContent(content: MultiPartPrompt): LanguageModelMessageContent[]
     if ('text' in part) {
       return { type: 'text', value: part.text };
     }
+    if ('type' in part) {
+      throw new Error('Function calls and responses are not supported');
+    }
 
     const file = part.file;
     if (file.type.startsWith('image/') || file.type.startsWith('audio/')) {

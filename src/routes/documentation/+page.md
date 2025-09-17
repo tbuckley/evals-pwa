@@ -260,7 +260,7 @@ prompts:
         outputAs: haiku
 ```
 
-Finally, pipelines let you save chat history using the `session` property. A session maintains conversational state (previous prompts & outputs) for every step that is part of that session. This is useful for creating multi-turn conversations, such as simulating a dialogue between two chatbots. Each step with the same session name will share the same conversation history. (Advanced: multiple steps may share the same session, but branches / accessing the same session in parallel is not supported.)
+Pipelines let you save chat history using the `session` property. A session maintains conversational state (previous prompts & outputs) for every step that is part of that session. This is useful for creating multi-turn conversations, such as simulating a dialogue between two chatbots. You can use `session:true` or choose a specific name (`string`) for a session. Each step with the same session name will share the same conversation history. (Advanced: multiple steps may share the same session, but branches / accessing the same session in parallel is not supported.)
 
 ```yaml
 prompts:
@@ -278,6 +278,46 @@ prompts:
         session: doug # Saves the chat history as "doug"
         prompt: '{{tomMessage}}' # Sends tom's latest message to doug
         outputAs: dougMessage # Outputs as dougMessage to trigger tom's deps
+```
+
+Finally, when using pipelines session steps also support function calling. When a step calls function `foo`, the step with dependency `$fn:foo` will be called. Any arguments will be passed as vars via the `$args` object. This function step will inherit vars from the original step, but any vars it creates will not be passed back.
+
+The function response must be an object. If the output of a step is a valid JSON object, it will be parsed and used as the response. Otherwise it will be wrapped as `{"result": output}`
+
+```yaml
+providers:
+  # An "orchestrator" model defines its tools
+  - id: gemini:gemini-2.5-flash
+    labels: ['orchestrator']
+    config:
+      tools:
+        - functionDeclarations:
+            - name: haiku
+              description: 'Write an expert-level haiku about a given topic'
+              parameters:
+                type: object
+                properties:
+                  topic:
+                    type: string
+                    description: 'A topic for the haiku'
+  # A "worker" model is used by the tools
+  - id: gemini:gemini-2.5-flash
+    labels: ['worker']
+
+prompts:
+  - $pipeline:
+      - session: 'orchestrator' # Session required to call functions
+        providerLabel: orchestrator # Use a provider that defines tools
+        prompt: '{{request}}'
+      # A step with a dependency on "$fn:NAME" will be triggered when that
+      # function is called
+      - deps: ['$fn:haiku']
+        providerLabel: worker
+        prompt: 'Write a haiku about: {{ $args.topic }}'
+
+tests:
+  - vars:
+      request: 'Write a haiku about the future of AI'
 ```
 
 #### Handlebars Helpers (Advanced)

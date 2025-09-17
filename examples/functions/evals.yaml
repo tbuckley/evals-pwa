@@ -1,0 +1,13 @@
+providers:
+  - id: gemini:gemini-2.5-flash
+    config:
+      tools:
+        - functionDeclarations:
+            - name: calculator
+              description: 'A calculator that can evaluate JavaScript math expressions'
+              parameters:
+                type: string
+                description: 'A JavaScript math expression to evaluate. Example: 1+1, Math.pow(2, 3)*4, etc'
+
+prompts:
+  - 'What is the square root of 29?'

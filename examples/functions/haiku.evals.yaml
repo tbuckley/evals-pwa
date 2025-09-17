@@ -1,0 +1,35 @@
+providers:
+  - id: gemini:gemini-2.5-flash
+    labels: ['worker']
+  - id: gemini:gemini-2.5-flash
+    labels: ['orchestrator']
+    config:
+      tools:
+        - functionDeclarations:
+            - name: haiku
+              description: 'Write an expert-level haiku about a given topic'
+              parameters:
+                type: object
+                properties:
+                  topic:
+                    type: string
+                    description: 'A topic for the haiku'
+
+prompts:
+  - $pipeline:
+      - id: orchestrator
+        providerLabel: orchestrator
+        prompt: '{{request}}'
+        session: 'orchestrator'
+      - id: haiku-writer
+        deps: ['$fn:haiku']
+        providerLabel: worker
+        prompt: 'Write a haiku about: {{ $args.topic }}'
+
+tests:
+  - vars:
+      request: 'Write a haiku about the future of AI'
+  - vars:
+      request: 'Write 5 haikus and pick the best one. Output only the winner and the reason you picked it.'
+  - vars:
+      request: 'Write 3 haikus about space travel, one at a time. Then share all of them at once.'
