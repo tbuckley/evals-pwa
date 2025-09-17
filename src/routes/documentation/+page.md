@@ -279,6 +279,7 @@ The function response must be an object. If the output of a step is a valid JSON
 
 ```yaml
 providers:
+  # An "orchestrator" model defines its tools
   - id: gemini:gemini-2.5-flash
     labels: ['orchestrator']
     config:
@@ -292,17 +293,18 @@ providers:
                   topic:
                     type: string
                     description: 'A topic for the haiku'
+  # A "worker" model is used by the tools
   - id: gemini:gemini-2.5-flash
     labels: ['worker']
 
 prompts:
   - $pipeline:
-      - id: orchestrator
-        providerLabel: orchestrator
+      - session: 'orchestrator' # Session required to call functions
+        providerLabel: orchestrator # Use a provider that defines tools
         prompt: '{{request}}'
-        session: 'orchestrator'
-      - id: haiku-writer
-        deps: ['$fn:haiku']
+      # A step with a dependency on "$fn:NAME" will be triggered when that
+      # function is called
+      - deps: ['$fn:haiku']
         providerLabel: worker
         prompt: 'Write a haiku about: {{ $args.topic }}'
 
