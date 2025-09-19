@@ -11,36 +11,91 @@ import { Semaphore } from '$lib/utils/semaphore';
 import { sse } from '$lib/utils/sse';
 import { z } from 'zod';
 import { CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN } from './common';
-import { exponentialBackoff, shouldRetryHttpError, HttpError } from '$lib/utils/exponentialBackoff';
 
 const OPENAI_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
 
-const generateContentResponseSchema = z.object({
-  id: z.string(),
-  choices: z.array(
-    z.object({
-      message: z
-        .object({
-          content: z.string().nullish(),
-          role: z.string(),
-        })
-        .optional(),
-      delta: z
-        .object({
-          content: z.string().nullish(),
-        })
-        .optional(),
-    }),
+const responseSchema = z.object({
+  // Lots of fields
+  output: z.array(
+    z
+      .discriminatedUnion('type', [
+        z.object({
+          id: z.string(),
+          type: z.literal('message'),
+          role: z.literal('assistant'),
+          content: z.array(
+            z
+              .discriminatedUnion('type', [
+                z.object({
+                  type: z.literal('output_text'),
+                  text: z.string(),
+                }),
+                z.object({
+                  type: z.literal('unknown'),
+                }),
+              ])
+              .catch({ type: 'unknown' }),
+          ),
+        }),
+        z.object({
+          type: z.literal('unknown'),
+        }),
+      ])
+      .catch({ type: 'unknown' }),
   ),
-  usage: z
-    .object({
-      completion_tokens: z.number().int(),
-      prompt_tokens: z.number().int(),
-      total_tokens: z.number().int(),
-    })
-    .nullable()
-    .optional(),
+  usage: z.object({
+    input_tokens: z.number(),
+    output_tokens: z.number(),
+    total_tokens: z.number(),
+  }),
 });
+
+const responseCompletedSchema = z.object({
+  type: z.literal('response.completed'),
+  sequence_number: z.number(),
+  response: responseSchema,
+});
+
+const generateContentResponseSchema = z
+  .discriminatedUnion('type', [
+    z.object({
+      type: z.literal('response.output_item.added'),
+      sequence_number: z.number(),
+
+      item: z.object({
+        id: z.string(),
+        status: z.string(), // TODO enum
+        type: z.string(), // TODO enum
+      }),
+    }),
+    z.object({
+      type: z.literal('response.content_part.added'),
+      sequence_number: z.number(),
+      item_id: z.string(),
+
+      output_index: z.number(),
+      content_index: z.number(),
+      part: z.object({
+        type: z.literal('output_text'),
+        text: z.string(),
+        // also annotations, empty array?
+      }),
+    }),
+    z.object({
+      type: z.literal('response.output_text.delta'),
+      sequence_number: z.number(),
+      item_id: z.string(),
+
+      output_index: z.number(),
+      content_index: z.number(),
+      delta: z.string(),
+    }),
+    responseCompletedSchema,
+    z.object({
+      type: z.literal('unknown'),
+    }),
+  ])
+  .catch({ type: 'unknown' });
 
 const configSchema = normalizedProviderConfigSchema
   .extend({
@@ -57,7 +112,7 @@ const errorSchema = z.object({
   }),
 });
 
-export class OpenaiProvider implements ModelProvider {
+export class OpenaiResponsesProvider implements ModelProvider {
   private apiBaseUrl: string;
   private request: object;
   constructor(
@@ -75,7 +130,7 @@ export class OpenaiProvider implements ModelProvider {
   }
 
   get id(): string {
-    return `openai:${this.model}`;
+    return `openai-responses:${this.model}`;
   }
 
   get requestSemaphore(): Semaphore {
@@ -88,21 +143,19 @@ export class OpenaiProvider implements ModelProvider {
     'image/jpeg',
     'image/webp',
     'image/gif',
+
+    // PDF
+    'application/pdf',
   ];
 
   async run(conversation: ConversationPrompt, context: RunContext) {
-    const sessionMessages = (context.session?.state ?? []) as Message[];
-    const newMessages = await conversationToOpenAI(conversation);
-    const messages = mergeMessages(sessionMessages, newMessages);
+    const input = await conversationToOpenAI(conversation);
 
     const request = {
       model: this.model,
       ...this.request,
       stream: true,
-      stream_options: {
-        include_usage: true,
-      },
-      messages,
+      input,
     } as const;
 
     const { apiBaseUrl, apiKey } = this;
@@ -111,95 +164,78 @@ export class OpenaiProvider implements ModelProvider {
       request,
       runModel: async function* () {
         yield '';
-        const resp = await exponentialBackoff(
-          async () => {
-            const resp = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${apiKey}`,
-              },
-              body: JSON.stringify(request),
-              signal: context.abortSignal,
-            });
-            if (!resp.ok) {
-              let error;
-              try {
-                const json: unknown = await resp.json();
-                error = errorSchema.parse(json);
-                throw new HttpError(
-                  `Failed to run model: ${error.error.type}: ${error.error.message}`,
-                  resp.status,
-                );
-              } catch (parseError) {
-                if (parseError instanceof HttpError) {
-                  throw parseError;
-                }
-                throw new HttpError(`Failed to run model: ${resp.statusText}`, resp.status);
-              }
-            }
-            return resp;
+        const resp = await fetch(`${apiBaseUrl}/v1/responses`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
           },
-          { shouldRetry: shouldRetryHttpError },
-        );
+          body: JSON.stringify(request),
+          signal: context.abortSignal,
+        });
+        if (!resp.ok) {
+          let error;
+          try {
+            const json: unknown = await resp.json();
+            error = errorSchema.parse(json);
+          } catch {
+            throw new Error(`Failed to run model: ${resp.statusText} ${resp.status}`);
+          }
+          throw new Error(`Failed to run model: ${error.error.type}: ${error.error.message}`);
+        }
         const stream = resp.body;
-        let fullText = '';
         let lastResponseJson: unknown;
         if (!stream) throw new Error(`Failed to run model: no response`);
         for await (const value of sse(resp)) {
           lastResponseJson = JSON.parse(value);
           const text = extractDeltaOutput(lastResponseJson);
-          fullText += text;
           yield text;
         }
 
-        const parsed = generateContentResponseSchema.parse(lastResponseJson);
-        const message = { role: 'assistant', content: fullText } satisfies Message;
-        parsed.choices = [{ message }];
+        const parsed = responseCompletedSchema.parse(lastResponseJson);
         return {
-          response: parsed,
-          session: {
-            state: [...messages, message] satisfies Message[],
-          },
+          response: parsed.response,
         };
       },
     };
   }
 
   extractDeltaOutput(response: unknown): string {
-    const json = generateContentResponseSchema.parse(response);
-    return json.choices[0]?.delta?.content ?? '';
+    const json = generateContentResponseSchema.safeParse(response);
+    if (!json.success || json.data.type === 'unknown') {
+      console.info('Unsupported OpenAI Responses API streaming message', response);
+      return '';
+    }
+
+    // TODO handle more than deltas
+    if (json.data.type === 'response.output_text.delta') {
+      return json.data.delta;
+    }
+    return '';
   }
 
-  extractOutput(response: unknown): (string | Blob)[] {
-    const json = generateContentResponseSchema.parse(response);
-    const firstChoice = json.choices[0].message?.content;
-    if (typeof firstChoice === 'string') {
-      return [firstChoice];
-    }
-    if (firstChoice == null) {
-      return [''];
-    }
-
-    throw new Error('Unexpected output format');
+  extractOutput(response: unknown): string {
+    const json = responseSchema.parse(response);
+    const text = json.output
+      .filter((o) => o.type === 'message')
+      .flatMap((o) => o.content)
+      .filter((c) => c.type === 'output_text')
+      .flatMap((c) => c.text)
+      .join('');
+    return text;
   }
 
   extractTokenUsage(response: unknown): TokenUsage {
-    const json = generateContentResponseSchema.parse(response);
+    const json = responseSchema.parse(response);
     // Usage in streaming responses is relatively new (May 2024)
     // so it hasn't quite landed in ollama yet: https://github.com/ollama/ollama/issues/5200
-    const usage = json.usage ?? {
-      completion_tokens: 0,
-      prompt_tokens: 0,
-      total_tokens: 0,
-    };
 
-    const { completion_tokens, prompt_tokens, total_tokens } = usage;
+    const { input_tokens, output_tokens, total_tokens } = json.usage;
     return {
-      inputTokens: prompt_tokens,
-      outputTokens: completion_tokens,
+      inputTokens: input_tokens,
+      outputTokens: output_tokens,
       totalTokens: total_tokens,
-      costDollars: this.costFunction(this.model, prompt_tokens, completion_tokens),
+      costDollars: this.costFunction(this.model, input_tokens, output_tokens),
     };
   }
 }
@@ -257,20 +293,26 @@ function getCost(model: string, prompt: number, completion: number): number | un
 }
 
 type Part =
-  | { type: 'text'; text: string }
-  | { type: 'image_url'; image_url: { url: string; detail?: 'auto' | 'low' | 'high' } };
+  | { type: 'input_text'; text: string }
+  | { type: 'input_file'; filename: string; file_data: string }
+  | { type: 'input_image'; image_url: string; detail?: 'auto' | 'low' | 'high' };
 
-export async function multiPartPromptToOpenAI(part: PromptPart): Promise<Part> {
+async function multiPartPromptToOpenAIResponsesAPI(part: PromptPart): Promise<Part> {
   if ('text' in part) {
-    return { type: 'text', text: part.text };
-  } else if ('file' in part) {
+    return { type: 'input_text', text: part.text };
+  } else if ('file' in part && part.file.type.startsWith('image/')) {
     const b64 = await fileToBase64(part.file);
 
     return {
-      type: 'image_url',
-      image_url: {
-        url: b64,
-      },
+      type: 'input_image',
+      image_url: b64,
+    };
+  } else if ('file' in part) {
+    const b64 = await fileToBase64(part.file);
+    return {
+      type: 'input_file',
+      filename: part.file.name,
+      file_data: b64,
     };
   } else {
     throw new Error('Unsupported part type');
@@ -279,7 +321,7 @@ export async function multiPartPromptToOpenAI(part: PromptPart): Promise<Part> {
 
 export interface Message {
   role: 'user' | 'assistant' | 'system';
-  content: Part[] | string;
+  content: Part[];
 }
 
 async function conversationToOpenAI(conversation: ConversationPrompt): Promise<Message[]> {
@@ -287,12 +329,8 @@ async function conversationToOpenAI(conversation: ConversationPrompt): Promise<M
     conversation.map(
       async (part): Promise<Message> => ({
         role: part.role,
-        content: await Promise.all(part.content.map(multiPartPromptToOpenAI)),
+        content: await Promise.all(part.content.map(multiPartPromptToOpenAIResponsesAPI)),
       }),
     ),
   );
-}
-
-function mergeMessages(a: Message[], b: Message[]): Message[] {
-  return [...a, ...b.filter((m) => m.role !== 'system')];
 }

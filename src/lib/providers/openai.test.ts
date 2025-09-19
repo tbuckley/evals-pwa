@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import { OpenaiProvider } from './openai';
+import { OpenaiCompletionsProvider } from './openai-completions';
 
-describe('OpenaiProvider', () => {
-  const provider = new OpenaiProvider('gpt-test', 'test-key');
+describe('OpenaiCompletionsProvider', () => {
+  const provider = new OpenaiCompletionsProvider('gpt-test', 'test-key');
 
   test('extractDeltaOutput handles null and undefined', () => {
     const nullDelta = { id: '1', choices: [{ delta: { content: null } }] };

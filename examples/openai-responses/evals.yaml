@@ -1,0 +1,12 @@
+providers:
+  - id: openai-responses:gpt-5
+    config:
+      tools:
+        - type: web_search
+      reasoning:
+        summary: auto # auto, concise, detailed
+        effort: medium # minimal, low, medium, high
+      "include": ["reasoning.encrypted_content"]
+
+prompts:
+  - "what was a positive news story from today?"
