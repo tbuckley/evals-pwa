@@ -57,14 +57,14 @@ const errorSchema = z.object({
   }),
 });
 
-export class OpenaiProvider implements ModelProvider {
+export class OpenaiCompletionsProvider implements ModelProvider {
   private apiBaseUrl: string;
   private request: object;
   constructor(
     public model: string,
     public apiKey: string,
     config = {},
-    public costFunction: typeof getCost = getCost,
+    public costFunction: typeof getOpenaiCost = getOpenaiCost,
   ) {
     const { apiBaseUrl, mimeTypes, ...request } = configSchema.parse(config);
     if (mimeTypes) {
@@ -204,7 +204,11 @@ export class OpenaiProvider implements ModelProvider {
   }
 }
 
-function getCost(model: string, prompt: number, completion: number): number | undefined {
+export function getOpenaiCost(
+  model: string,
+  prompt: number,
+  completion: number,
+): number | undefined {
   // As of July 18 2024
   let inputCostPerMillion: number, outputCostPerMillion: number;
   if (model.startsWith('gpt-4.1-nano')) {
@@ -260,7 +264,7 @@ type Part =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string; detail?: 'auto' | 'low' | 'high' } };
 
-export async function multiPartPromptToOpenAI(part: PromptPart): Promise<Part> {
+export async function multiPartPromptToOpenAICompletionsAPI(part: PromptPart): Promise<Part> {
   if ('text' in part) {
     return { type: 'text', text: part.text };
   } else if ('file' in part) {
@@ -287,7 +291,7 @@ async function conversationToOpenAI(conversation: ConversationPrompt): Promise<M
     conversation.map(
       async (part): Promise<Message> => ({
         role: part.role,
-        content: await Promise.all(part.content.map(multiPartPromptToOpenAI)),
+        content: await Promise.all(part.content.map(multiPartPromptToOpenAICompletionsAPI)),
       }),
     ),
   );

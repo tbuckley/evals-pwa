@@ -5,6 +5,7 @@ providers:
         thinkingConfig:
           thinkingBudget: 1000
   - id: openai:gpt-5-mini
+  - id: openai-responses:gpt-5-mini
   - id: anthropic:claude-sonnet-4-20250514
 
 prompts:
