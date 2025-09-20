@@ -6,7 +6,7 @@ providers:
       reasoning:
         summary: auto # auto, concise, detailed
         effort: medium # minimal, low, medium, high
-      "include": ["reasoning.encrypted_content"]
+      'include': ['reasoning.encrypted_content']
 
 prompts:
-  - "what was a positive news story from today?"
+  - 'what was a positive news story from today?'

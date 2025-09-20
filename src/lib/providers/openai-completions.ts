@@ -64,7 +64,7 @@ export class OpenaiCompletionsProvider implements ModelProvider {
     public model: string,
     public apiKey: string,
     config = {},
-    public costFunction: typeof getCost = getCost,
+    public costFunction: typeof getOpenaiCost = getOpenaiCost,
   ) {
     const { apiBaseUrl, mimeTypes, ...request } = configSchema.parse(config);
     if (mimeTypes) {
@@ -204,7 +204,11 @@ export class OpenaiCompletionsProvider implements ModelProvider {
   }
 }
 
-function getCost(model: string, prompt: number, completion: number): number | undefined {
+export function getOpenaiCost(
+  model: string,
+  prompt: number,
+  completion: number,
+): number | undefined {
   // As of July 18 2024
   let inputCostPerMillion: number, outputCostPerMillion: number;
   if (model.startsWith('gpt-4.1-nano')) {
