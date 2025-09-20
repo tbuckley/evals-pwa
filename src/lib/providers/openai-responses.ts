@@ -11,7 +11,7 @@ import { Semaphore } from '$lib/utils/semaphore';
 import { z } from 'zod';
 import { CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN } from './common';
 import OpenAI from 'openai';
-import type { EasyInputMessage } from 'openai/resources/responses/responses.mjs';
+import type { EasyInputMessage, ResponseInput } from 'openai/resources/responses/responses.mjs';
 import { getOpenaiCost } from './openai-completions';
 
 const OPENAI_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
@@ -61,14 +61,19 @@ export class OpenaiResponsesProvider implements ModelProvider {
   ];
 
   async run(conversation: ConversationPrompt, context: RunContext) {
-    const input = await conversationToOpenAI(conversation);
+    const sessionMessages = (context.session?.state ?? []) as ResponseInput;
+    const newMessages = (await conversationToOpenAI(conversation)) satisfies EasyInputMessage[];
+    const input = [...sessionMessages, ...newMessages] satisfies ResponseInput;
 
     const request = {
       model: this.model,
+      include: ['reasoning.encrypted_content'],
       ...this.request,
+      // Override to always stream and pass latest input
+      store: false,
       stream: true,
-      input: input satisfies EasyInputMessage[],
-    } as const;
+      input,
+    } satisfies OpenAI.Responses.ResponseCreateParamsStreaming;
 
     const { apiBaseUrl, apiKey } = this;
     return {
@@ -105,6 +110,9 @@ export class OpenaiResponsesProvider implements ModelProvider {
         }
         return {
           response: chunk,
+          session: {
+            state: [...input, ...chunk.response.output] satisfies ResponseInput,
+          },
         };
       },
     };
