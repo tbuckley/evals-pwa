@@ -2,7 +2,9 @@ import {
   normalizedProviderConfigSchema,
   type ConversationPrompt,
   type ModelProvider,
+  type ModelUpdate,
   type PromptPart,
+  type ProviderOutputPart,
   type RunContext,
   type TokenUsage,
 } from '$lib/types';
@@ -11,8 +13,13 @@ import { Semaphore } from '$lib/utils/semaphore';
 import { z } from 'zod';
 import { CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN } from './common';
 import OpenAI from 'openai';
-import type { EasyInputMessage, ResponseInput } from 'openai/resources/responses/responses.mjs';
+import type {
+  EasyInputMessage,
+  ResponseFunctionWebSearch,
+  ResponseInput,
+} from 'openai/resources/responses/responses.mjs';
 import { getOpenaiCost } from './openai-completions';
+import { FileReference } from '$lib/storage/FileReference';
 
 const OPENAI_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
 
@@ -87,10 +94,21 @@ export class OpenaiResponsesProvider implements ModelProvider {
         const stream = await client.responses.create(request, { signal: context.abortSignal });
         let chunk: OpenAI.Responses.ResponseStreamEvent | undefined;
         for await (chunk of stream) {
+          if (chunk.type === 'response.output_item.done') {
+            // Ignore type message, since we yield the delta directly
+            // TODO handle type=message, part.type=refusal
+            if (chunk.item.type !== 'message') {
+              const output = convertOutputItem(chunk.item);
+              if (output) {
+                yield {
+                  type: 'append',
+                  output,
+                } satisfies ModelUpdate;
+              }
+            }
+          }
           if (chunk.type === 'response.output_text.delta') {
             yield chunk.delta;
-          } else {
-            console.log(chunk.type); // FIXME: don't log
           }
         }
         // if (!resp.ok) {
@@ -118,17 +136,20 @@ export class OpenaiResponsesProvider implements ModelProvider {
     };
   }
 
-  extractOutput(response: unknown): string {
+  extractOutput(response: unknown) {
     if (!isResponse(response)) {
       throw new Error('Unexpected response format');
     }
 
     return response.response.output
-      .filter((o) => o.type === 'message')
-      .flatMap((o) => o.content)
-      .filter((c) => c.type === 'output_text')
-      .flatMap((c) => c.text)
-      .join('');
+      .map((item) => {
+        const output = convertOutputItem(item);
+        if (output instanceof FileReference) {
+          return output.file;
+        }
+        return output;
+      })
+      .filter((item) => item !== null);
   }
 
   extractTokenUsage(response: unknown): TokenUsage {
@@ -198,4 +219,46 @@ const parsedResponseSchema = z.object({
 });
 function isResponse(response: unknown): response is OpenAI.Responses.ResponseCompletedEvent {
   return parsedResponseSchema.safeParse(response).success;
+}
+
+function convertOutputItem(item: OpenAI.Responses.ResponseOutputItem): ProviderOutputPart | null {
+  if (item.type === 'message') {
+    return item.content
+      .filter((c) => c.type === 'output_text') // TODO handle refusal too
+      .flatMap((c) => c.text) // TODO handle annotations too
+      .join('');
+  } else if (item.type === 'reasoning') {
+    return {
+      type: 'meta',
+      title: 'Reasoning',
+      icon: 'thinking',
+      message: item.summary.map((s) => s.text).join('\n'),
+    };
+  } else if (item.type === 'web_search_call') {
+    const action = (item as unknown as WebSearchCall).action;
+    return {
+      type: 'meta',
+      title: 'Web Search',
+      icon: 'search',
+      message: summarizeSearchAction(action),
+    };
+  }
+  return null;
+}
+
+interface WebSearchCall {
+  action:
+    | ResponseFunctionWebSearch.Search
+    | ResponseFunctionWebSearch.OpenPage
+    | ResponseFunctionWebSearch.Find;
+}
+function summarizeSearchAction(action: WebSearchCall['action']): string {
+  if (action.type === 'search') {
+    const sources = action.sources?.map((source) => source.url).join(', ') ?? 'the web';
+    return `Searching for "${action.query}" across ${sources}`;
+  } else if (action.type === 'open_page') {
+    return `Opening page ${action.url}`;
+  } else {
+    return `Finding "${action.pattern}" on page ${action.url}`;
+  }
 }
