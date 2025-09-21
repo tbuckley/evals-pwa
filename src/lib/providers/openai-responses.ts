@@ -284,7 +284,75 @@ async function convertOutputItem(
       const blob = new Blob([byteArray], { type: 'image/png' });
       return blobToFileReference(blob);
     }
+  } else if (item.type === 'code_interpreter_call') {
+    return {
+      type: 'meta',
+      title: 'Code Interpreter',
+      icon: 'code',
+      message: (item.code ?? 'No code provided') + '\n\nOutputs not shown.',
+      // TODO add item.outputs
+    };
+  } else if (item.type === 'computer_call') {
+    return {
+      type: 'meta',
+      title: 'Computer Use',
+      icon: 'code',
+      message: JSON.stringify(
+        {
+          call_id: item.call_id,
+          action: item.action,
+          pending_safety_checks: item.pending_safety_checks,
+        },
+        null,
+        2,
+      ),
+    };
+  } else if (item.type === 'local_shell_call') {
+    return {
+      type: 'meta',
+      title: 'Local Shell',
+      icon: 'code',
+      message: JSON.stringify(
+        {
+          call_id: item.call_id,
+          action: item.action,
+        },
+        null,
+        2,
+      ),
+    };
+  } else if (item.type === 'file_search_call') {
+    return {
+      type: 'meta',
+      title: 'File Search',
+      icon: 'search',
+      message: JSON.stringify(
+        {
+          queries: item.queries,
+          results: item.results,
+        },
+        null,
+        2,
+      ),
+    };
+  } else if (item.type === 'custom_tool_call') {
+    return {
+      type: 'meta',
+      title: 'Custom Tool',
+      icon: 'code',
+      message: JSON.stringify(
+        {
+          call_id: item.call_id,
+          name: item.name,
+          input: item.input,
+        },
+        null,
+        2,
+      ),
+    };
   }
+  // TODO handle MCP calls
+  console.error('Unsupported OpenAI Responses item', item);
   return null;
 }
 
