@@ -8,7 +8,7 @@ import {
   type RunContext,
   type TokenUsage,
 } from '$lib/types';
-import { fileToBase64 } from '$lib/utils/media';
+import { decodeB64Blob, fileToBase64 } from '$lib/utils/media';
 import { Semaphore } from '$lib/utils/semaphore';
 import { z } from 'zod';
 import { CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN } from './common';
@@ -19,6 +19,7 @@ import type {
 } from 'openai/resources/responses/responses.mjs';
 import { getOpenaiCost } from './openai-completions';
 import { FileReference } from '$lib/storage/FileReference';
+import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 
 const OPENAI_SEMAPHORE = new Semaphore(CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN);
 
@@ -99,7 +100,7 @@ export class OpenaiResponsesProvider implements ModelProvider {
             // Ignore type message, since we yield the delta directly
             // TODO handle type=message, part.type=refusal
             if (chunk.item.type !== 'message') {
-              const output = convertOutputItem(chunk.item);
+              const output = await convertOutputItem(chunk.item);
               if (output) {
                 yield {
                   type: 'append',
@@ -137,20 +138,21 @@ export class OpenaiResponsesProvider implements ModelProvider {
     };
   }
 
-  extractOutput(response: unknown) {
+  async extractOutput(response: unknown) {
     if (!isResponse(response)) {
       throw new Error('Unexpected response format');
     }
 
-    return response.response.output
-      .map((item) => {
-        const output = convertOutputItem(item);
+    const outputs = await Promise.all(
+      response.response.output.map(async (item) => {
+        const output = await convertOutputItem(item);
         if (output instanceof FileReference) {
           return output.file;
         }
         return output;
-      })
-      .filter((item) => item !== null);
+      }),
+    );
+    return outputs.filter((item) => item !== null);
   }
 
   extractTokenUsage(response: unknown): TokenUsage {
@@ -244,7 +246,9 @@ function isResponse(response: unknown): response is OpenAI.Responses.ResponseCom
   return parsedResponseSchema.safeParse(response).success;
 }
 
-function convertOutputItem(item: OpenAI.Responses.ResponseOutputItem): ProviderOutputPart | null {
+async function convertOutputItem(
+  item: OpenAI.Responses.ResponseOutputItem,
+): Promise<ProviderOutputPart | null> {
   if (item.type === 'message') {
     return item.content
       .filter((c) => c.type === 'output_text') // TODO handle refusal too
@@ -274,6 +278,12 @@ function convertOutputItem(item: OpenAI.Responses.ResponseOutputItem): ProviderO
         call_id: item.call_id,
       } satisfies FunctionCallMeta,
     };
+  } else if (item.type === 'image_generation_call') {
+    if (item.result) {
+      const byteArray = decodeB64Blob(item.result);
+      const blob = new Blob([byteArray], { type: 'image/png' });
+      return blobToFileReference(blob);
+    }
   }
   return null;
 }

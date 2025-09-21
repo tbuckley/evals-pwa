@@ -8,7 +8,7 @@ import {
 } from '$lib/types';
 import { z } from 'zod';
 import { conversationToSinglePrompt } from './legacyProvider';
-import { fileToBase64 } from '$lib/utils/media';
+import { decodeB64Blob, fileToBase64 } from '$lib/utils/media';
 
 const dalleResponseSchema = z.object({
   created: z.number(),
@@ -141,12 +141,7 @@ export class DalleProvider implements ModelProvider {
 
     if (typeof firstChoice === 'string') {
       // Convert base64 to blob
-      const byteCharacters = atob(firstChoice);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
+      const byteArray = decodeB64Blob(firstChoice);
       const res: (Blob | string)[] = [new Blob([byteArray], { type: 'image/png' })];
       return res;
     }

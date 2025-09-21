@@ -1,5 +1,6 @@
 providers:
   - id: openai-responses:gpt-5
+    labels: ['search']
     config:
       tools:
         - type: web_search
@@ -7,6 +8,18 @@ providers:
         summary: auto # auto, concise, detailed
         effort: medium # minimal, low, medium, high
       'include': ['reasoning.encrypted_content']
+  - id: openai-responses:gpt-5
+    labels: ['image-gen']
+    config:
+      tools:
+        - type: image_generation
+      reasoning:
+        summary: auto # auto, concise, detailed
+        effort: medium # minimal, low, medium, high
+      'include': ['reasoning.encrypted_content']
 
 prompts:
-  - 'what was a positive news story from today?'
+  - prompt: 'what was a positive news story from today?'
+    providerLabel: search
+  - prompt: 'generate an image of a dog on a skateboard'
+    providerLabel: image-gen
