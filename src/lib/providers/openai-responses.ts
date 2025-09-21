@@ -14,7 +14,6 @@ import { z } from 'zod';
 import { CHROME_CONCURRENT_REQUEST_LIMIT_PER_DOMAIN } from './common';
 import OpenAI from 'openai';
 import type {
-  EasyInputMessage,
   ResponseFunctionWebSearch,
   ResponseInput,
 } from 'openai/resources/responses/responses.mjs';
@@ -69,7 +68,9 @@ export class OpenaiResponsesProvider implements ModelProvider {
 
   async run(conversation: ConversationPrompt, context: RunContext) {
     const sessionMessages = (context.session?.state ?? []) as ResponseInput;
-    const newMessages = (await conversationToOpenAI(conversation)) satisfies EasyInputMessage[];
+    const newMessages = (await conversationToOpenAI(
+      conversation,
+    )) satisfies OpenAI.Responses.ResponseInputItem[];
     const input = [...sessionMessages, ...newMessages] satisfies ResponseInput;
 
     const request = {
@@ -194,24 +195,46 @@ async function multiPartPromptToOpenAIResponsesAPI(part: PromptPart): Promise<Pa
       file_data: b64,
     };
   } else {
+    console.error('Unsupported OpenAI Responses part', part);
     throw new Error('Unsupported part type');
   }
 }
 
-export interface Message {
-  role: 'user' | 'assistant' | 'system';
-  content: Part[];
-}
+export type Message = OpenAI.Responses.ResponseInputItem;
+
+const functionCallMetaSchema = z.object({
+  call_id: z.string(),
+});
+type FunctionCallMeta = z.infer<typeof functionCallMetaSchema>;
 
 async function conversationToOpenAI(conversation: ConversationPrompt): Promise<Message[]> {
-  return await Promise.all(
-    conversation.map(
-      async (part): Promise<Message> => ({
-        role: part.role,
-        content: await Promise.all(part.content.map(multiPartPromptToOpenAIResponsesAPI)),
-      }),
-    ),
+  const messages = await Promise.all(
+    conversation.map(async (part): Promise<Message[]> => {
+      // If it's only function responses, return them as individual messages
+      // TODO return function calls, and any other parts as a message
+      if (part.content.every((p) => 'type' in p && p.type === 'function-response')) {
+        return part.content.map((r) => {
+          const meta = functionCallMetaSchema.safeParse(r.call.meta);
+          if (!meta.success) {
+            throw new Error('function call is missing call_id required for OpenAI');
+          }
+          return {
+            type: 'function_call_output',
+            call_id: meta.data.call_id,
+            output: JSON.stringify(r.response),
+          } satisfies OpenAI.Responses.ResponseInputItem.FunctionCallOutput;
+        });
+      }
+      // Return it as a single message
+      return [
+        {
+          role: part.role,
+          content: await Promise.all(part.content.map(multiPartPromptToOpenAIResponsesAPI)),
+        },
+      ];
+    }),
   );
+  return messages.flat();
 }
 
 const parsedResponseSchema = z.object({
@@ -241,6 +264,15 @@ function convertOutputItem(item: OpenAI.Responses.ResponseOutputItem): ProviderO
       title: 'Web Search',
       icon: 'search',
       message: summarizeSearchAction(action),
+    };
+  } else if (item.type === 'function_call') {
+    return {
+      type: 'function-call',
+      name: item.name,
+      args: JSON.parse(item.arguments),
+      meta: {
+        call_id: item.call_id,
+      } satisfies FunctionCallMeta,
     };
   }
   return null;

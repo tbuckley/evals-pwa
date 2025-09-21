@@ -22,6 +22,19 @@ providers:
                 type: string
                 description: 'The expression to evaluate'
 
+  - id: openai-responses:gpt-5-mini
+    config:
+      tools:
+        - type: function
+          name: calculator
+          description: 'A calculator'
+          parameters:
+            type: object
+            properties:
+              expression:
+                type: string
+                description: 'The expression to evaluate'
+
 prompts:
   - 'What is the square root of 29?'
   - 'What events are happening in NYC on August 25th, 2025?'
