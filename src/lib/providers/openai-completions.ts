@@ -211,7 +211,16 @@ export function getOpenaiCost(
 ): number | undefined {
   // As of July 18 2024
   let inputCostPerMillion: number, outputCostPerMillion: number;
-  if (model.startsWith('gpt-4.1-nano')) {
+  if (model.startsWith('gpt-5-nano')) {
+    inputCostPerMillion = 0.05;
+    outputCostPerMillion = 0.4;
+  } else if (model.startsWith('gpt-5-mini')) {
+    inputCostPerMillion = 0.25;
+    outputCostPerMillion = 2.0;
+  } else if (model.startsWith('gpt-5')) {
+    inputCostPerMillion = 1.25;
+    outputCostPerMillion = 10;
+  } else if (model.startsWith('gpt-4.1-nano')) {
     inputCostPerMillion = 0.1;
     outputCostPerMillion = 0.4;
   } else if (model.startsWith('gpt-4.1-mini')) {
