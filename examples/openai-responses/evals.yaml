@@ -1,0 +1,38 @@
+providers:
+  - id: openai-responses:gpt-5
+    labels: ['search']
+    config:
+      tools:
+        - type: web_search
+      reasoning:
+        summary: auto # auto, concise, detailed
+        effort: medium # minimal, low, medium, high
+      'include': ['reasoning.encrypted_content']
+  - id: openai-responses:gpt-5
+    labels: ['image-gen']
+    config:
+      tools:
+        - type: image_generation
+      reasoning:
+        summary: auto # auto, concise, detailed
+        effort: medium # minimal, low, medium, high
+      'include': ['reasoning.encrypted_content']
+  - id: openai-responses:gpt-5
+    labels: ['code-interpreter']
+    config:
+      tools:
+        - type: code_interpreter
+          container:
+            type: auto
+      reasoning:
+        summary: auto # auto, concise, detailed
+        effort: medium # minimal, low, medium, high
+      'include': ['reasoning.encrypted_content']
+
+prompts:
+  - prompt: 'what was a positive news story from today?'
+    providerLabel: search
+  - prompt: 'generate an image of a dog on a skateboard'
+    providerLabel: image-gen
+  - prompt: 'What is the square root of 43121229?'
+    providerLabel: code-interpreter

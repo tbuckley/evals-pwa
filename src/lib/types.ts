@@ -128,7 +128,7 @@ const functionCallSchema = z.object({
 });
 const functionResponseSchema = z.object({
   type: z.literal('function-response'),
-  call: z.string(),
+  call: functionCallSchema,
   response: z.unknown(),
 });
 export type FunctionCall = z.infer<typeof functionCallSchema>;

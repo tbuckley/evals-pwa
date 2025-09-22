@@ -330,13 +330,7 @@ export class GeminiProvider implements ModelProvider {
           meta: null,
         };
       }
-      if ('functionResponse' in part) {
-        return {
-          type: 'function-response',
-          call: part.functionResponse.name,
-          response: part.functionResponse.response,
-        };
-      }
+      // Don't handle functionResponse, it won't actually appear in output
       return {
         type: 'meta',
         title: 'Unknown',
@@ -521,7 +515,7 @@ async function multiPartPromptToGemini(prompt: MultiPartPrompt): Promise<Part[]>
     } else if (part.type === 'function-response') {
       parts.push({
         functionResponse: {
-          name: part.call,
+          name: part.call.name,
           response: maybeWrapFunctionResponse(part.response),
         },
       });

@@ -1,7 +1,7 @@
 import type { ModelProvider } from '$lib/types';
-import { OpenaiProvider } from './openai';
+import { OpenaiCompletionsProvider } from './openai-completions';
 
-export class OllamaProvider extends OpenaiProvider implements ModelProvider {
+export class OllamaProvider extends OpenaiCompletionsProvider implements ModelProvider {
   constructor(
     public model: string,
     public apiKey: string,

@@ -14,6 +14,19 @@ providers:
                   topic:
                     type: string
                     description: 'A topic for the haiku'
+  - id: openai-responses:gpt-5-mini
+    labels: ['orchestrator']
+    config:
+      tools:
+        - type: function
+          name: haiku
+          description: 'Write an expert-level haiku about a given topic'
+          parameters:
+            type: object
+            properties:
+              topic:
+                type: string
+                description: 'A topic for the haiku'
 
 prompts:
   - $pipeline:

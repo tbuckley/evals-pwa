@@ -576,7 +576,7 @@ function getFunctionResponses(context: PipelineContext, deps: string[]): Functio
   for (let i = 0; i < calls.length; i++) {
     responses.push({
       type: 'function-response',
-      call: calls[i].name,
+      call: calls[i],
       response: parseFunctionResponse(stripOutputMetadata(context.vars[callResults[i]])),
     });
   }
