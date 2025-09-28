@@ -1,3 +1,4 @@
+import { toCodeReference } from '$lib/storage/CodeReference';
 import { FileReference } from '$lib/storage/FileReference';
 import {
   type TestEnvironment,
@@ -12,14 +13,16 @@ import {
   type TestResult,
   type NormalizedPipelinePrompt,
   type ModelSession,
-  type ProviderOutputPart,
   type FunctionCall,
   type FunctionResponse,
   providerOutputSchema,
+  type ProviderOutput,
+  functionCallSchema,
 } from '$lib/types';
 import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
 import { generator } from './generator';
 import { HandlebarsPromptFormatter } from './HandlebarsPromptFormatter';
+import { hashJson } from './hashJson';
 import { makeOrderedMerge } from './orderedMerge';
 import { ParallelTaskQueue } from './ParallelTaskQueue';
 import { PipelineState } from './PipelineState';
@@ -38,10 +41,10 @@ export interface Config {
 export interface HistoryItem {
   id: string;
   prompt: ConversationPrompt;
-  output: NonNullable<TestResult['output']>;
+  output: unknown;
 }
 export interface PipelineVars {
-  $output: NonNullable<TestResult['output']> | null;
+  $output: unknown;
   $history: HistoryItem[];
   [key: string]: unknown;
 }
@@ -222,11 +225,23 @@ export class PipelineEnvironment implements TestEnvironment {
         );
       }
 
+      // Clean the output for vars, stripping metadata and simplifying to string if possible
+      let varOutput: ProviderOutput = simplifyOutputArray(stripOutputMetadata(output));
+
+      // Transform output
+      if (step.transform) {
+        const code = await toCodeReference(step.transform);
+        const execute = await code.bind();
+        const result = await execute(varOutput, { vars });
+        // FIXME: also let it modify vars
+        varOutput = providerOutputSchema.parse(result);
+      }
+
       // Add the output to the vars, and remove any virtual vars
       // Use step.id for this history since it is only used for prompts/if
-      const newHistory = [...pipelineContext.history, { id: step.id, prompt, output }];
+      const newHistory = [...pipelineContext.history, { id: step.id, prompt, output: varOutput }];
       if (step.outputAs && !delegateMarkCompleteToDependency) {
-        newPipelineVars[step.outputAs] = stripOutputMetadata(output);
+        newPipelineVars[step.outputAs] = varOutput;
       }
       stripFunctionCallResults(newPipelineVars);
 
@@ -234,7 +249,7 @@ export class PipelineEnvironment implements TestEnvironment {
       const stepResult: TestOutput = {
         rawPrompt: prompt,
         rawOutput: response,
-        output: output,
+        output: output, // FIXME: save the transformed output?
         latencyMillis: latencyMillis,
         tokenUsage: tokenUsage,
       };
@@ -248,7 +263,7 @@ export class PipelineEnvironment implements TestEnvironment {
           ...vars,
           ...newPipelineVars,
           $history: newHistory,
-          $output: stripOutputMetadata(newHistory.at(-1)?.output ?? null),
+          $output: newHistory.at(-1)?.output ?? null,
         },
 
         {
@@ -399,40 +414,20 @@ const historyMergeFn = makeOrderedMerge<HistoryItem>(function (a, b) {
   }
 
   // Finally, by output
-  if (typeof a.output === 'string' && typeof b.output === 'string') {
-    if (a.output !== b.output) {
-      return a.output < b.output ? -1 : 1;
-    }
-  } else if (typeof a.output === 'string' && typeof b.output === 'object') {
-    return -1;
-  } else if (typeof a.output === 'object' && typeof b.output === 'string') {
-    return 1;
-  } else if (typeof a.output === 'object' && typeof b.output === 'object') {
-    if (a.output.length !== b.output.length) {
-      return a.output.length < b.output.length ? -1 : 1;
-    }
-    for (let i = 0; i < a.output.length; i++) {
-      const ao = a.output[i];
-      const bo = b.output[i];
-      if (typeof ao === 'string' && typeof bo === 'string') {
-        return ao < bo ? -1 : 1;
-      } else if (typeof ao === 'string' && typeof bo === 'object') {
-        return -1;
-      } else if (typeof ao === 'object' && typeof bo === 'string') {
-        return 1;
-      } else if (ao instanceof FileReference && bo instanceof FileReference) {
-        // Here we can use the file name since FileReference has an absolute path
-        if (ao.uri !== bo.uri) {
-          return ao.uri < bo.uri ? -1 : 1;
-        }
-      } else if (typeof ao === 'object' && typeof bo === 'object') {
-        const ja = JSON.stringify(ao);
-        const jb = JSON.stringify(bo);
-        if (ja !== jb) {
-          return ja < jb ? -1 : 1;
-        }
-      } else {
-        throw new Error('Invalid output part');
+  if (a.output !== b.output) {
+    if (typeof a.output === 'string' && typeof b.output === 'string') {
+      if (a.output !== b.output) {
+        return a.output < b.output ? -1 : 1;
+      }
+    } else if (typeof a.output === 'string' && typeof b.output === 'object') {
+      return -1;
+    } else if (typeof a.output === 'object' && typeof b.output === 'string') {
+      return 1;
+    } else if (typeof a.output === 'object' && typeof b.output === 'object') {
+      const ahash = hashJson(a.output);
+      const bhash = hashJson(b.output);
+      if (ahash !== bhash) {
+        return ahash < bhash ? -1 : 1;
       }
     }
   }
@@ -453,8 +448,8 @@ function mergePipelineContext(a: PipelineContext, b: PipelineContext): PipelineC
   };
 }
 
-function isFunctionCall(part: ProviderOutputPart): part is FunctionCall {
-  return typeof part === 'object' && 'type' in part && part.type === 'function-call';
+function isFunctionCall(part: unknown): part is FunctionCall {
+  return functionCallSchema.safeParse(part).success;
 }
 
 function stripFunctionCallResults(vars: VarSet) {
@@ -577,7 +572,7 @@ function getFunctionResponses(context: PipelineContext, deps: string[]): Functio
     responses.push({
       type: 'function-response',
       call: calls[i],
-      response: parseFunctionResponse(stripOutputMetadata(context.vars[callResults[i]])),
+      response: parseFunctionResponse(context.vars[callResults[i]]),
     });
   }
 
@@ -586,29 +581,25 @@ function getFunctionResponses(context: PipelineContext, deps: string[]): Functio
 
 function parseFunctionResponse(val: unknown): unknown {
   // If it's a string-like output, try parsing as JSON
-  const stringVal = getOutputAsString(val);
-  if (stringVal) {
+  if (typeof val === 'string') {
     try {
-      const parsed = JSON.parse(stringVal) as unknown;
+      const parsed = JSON.parse(val) as unknown;
       return parsed;
     } catch {
-      return stringVal;
+      // Do nothing
     }
   }
 
   // Otherwise just return the object
   return val;
 }
-function getOutputAsString(val: unknown): string | null {
-  if (typeof val === 'string') {
-    return val;
-  }
+function simplifyOutputArray(val: ProviderOutput): ProviderOutput {
   if (Array.isArray(val) && val.length === 1 && typeof val[0] === 'string') {
     return val[0];
   }
-  return null;
+  return val;
 }
-function stripOutputMetadata(val: unknown): unknown {
+function stripOutputMetadata(val: ProviderOutput): ProviderOutput {
   // Get only string/file parts, ignoring function calls/responses and metadata
   const parsed = providerOutputSchema.safeParse(val);
   if (!parsed.success) {
@@ -618,7 +609,12 @@ function stripOutputMetadata(val: unknown): unknown {
     return parsed.data;
   }
   return parsed.data.filter((p) => {
-    return typeof p === 'string' || p instanceof FileReference;
+    return (
+      typeof p === 'string' ||
+      p instanceof FileReference ||
+      p.type === 'function-call' ||
+      p.type === 'function-response'
+    );
   });
 }
 
@@ -632,7 +628,7 @@ function generatePipelineVars(vars: VarSet, pipelineContext: PipelineContext) {
     ...vars,
     ...pipelineContext.vars,
     $history: pipelineContext.history,
-    $output: stripOutputMetadata(pipelineContext.history.at(-1)?.output ?? null),
+    $output: pipelineContext.history.at(-1)?.output ?? null,
   };
 }
 

@@ -37,6 +37,7 @@ export interface NormalizedPipelineStep {
   deps?: string[];
   providerLabel?: string;
   session?: string | boolean;
+  transform?: string | CodeReference;
 }
 export interface NormalizedPipelinePrompt {
   $pipeline: NormalizedPipelineStep[];
@@ -120,7 +121,7 @@ const tokenUsageSchema = z.object({
 });
 export type TokenUsage = z.infer<typeof tokenUsageSchema>;
 
-const functionCallSchema = z.object({
+export const functionCallSchema = z.object({
   type: z.literal('function-call'),
   name: z.string(),
   args: z.unknown(),

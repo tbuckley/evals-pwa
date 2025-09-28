@@ -68,7 +68,7 @@ describe('PipelineEnvironment', () => {
           {
             id: 'step-0',
             deps: ['b'],
-            if: 'function execute(vars) {return vars.b?.[0]?.length < 5;}',
+            if: 'function execute(vars) {return vars.b?.length < 5;}',
             prompt: '{{b}}A',
             outputAs: 'a',
           },
@@ -251,5 +251,25 @@ describe('PipelineEnvironment', () => {
 
     expect(output.error).toBeUndefined();
     expect(output.output).toEqual(['"hello...!""world...!"', finishMeta]);
+  });
+
+  test('supports transform functions', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'step-0',
+            prompt: 'Hello {{target}}',
+            transform: 'function execute(output) { return output.toUpperCase() }',
+          },
+          { id: 'step-1', prompt: '{{$output}}!' },
+          { id: 'step-2', prompt: '{{$output}} Hi {{target}}.' },
+        ],
+      },
+      { target: 'world' },
+    );
+
+    expect(output.output).toEqual(['HELLO WORLD! Hi world.', finishMeta]);
+    expect(output.error).toBeUndefined();
   });
 });
