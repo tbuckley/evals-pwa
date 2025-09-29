@@ -31,7 +31,7 @@ export const providerSchema = z.union([z.string(), normalizedProviderSchema]);
 
 export interface NormalizedPipelineStep {
   id: string;
-  prompt: string;
+  prompt?: string;
   outputAs?: string;
   if?: string | CodeReference;
   deps?: string[];
@@ -53,11 +53,13 @@ export const pipelinePromptSchema = z.object({
       z.string(),
       z.object({
         id: z.string().optional(),
-        prompt: z.string(),
+        prompt: z.string().optional(),
         providerLabel: z.string().optional(),
         outputAs: z.string().optional(),
         if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
         deps: z.array(z.string()).optional(),
+        session: z.union([z.string(), z.boolean()]).optional(),
+        transform: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
       }),
     ]),
   ),

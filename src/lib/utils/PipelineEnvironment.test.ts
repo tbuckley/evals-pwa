@@ -262,7 +262,7 @@ describe('PipelineEnvironment', () => {
             prompt: 'Hello {{target}}',
             transform: 'function execute(output) { return output.toUpperCase() }',
           },
-          { id: 'step-1', prompt: '{{$output}}!' },
+          { id: 'step-1', transform: 'function execute(output) { return output + "!" }' },
           { id: 'step-2', prompt: '{{$output}} Hi {{target}}.' },
         ],
       },
@@ -270,6 +270,31 @@ describe('PipelineEnvironment', () => {
     );
 
     expect(output.output).toEqual(['HELLO WORLD! Hi world.', finishMeta]);
+    expect(output.error).toBeUndefined();
+  });
+
+  test('supports transform functions with no prompt', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'set-2',
+            transform: 'function execute(output) { return "2"; }',
+          },
+          {
+            id: 'mult-3',
+            transform: 'function execute(output) { return (parseInt(output)*3).toString(); }',
+          },
+          {
+            id: 'add-4',
+            transform: 'function execute(output) { return (parseInt(output)+4).toString(); }',
+          },
+        ],
+      },
+      { target: 'world' },
+    );
+
+    expect(output.output).toEqual('10');
     expect(output.error).toBeUndefined();
   });
 });

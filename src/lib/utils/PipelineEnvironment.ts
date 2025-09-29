@@ -18,6 +18,7 @@ import {
   providerOutputSchema,
   type ProviderOutput,
   functionCallSchema,
+  type TokenUsage,
 } from '$lib/types';
 import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
 import { generator } from './generator';
@@ -150,12 +151,12 @@ export class PipelineEnvironment implements TestEnvironment {
         throw new Error(`Model for step ${step.id} not found`);
       }
 
-      // Generate the prompt
-      let prompt: ConversationPrompt;
+      // Generate the prompt (optional)
+      let prompt: ConversationPrompt | undefined;
       const functionResponses = getFunctionResponses(pipelineContext, step.deps ?? []);
       if (functionResponses) {
         prompt = [{ role: 'user', content: functionResponses }];
-      } else {
+      } else if (step.prompt) {
         prompt = await renderPrompt(
           step.prompt,
           generatePipelineVars(vars, pipelineContext),
@@ -165,24 +166,32 @@ export class PipelineEnvironment implements TestEnvironment {
 
       // Run the prompt (or read from cache)
       const session = sessionId ? sessionManager.get(sessionId) : undefined;
-
-      const { output, tokenUsage, latencyMillis, finished, response, errorResult } = await runModel(
-        model,
-        prompt,
-        this.cache,
-        session,
-        sessionId ? (value: SessionState) => sessionManager.set(sessionId, value) : undefined,
-        context,
-        count,
-        (value: ModelUpdate) => {
-          modelUpdateGenerator.yield({ ...value, internalId: stepId });
-        },
-      );
-      if (errorResult) {
-        history.push({ id: stepId, ...errorResult });
-        result = errorResult;
-        return;
+      let modelResult: RunModelResult | undefined;
+      if (prompt) {
+        modelResult = await runModel(
+          model,
+          prompt,
+          this.cache,
+          session,
+          sessionId ? (value: SessionState) => sessionManager.set(sessionId, value) : undefined,
+          context,
+          count,
+          (value: ModelUpdate) => {
+            modelUpdateGenerator.yield({ ...value, internalId: stepId });
+          },
+        );
+        if (modelResult.errorResult) {
+          history.push({ id: stepId, ...modelResult.errorResult });
+          result = modelResult.errorResult;
+          return;
+        }
       }
+
+      // If no output, try using the previous output
+      const output =
+        modelResult?.output ??
+        (pipelineContext.history.at(-1)?.output as ProviderOutput | undefined) ??
+        [];
 
       // Do not mark as completed, it will be delegated by a virtual step
       let delegateMarkCompleteToDependency: string | null = null;
@@ -239,7 +248,10 @@ export class PipelineEnvironment implements TestEnvironment {
 
       // Add the output to the vars, and remove any virtual vars
       // Use step.id for this history since it is only used for prompts/if
-      const newHistory = [...pipelineContext.history, { id: step.id, prompt, output: varOutput }];
+      const newHistory = [
+        ...pipelineContext.history,
+        { id: step.id, prompt: prompt ?? [], output: varOutput },
+      ];
       if (step.outputAs && !delegateMarkCompleteToDependency) {
         newPipelineVars[step.outputAs] = varOutput;
       }
@@ -248,10 +260,10 @@ export class PipelineEnvironment implements TestEnvironment {
       // Save the step's result to history
       const stepResult: TestOutput = {
         rawPrompt: prompt,
-        rawOutput: response,
-        output: output, // FIXME: save the transformed output?
-        latencyMillis: latencyMillis,
-        tokenUsage: tokenUsage,
+        rawOutput: modelResult?.response,
+        output: step.transform ? varOutput : output, // Save transformed output if there is a transform
+        latencyMillis: modelResult?.latencyMillis,
+        tokenUsage: modelResult?.tokenUsage,
       };
       history.push({ id: stepId, ...stepResult });
 
@@ -305,7 +317,7 @@ export class PipelineEnvironment implements TestEnvironment {
         result = {
           ...stepResult,
           history,
-          latencyMillis: finished - start,
+          latencyMillis: modelResult?.finished ? modelResult.finished - start : undefined,
           tokenUsage: {
             costDollars: history
               .map((h) => h.tokenUsage?.costDollars)
@@ -462,6 +474,15 @@ function stripFunctionCallResults(vars: VarSet) {
   return vars;
 }
 
+interface RunModelResult {
+  output?: ProviderOutput;
+  tokenUsage?: TokenUsage;
+  latencyMillis?: number;
+  finished?: number;
+  response?: unknown;
+  errorResult?: TestOutput;
+}
+
 async function runModel(
   model: ModelProvider,
   prompt: ConversationPrompt,
@@ -471,7 +492,7 @@ async function runModel(
   context: RunContext,
   count: number,
   yieldUpdate: (value: ModelUpdate) => void,
-) {
+): Promise<RunModelResult> {
   const { request, runModel } = await model.run(prompt, {
     ...context,
     session: session?.provider === model ? session.session : undefined,
