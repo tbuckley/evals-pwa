@@ -297,4 +297,45 @@ describe('PipelineEnvironment', () => {
     expect(output.output).toEqual('10');
     expect(output.error).toBeUndefined();
   });
+
+  test('supports state', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'set-value',
+            state: ['value'],
+            transform:
+              'function execute(output, {vars}) { return {vars: { $state: { value: vars.$state.value + 1 } } }; }',
+          },
+          {
+            id: 'print-value',
+            state: ['value'],
+            prompt: '{{$state.value}}',
+          },
+        ],
+      },
+      { $state: { value: 41 } },
+    );
+
+    expect(output.error).toBeUndefined();
+    expect(output.output).toEqual(['42', finishMeta]);
+  });
+
+  test('cannot read state without declaration', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'print-value',
+            prompt: 'Value: {{$state.value}}',
+          },
+        ],
+      },
+      { $state: { value: 42 } },
+    );
+
+    expect(output.output).toEqual(['Value: ', finishMeta]);
+    expect(output.error).toBeUndefined();
+  });
 });

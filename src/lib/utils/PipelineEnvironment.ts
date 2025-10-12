@@ -96,7 +96,7 @@ export class PipelineEnvironment implements TestEnvironment {
   }
 
   async *run(
-    vars: VarSet,
+    varsOriginal: VarSet,
     context: RunContext,
   ): AsyncGenerator<string | ModelUpdate, TestOutput, void> {
     const pipelineState = new PipelineState(this.pipeline.$pipeline, mergePipelineContext);
@@ -115,7 +115,8 @@ export class PipelineEnvironment implements TestEnvironment {
 
     const sessionManager = new Map<string, SessionState>();
 
-    const initialState = varSetSchema.safeParse(vars.$state);
+    const vars = { ...varsOriginal, $state: undefined }; // Clone vars so we don't mutate the original
+    const initialState = varSetSchema.safeParse(varsOriginal.$state);
     const stateManager = new StateManager(initialState.success ? initialState.data : {});
 
     const safeRunStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
@@ -327,12 +328,16 @@ export class PipelineEnvironment implements TestEnvironment {
       // Update the state vars so they'll be written back
       // TODO: Make this less hacky, e.g. return new stateVars?
       for (const key in stateVars) {
-        const updatedState = varSetSchema.safeParse(newPipelineVars.$state);
+        // $state may never have been written to (via outputAs or transform)
+        const updatedState = varSetSchema.safeParse(newPipelineVars.$state ?? {});
         if (!updatedState.success) {
           throw new Error(`Invalid state vars: ${updatedState.error.message}`);
         }
         stateVars[key] = updatedState.data[key] as unknown;
       }
+
+      // Remove state vars from the pipeline, each step must declare its own state
+      delete newPipelineVars.$state;
 
       // Save the step's result to history
       const stepResult: TestOutput = {
@@ -365,7 +370,6 @@ export class PipelineEnvironment implements TestEnvironment {
       if (next.length > 0) {
         // Run the next steps
         for (const { step, context } of next) {
-          console.log('enqueueing step', step.id);
           taskQueue.enqueue(() => safeRunStep(step, context));
         }
       } else if (isLeaf) {
