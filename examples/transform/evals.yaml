@@ -3,20 +3,20 @@ providers:
 
 prompts:
   - $pipeline:
-      - transform: "function execute(output, context) { return context.vars.input; }"
-      - transform: "function execute(output) { return (parseInt(output)*3).toString(); }"
-      - transform: "function execute(output) { return (parseInt(output)+4).toString(); }"
+      - transform: 'function execute(output, context) { return context.vars.input; }'
+      - transform: 'function execute(output) { return (parseInt(output)*3).toString(); }'
+      - transform: 'function execute(output) { return (parseInt(output)+4).toString(); }'
 
 tests:
   - vars:
-      input: "2"
+      input: '2'
     assert:
       - type: equals
         vars:
-          value: "10"
+          value: '10'
   - vars:
-      input: "3"
+      input: '3'
     assert:
       - type: equals
         vars:
-          value: "13"
+          value: '13'

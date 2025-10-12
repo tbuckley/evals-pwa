@@ -20,6 +20,7 @@ import {
   functionCallSchema,
   type TokenUsage,
 } from '$lib/types';
+import { z } from 'zod';
 import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
 import { generator } from './generator';
 import { HandlebarsPromptFormatter } from './HandlebarsPromptFormatter';
@@ -53,6 +54,11 @@ interface SessionState {
   session: ModelSession;
   provider: ModelProvider;
 }
+
+const transformOutputSchema = z.object({
+  vars: z.record(z.string(), z.unknown()).optional(),
+  output: providerOutputSchema.optional(),
+});
 
 export class PipelineEnvironment implements TestEnvironment {
   models: ModelConfig;
@@ -242,8 +248,21 @@ export class PipelineEnvironment implements TestEnvironment {
         const code = await toCodeReference(step.transform);
         const execute = await code.bind();
         const result = await execute(varOutput, { vars });
-        // FIXME: also let it modify vars
-        varOutput = providerOutputSchema.parse(result);
+
+        // FIXME: Check whether the result can contain FileReferences, or whether it is blobs and must be converted
+        const parsed = transformOutputSchema.safeParse(result);
+        if (parsed.success && (parsed.data.vars || parsed.data.output)) {
+          // Check if it is a structured transform with vars/output
+          if (parsed.data.vars) {
+            vars = { ...vars, ...parsed.data.vars };
+          }
+          if (parsed.data.output) {
+            varOutput = parsed.data.output;
+          }
+        } else {
+          // If not, it must be a valid output
+          varOutput = providerOutputSchema.parse(result);
+        }
       }
 
       // Add the output to the vars, and remove any virtual vars
