@@ -6,7 +6,7 @@ import type { Semaphore } from './utils/semaphore';
 
 const varSchema = z.any();
 
-const varSetSchema = z.record(z.string(), varSchema);
+export const varSetSchema = z.record(z.string(), varSchema);
 
 const assertionSchema = z.object({
   // Required
@@ -38,6 +38,7 @@ export interface NormalizedPipelineStep {
   providerLabel?: string;
   session?: string | boolean;
   transform?: string | CodeReference;
+  state?: string[];
 }
 export interface NormalizedPipelinePrompt {
   $pipeline: NormalizedPipelineStep[];
@@ -60,6 +61,7 @@ export const pipelinePromptSchema = z.object({
         deps: z.array(z.string()).optional(),
         session: z.union([z.string(), z.boolean()]).optional(),
         transform: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
+        state: z.array(z.string()).optional(),
       }),
     ]),
   ),
@@ -158,6 +160,18 @@ export type ProviderOutputPart = z.infer<typeof providerOutputPartSchema>;
 export const providerOutputSchema = z.union([z.string(), z.array(providerOutputPartSchema)]);
 export type ProviderOutput = z.infer<typeof providerOutputSchema>;
 export type ExtractedOutputPart = string | Blob | MetaProviderOutputPart;
+// A TransformOutput is what the transform() function returns
+export const transformOutputSchema = z.union([
+  z.string(),
+  z.array(
+    z.union([
+      z.string(),
+      z.instanceof(Blob), // Replace FileReferences with Blobs
+      metaProviderOutputPartSchema,
+    ]),
+  ),
+]);
+export type TransformOutput = z.infer<typeof transformOutputSchema>;
 
 const baseTestOutputSchema = z.object({
   // Required

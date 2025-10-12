@@ -19,6 +19,9 @@ import {
   type ProviderOutput,
   functionCallSchema,
   type TokenUsage,
+  varSetSchema,
+  transformOutputSchema,
+  type TransformOutput,
 } from '$lib/types';
 import { z } from 'zod';
 import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
@@ -28,6 +31,8 @@ import { hashJson } from './hashJson';
 import { makeOrderedMerge } from './orderedMerge';
 import { ParallelTaskQueue } from './ParallelTaskQueue';
 import { PipelineState } from './PipelineState';
+import { StateManager } from './StateManager';
+import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 
 export interface ModelConfig {
   default: ModelProvider | null;
@@ -55,9 +60,9 @@ interface SessionState {
   provider: ModelProvider;
 }
 
-const transformOutputSchema = z.object({
+const transformResultSchema = z.object({
   vars: z.record(z.string(), z.unknown()).optional(),
-  output: providerOutputSchema.optional(),
+  output: transformOutputSchema.optional(),
 });
 
 export class PipelineEnvironment implements TestEnvironment {
@@ -110,12 +115,16 @@ export class PipelineEnvironment implements TestEnvironment {
 
     const sessionManager = new Map<string, SessionState>();
 
+    const initialState = varSetSchema.safeParse(vars.$state);
+    const stateManager = new StateManager(initialState.success ? initialState.data : {});
+
     const safeRunStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
       const count = stepRunCount.get(step.id) ?? 1;
       const stepId = step.id + (count > 1 ? ` #${count}` : '');
 
+      const { vars: stateVars, release: stateRelease } = await stateManager.lock(step.state ?? []);
       try {
-        await runStep(step, pipelineContext);
+        await runStep(step, pipelineContext, stateVars);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error('Error running step:', error);
@@ -124,10 +133,17 @@ export class PipelineEnvironment implements TestEnvironment {
           history: [...history, { id: stepId, error: errorMessage }],
         };
         taskQueue.abort();
+      } finally {
+        // Release any state
+        stateRelease(stateVars);
       }
     };
 
-    const runStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
+    const runStep = async (
+      step: NormalizedPipelineStep,
+      pipelineContext: PipelineContext,
+      stateVars: VarSet,
+    ) => {
       // Generate an ID for the step
       const count = stepRunCount.get(step.id) ?? 1;
       stepRunCount.set(step.id, count + 1);
@@ -161,11 +177,12 @@ export class PipelineEnvironment implements TestEnvironment {
       let prompt: ConversationPrompt | undefined;
       const functionResponses = getFunctionResponses(pipelineContext, step.deps ?? []);
       if (functionResponses) {
+        // TODO: Only respond if the step has a prompt, otherwise pass to transform?
         prompt = [{ role: 'user', content: functionResponses }];
       } else if (step.prompt) {
         prompt = await renderPrompt(
           step.prompt,
-          generatePipelineVars(vars, pipelineContext),
+          generatePipelineVars({ ...vars, $state: stateVars }, pipelineContext),
           model.mimeTypes,
         );
       }
@@ -191,6 +208,9 @@ export class PipelineEnvironment implements TestEnvironment {
           result = modelResult.errorResult;
           return;
         }
+      } else {
+        // Emit something so the step will appear
+        modelUpdateGenerator.yield({ type: 'replace', output: '', internalId: stepId });
       }
 
       // If no output, try using the previous output
@@ -199,11 +219,55 @@ export class PipelineEnvironment implements TestEnvironment {
         (pipelineContext.history.at(-1)?.output as ProviderOutput | undefined) ??
         [];
 
+      // Clean the output for vars, stripping metadata and simplifying to string if possible
+      let varOutput: ProviderOutput = simplifyOutputArray(stripOutputMetadata(output));
+
+      // Transform output
+      if (step.transform) {
+        const code = await toCodeReference(step.transform);
+        const execute = await code.bind();
+        const result = await execute(varOutput, {
+          vars: {
+            ...vars,
+            ...pipelineContext.vars,
+            $state: stateVars,
+            $history: pipelineContext.history,
+            $output: pipelineContext.history.at(-1)?.output ?? null,
+          },
+        });
+
+        const parsed = transformResultSchema.safeParse(result);
+        if (parsed.success && (parsed.data.vars || parsed.data.output)) {
+          // Check if it is a structured transform with vars/output
+          if (parsed.data.vars) {
+            for (const key in parsed.data.vars) {
+              newPipelineVars[key] = parsed.data.vars[key];
+            }
+          }
+          if (parsed.data.output) {
+            varOutput = await transformOutputToProviderOutput(parsed.data.output);
+            // Update the output
+            modelUpdateGenerator.yield({ type: 'replace', output: '', internalId: stepId });
+            for (const part of varOutput) {
+              modelUpdateGenerator.yield({ type: 'append', output: part, internalId: stepId });
+            }
+          }
+        } else {
+          // If not, it must be a valid output
+          varOutput = await transformOutputToProviderOutput(transformOutputSchema.parse(result));
+          // Update the output
+          modelUpdateGenerator.yield({ type: 'replace', output: '', internalId: stepId });
+          for (const part of varOutput) {
+            modelUpdateGenerator.yield({ type: 'append', output: part, internalId: stepId });
+          }
+        }
+      }
+
       // Do not mark as completed, it will be delegated by a virtual step
       let delegateMarkCompleteToDependency: string | null = null;
 
-      const functionCalls = getFunctionCalls(output);
-      if (functionCalls.length > 0 && step.session !== undefined) {
+      const functionCalls = getFunctionCalls(varOutput);
+      if (functionCalls.length > 0 && sessionId !== undefined) {
         // Create a unique suffix for virtual steps
         // TODO: consider nanoid for shorter UUIDs
         const suffix = crypto.randomUUID();
@@ -232,37 +296,12 @@ export class PipelineEnvironment implements TestEnvironment {
               pipelineState,
               part,
               virtualOutput,
-              vars,
+              vars, // stateVars are not needed here
               pipelineContext,
             );
             taskQueue.enqueue(() => safeRunStep(next.step, next.context));
           }),
         );
-      }
-
-      // Clean the output for vars, stripping metadata and simplifying to string if possible
-      let varOutput: ProviderOutput = simplifyOutputArray(stripOutputMetadata(output));
-
-      // Transform output
-      if (step.transform) {
-        const code = await toCodeReference(step.transform);
-        const execute = await code.bind();
-        const result = await execute(varOutput, { vars });
-
-        // FIXME: Check whether the result can contain FileReferences, or whether it is blobs and must be converted
-        const parsed = transformOutputSchema.safeParse(result);
-        if (parsed.success && (parsed.data.vars || parsed.data.output)) {
-          // Check if it is a structured transform with vars/output
-          if (parsed.data.vars) {
-            vars = { ...vars, ...parsed.data.vars };
-          }
-          if (parsed.data.output) {
-            varOutput = parsed.data.output;
-          }
-        } else {
-          // If not, it must be a valid output
-          varOutput = providerOutputSchema.parse(result);
-        }
       }
 
       // Add the output to the vars, and remove any virtual vars
@@ -272,9 +311,28 @@ export class PipelineEnvironment implements TestEnvironment {
         { id: step.id, prompt: prompt ?? [], output: varOutput },
       ];
       if (step.outputAs && !delegateMarkCompleteToDependency) {
-        newPipelineVars[step.outputAs] = varOutput;
+        // Handle outputAs like foo or $state.foo
+        if (step.outputAs.startsWith('$state.')) {
+          const stateOutputAs = step.outputAs.slice(6);
+          if (!varSetSchema.safeParse(newPipelineVars.$state).success) {
+            throw new Error('Invalid state vars');
+          }
+          (newPipelineVars.$state as VarSet)[stateOutputAs] = varOutput;
+        } else {
+          newPipelineVars[step.outputAs] = varOutput;
+        }
       }
       stripFunctionCallResults(newPipelineVars);
+
+      // Update the state vars so they'll be written back
+      // TODO: Make this less hacky, e.g. return new stateVars?
+      for (const key in stateVars) {
+        const updatedState = varSetSchema.safeParse(newPipelineVars.$state);
+        if (!updatedState.success) {
+          throw new Error(`Invalid state vars: ${updatedState.error.message}`);
+        }
+        stateVars[key] = updatedState.data[key] as unknown;
+      }
 
       // Save the step's result to history
       const stepResult: TestOutput = {
@@ -791,4 +849,18 @@ async function getNextSteps(
 
   // Otherwise it's a normal leaf node, pass it on
   return { next, isLeaf };
+}
+
+async function transformOutputToProviderOutput(output: TransformOutput): Promise<ProviderOutput> {
+  if (typeof output === 'string') {
+    return output;
+  }
+  return Promise.all(
+    output.map((o) => {
+      if (o instanceof Blob) {
+        return blobToFileReference(o);
+      }
+      return o;
+    }),
+  );
 }
