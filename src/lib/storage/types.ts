@@ -46,7 +46,8 @@ export const fsPipelinePromptSchema = z
         fsConvoPromptSchema,
         z.object({
           id: z.string().optional(),
-          prompt: z.union([z.string(), fsConvoPromptSchema]),
+          prompt: z.union([z.string(), fsConvoPromptSchema]).optional(),
+          transform: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
           providerLabel: z.string().optional(),
           outputAs: z.string().optional(),
           if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),

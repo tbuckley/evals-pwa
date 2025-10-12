@@ -704,7 +704,6 @@ function registerCompletionStep(
   pipelineState.registerStep({
     id,
     deps,
-    prompt: '', // FIXME: Make prompt optional
 
     // Inherit any model + post-prompt settings the original step
     providerLabel: step.providerLabel,
@@ -726,7 +725,6 @@ async function getNextSteps(
     const { next } = await pipelineState.markCompleteAndGetNextSteps(
       {
         id: delegateMarkCompleteToDependency,
-        prompt: '', // FIXME: Make prompt optional
         outputAs: delegateMarkCompleteToDependency,
       },
       vars,
