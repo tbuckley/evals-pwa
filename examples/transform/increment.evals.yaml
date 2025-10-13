@@ -1,0 +1,16 @@
+providers:
+  - echo:echo
+
+prompts:
+  - $pipeline:
+      - transform: 'function execute(output, context) { return {vars: {num: context.vars.num + 3}}; }'
+      - transform: 'function execute(output, context) { return {vars: {num: context.vars.num * 2}}; }'
+      - prompt: '{{num}}'
+
+tests:
+  - vars:
+      num: 0
+    assert:
+      - type: equals
+        vars:
+          value: '6'

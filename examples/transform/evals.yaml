@@ -1,0 +1,22 @@
+providers:
+  - gemini:gemini-2.5-flash-lite # Doesn't really matter
+
+prompts:
+  - $pipeline:
+      - transform: 'function execute(output, context) { return context.vars.input; }'
+      - transform: 'function execute(output) { return (parseInt(output)*3).toString(); }'
+      - transform: 'function execute(output) { return (parseInt(output)+4).toString(); }'
+
+tests:
+  - vars:
+      input: '2'
+    assert:
+      - type: equals
+        vars:
+          value: '10'
+  - vars:
+      input: '3'
+    assert:
+      - type: equals
+        vars:
+          value: '13'

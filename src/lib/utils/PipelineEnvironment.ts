@@ -1,3 +1,4 @@
+import { toCodeReference } from '$lib/storage/CodeReference';
 import { FileReference } from '$lib/storage/FileReference';
 import {
   type TestEnvironment,
@@ -12,17 +13,26 @@ import {
   type TestResult,
   type NormalizedPipelinePrompt,
   type ModelSession,
-  type ProviderOutputPart,
   type FunctionCall,
   type FunctionResponse,
   providerOutputSchema,
+  type ProviderOutput,
+  functionCallSchema,
+  type TokenUsage,
+  varSetSchema,
+  transformOutputSchema,
+  type TransformOutput,
 } from '$lib/types';
+import { z } from 'zod';
 import { maybeUseCache, modelOutputToTestOutput } from './environmentHelpers';
 import { generator } from './generator';
 import { HandlebarsPromptFormatter } from './HandlebarsPromptFormatter';
+import { hashJson } from './hashJson';
 import { makeOrderedMerge } from './orderedMerge';
 import { ParallelTaskQueue } from './ParallelTaskQueue';
 import { PipelineState } from './PipelineState';
+import { StateManager } from './StateManager';
+import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
 
 export interface ModelConfig {
   default: ModelProvider | null;
@@ -38,10 +48,10 @@ export interface Config {
 export interface HistoryItem {
   id: string;
   prompt: ConversationPrompt;
-  output: NonNullable<TestResult['output']>;
+  output: unknown;
 }
 export interface PipelineVars {
-  $output: NonNullable<TestResult['output']> | null;
+  $output: unknown;
   $history: HistoryItem[];
   [key: string]: unknown;
 }
@@ -49,6 +59,11 @@ interface SessionState {
   session: ModelSession;
   provider: ModelProvider;
 }
+
+const transformResultSchema = z.object({
+  vars: z.record(z.string(), z.unknown()).optional(),
+  output: transformOutputSchema.optional(),
+});
 
 export class PipelineEnvironment implements TestEnvironment {
   models: ModelConfig;
@@ -81,7 +96,7 @@ export class PipelineEnvironment implements TestEnvironment {
   }
 
   async *run(
-    vars: VarSet,
+    varsOriginal: VarSet,
     context: RunContext,
   ): AsyncGenerator<string | ModelUpdate, TestOutput, void> {
     const pipelineState = new PipelineState(this.pipeline.$pipeline, mergePipelineContext);
@@ -100,12 +115,17 @@ export class PipelineEnvironment implements TestEnvironment {
 
     const sessionManager = new Map<string, SessionState>();
 
+    const vars = { ...varsOriginal, $state: undefined }; // Clone vars so we don't mutate the original
+    const initialState = varSetSchema.safeParse(varsOriginal.$state);
+    const stateManager = new StateManager(initialState.success ? initialState.data : {});
+
     const safeRunStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
       const count = stepRunCount.get(step.id) ?? 1;
       const stepId = step.id + (count > 1 ? ` #${count}` : '');
 
+      const { vars: stateVars, release: stateRelease } = await stateManager.lock(step.state ?? []);
       try {
-        await runStep(step, pipelineContext);
+        await runStep(step, pipelineContext, stateVars);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error('Error running step:', error);
@@ -114,10 +134,17 @@ export class PipelineEnvironment implements TestEnvironment {
           history: [...history, { id: stepId, error: errorMessage }],
         };
         taskQueue.abort();
+      } finally {
+        // Release any state
+        stateRelease(stateVars);
       }
     };
 
-    const runStep = async (step: NormalizedPipelineStep, pipelineContext: PipelineContext) => {
+    const runStep = async (
+      step: NormalizedPipelineStep,
+      pipelineContext: PipelineContext,
+      stateVars: VarSet,
+    ) => {
       // Generate an ID for the step
       const count = stepRunCount.get(step.id) ?? 1;
       stepRunCount.set(step.id, count + 1);
@@ -147,45 +174,101 @@ export class PipelineEnvironment implements TestEnvironment {
         throw new Error(`Model for step ${step.id} not found`);
       }
 
-      // Generate the prompt
-      let prompt: ConversationPrompt;
+      // Generate the prompt (optional)
+      let prompt: ConversationPrompt | undefined;
       const functionResponses = getFunctionResponses(pipelineContext, step.deps ?? []);
       if (functionResponses) {
+        // TODO: Only respond if the step has a prompt, otherwise pass to transform?
         prompt = [{ role: 'user', content: functionResponses }];
-      } else {
+      } else if (step.prompt) {
         prompt = await renderPrompt(
           step.prompt,
-          generatePipelineVars(vars, pipelineContext),
+          generatePipelineVars({ ...vars, $state: stateVars }, pipelineContext),
           model.mimeTypes,
         );
       }
 
       // Run the prompt (or read from cache)
       const session = sessionId ? sessionManager.get(sessionId) : undefined;
+      let modelResult: RunModelResult | undefined;
+      if (prompt) {
+        modelResult = await runModel(
+          model,
+          prompt,
+          this.cache,
+          session,
+          sessionId ? (value: SessionState) => sessionManager.set(sessionId, value) : undefined,
+          context,
+          count,
+          (value: ModelUpdate) => {
+            modelUpdateGenerator.yield({ ...value, internalId: stepId });
+          },
+        );
+        if (modelResult.errorResult) {
+          history.push({ id: stepId, ...modelResult.errorResult });
+          result = modelResult.errorResult;
+          return;
+        }
+      } else {
+        // Emit something so the step will appear
+        modelUpdateGenerator.yield({ type: 'replace', output: '', internalId: stepId });
+      }
 
-      const { output, tokenUsage, latencyMillis, finished, response, errorResult } = await runModel(
-        model,
-        prompt,
-        this.cache,
-        session,
-        sessionId ? (value: SessionState) => sessionManager.set(sessionId, value) : undefined,
-        context,
-        count,
-        (value: ModelUpdate) => {
-          modelUpdateGenerator.yield({ ...value, internalId: stepId });
-        },
-      );
-      if (errorResult) {
-        history.push({ id: stepId, ...errorResult });
-        result = errorResult;
-        return;
+      // If no output, try using the previous output
+      const output =
+        modelResult?.output ??
+        (pipelineContext.history.at(-1)?.output as ProviderOutput | undefined) ??
+        [];
+
+      // Clean the output for vars, stripping metadata and simplifying to string if possible
+      let varOutput: ProviderOutput = simplifyOutputArray(stripOutputMetadata(output));
+
+      // Transform output
+      if (step.transform) {
+        const code = await toCodeReference(step.transform);
+        const execute = await code.bind();
+        const result = await execute(varOutput, {
+          vars: {
+            ...vars,
+            ...pipelineContext.vars,
+            $state: stateVars,
+            $history: pipelineContext.history,
+            $output: pipelineContext.history.at(-1)?.output ?? null,
+          },
+        });
+
+        const parsed = transformResultSchema.safeParse(result);
+        if (parsed.success && (parsed.data.vars || parsed.data.output)) {
+          // Check if it is a structured transform with vars/output
+          if (parsed.data.vars) {
+            for (const key in parsed.data.vars) {
+              newPipelineVars[key] = parsed.data.vars[key];
+            }
+          }
+          if (parsed.data.output) {
+            varOutput = await transformOutputToProviderOutput(parsed.data.output);
+            // Update the output
+            modelUpdateGenerator.yield({ type: 'replace', output: '', internalId: stepId });
+            for (const part of varOutput) {
+              modelUpdateGenerator.yield({ type: 'append', output: part, internalId: stepId });
+            }
+          }
+        } else {
+          // If not, it must be a valid output
+          varOutput = await transformOutputToProviderOutput(transformOutputSchema.parse(result));
+          // Update the output
+          modelUpdateGenerator.yield({ type: 'replace', output: '', internalId: stepId });
+          for (const part of varOutput) {
+            modelUpdateGenerator.yield({ type: 'append', output: part, internalId: stepId });
+          }
+        }
       }
 
       // Do not mark as completed, it will be delegated by a virtual step
       let delegateMarkCompleteToDependency: string | null = null;
 
-      const functionCalls = getFunctionCalls(output);
-      if (functionCalls.length > 0 && step.session !== undefined) {
+      const functionCalls = getFunctionCalls(varOutput);
+      if (functionCalls.length > 0 && sessionId !== undefined) {
         // Create a unique suffix for virtual steps
         // TODO: consider nanoid for shorter UUIDs
         const suffix = crypto.randomUUID();
@@ -214,7 +297,7 @@ export class PipelineEnvironment implements TestEnvironment {
               pipelineState,
               part,
               virtualOutput,
-              vars,
+              vars, // stateVars are not needed here
               pipelineContext,
             );
             taskQueue.enqueue(() => safeRunStep(next.step, next.context));
@@ -224,19 +307,45 @@ export class PipelineEnvironment implements TestEnvironment {
 
       // Add the output to the vars, and remove any virtual vars
       // Use step.id for this history since it is only used for prompts/if
-      const newHistory = [...pipelineContext.history, { id: step.id, prompt, output }];
+      const newHistory = [
+        ...pipelineContext.history,
+        { id: step.id, prompt: prompt ?? [], output: varOutput },
+      ];
       if (step.outputAs && !delegateMarkCompleteToDependency) {
-        newPipelineVars[step.outputAs] = stripOutputMetadata(output);
+        // Handle outputAs like foo or $state.foo
+        if (step.outputAs.startsWith('$state.')) {
+          const stateOutputAs = step.outputAs.slice(6);
+          if (!varSetSchema.safeParse(newPipelineVars.$state).success) {
+            throw new Error('Invalid state vars');
+          }
+          (newPipelineVars.$state as VarSet)[stateOutputAs] = varOutput;
+        } else {
+          newPipelineVars[step.outputAs] = varOutput;
+        }
       }
       stripFunctionCallResults(newPipelineVars);
+
+      // Update the state vars so they'll be written back
+      // TODO: Make this less hacky, e.g. return new stateVars?
+      for (const key in stateVars) {
+        // $state may never have been written to (via outputAs or transform)
+        const updatedState = varSetSchema.safeParse(newPipelineVars.$state ?? {});
+        if (!updatedState.success) {
+          throw new Error(`Invalid state vars: ${updatedState.error.message}`);
+        }
+        stateVars[key] = updatedState.data[key] as unknown;
+      }
+
+      // Remove state vars from the pipeline, each step must declare its own state
+      delete newPipelineVars.$state;
 
       // Save the step's result to history
       const stepResult: TestOutput = {
         rawPrompt: prompt,
-        rawOutput: response,
-        output: output,
-        latencyMillis: latencyMillis,
-        tokenUsage: tokenUsage,
+        rawOutput: modelResult?.response,
+        output: step.transform ? varOutput : output, // Save transformed output if there is a transform
+        latencyMillis: modelResult?.latencyMillis,
+        tokenUsage: modelResult?.tokenUsage,
       };
       history.push({ id: stepId, ...stepResult });
 
@@ -248,7 +357,7 @@ export class PipelineEnvironment implements TestEnvironment {
           ...vars,
           ...newPipelineVars,
           $history: newHistory,
-          $output: stripOutputMetadata(newHistory.at(-1)?.output ?? null),
+          $output: newHistory.at(-1)?.output ?? null,
         },
 
         {
@@ -261,7 +370,6 @@ export class PipelineEnvironment implements TestEnvironment {
       if (next.length > 0) {
         // Run the next steps
         for (const { step, context } of next) {
-          console.log('enqueueing step', step.id);
           taskQueue.enqueue(() => safeRunStep(step, context));
         }
       } else if (isLeaf) {
@@ -290,7 +398,7 @@ export class PipelineEnvironment implements TestEnvironment {
         result = {
           ...stepResult,
           history,
-          latencyMillis: finished - start,
+          latencyMillis: modelResult?.finished ? modelResult.finished - start : undefined,
           tokenUsage: {
             costDollars: history
               .map((h) => h.tokenUsage?.costDollars)
@@ -399,40 +507,20 @@ const historyMergeFn = makeOrderedMerge<HistoryItem>(function (a, b) {
   }
 
   // Finally, by output
-  if (typeof a.output === 'string' && typeof b.output === 'string') {
-    if (a.output !== b.output) {
-      return a.output < b.output ? -1 : 1;
-    }
-  } else if (typeof a.output === 'string' && typeof b.output === 'object') {
-    return -1;
-  } else if (typeof a.output === 'object' && typeof b.output === 'string') {
-    return 1;
-  } else if (typeof a.output === 'object' && typeof b.output === 'object') {
-    if (a.output.length !== b.output.length) {
-      return a.output.length < b.output.length ? -1 : 1;
-    }
-    for (let i = 0; i < a.output.length; i++) {
-      const ao = a.output[i];
-      const bo = b.output[i];
-      if (typeof ao === 'string' && typeof bo === 'string') {
-        return ao < bo ? -1 : 1;
-      } else if (typeof ao === 'string' && typeof bo === 'object') {
-        return -1;
-      } else if (typeof ao === 'object' && typeof bo === 'string') {
-        return 1;
-      } else if (ao instanceof FileReference && bo instanceof FileReference) {
-        // Here we can use the file name since FileReference has an absolute path
-        if (ao.uri !== bo.uri) {
-          return ao.uri < bo.uri ? -1 : 1;
-        }
-      } else if (typeof ao === 'object' && typeof bo === 'object') {
-        const ja = JSON.stringify(ao);
-        const jb = JSON.stringify(bo);
-        if (ja !== jb) {
-          return ja < jb ? -1 : 1;
-        }
-      } else {
-        throw new Error('Invalid output part');
+  if (a.output !== b.output) {
+    if (typeof a.output === 'string' && typeof b.output === 'string') {
+      if (a.output !== b.output) {
+        return a.output < b.output ? -1 : 1;
+      }
+    } else if (typeof a.output === 'string' && typeof b.output === 'object') {
+      return -1;
+    } else if (typeof a.output === 'object' && typeof b.output === 'string') {
+      return 1;
+    } else if (typeof a.output === 'object' && typeof b.output === 'object') {
+      const ahash = hashJson(a.output);
+      const bhash = hashJson(b.output);
+      if (ahash !== bhash) {
+        return ahash < bhash ? -1 : 1;
       }
     }
   }
@@ -453,8 +541,8 @@ function mergePipelineContext(a: PipelineContext, b: PipelineContext): PipelineC
   };
 }
 
-function isFunctionCall(part: ProviderOutputPart): part is FunctionCall {
-  return typeof part === 'object' && 'type' in part && part.type === 'function-call';
+function isFunctionCall(part: unknown): part is FunctionCall {
+  return functionCallSchema.safeParse(part).success;
 }
 
 function stripFunctionCallResults(vars: VarSet) {
@@ -467,6 +555,15 @@ function stripFunctionCallResults(vars: VarSet) {
   return vars;
 }
 
+interface RunModelResult {
+  output?: ProviderOutput;
+  tokenUsage?: TokenUsage;
+  latencyMillis?: number;
+  finished?: number;
+  response?: unknown;
+  errorResult?: TestOutput;
+}
+
 async function runModel(
   model: ModelProvider,
   prompt: ConversationPrompt,
@@ -476,7 +573,7 @@ async function runModel(
   context: RunContext,
   count: number,
   yieldUpdate: (value: ModelUpdate) => void,
-) {
+): Promise<RunModelResult> {
   const { request, runModel } = await model.run(prompt, {
     ...context,
     session: session?.provider === model ? session.session : undefined,
@@ -577,7 +674,7 @@ function getFunctionResponses(context: PipelineContext, deps: string[]): Functio
     responses.push({
       type: 'function-response',
       call: calls[i],
-      response: parseFunctionResponse(stripOutputMetadata(context.vars[callResults[i]])),
+      response: parseFunctionResponse(context.vars[callResults[i]]),
     });
   }
 
@@ -586,29 +683,25 @@ function getFunctionResponses(context: PipelineContext, deps: string[]): Functio
 
 function parseFunctionResponse(val: unknown): unknown {
   // If it's a string-like output, try parsing as JSON
-  const stringVal = getOutputAsString(val);
-  if (stringVal) {
+  if (typeof val === 'string') {
     try {
-      const parsed = JSON.parse(stringVal) as unknown;
+      const parsed = JSON.parse(val) as unknown;
       return parsed;
     } catch {
-      return stringVal;
+      // Do nothing
     }
   }
 
   // Otherwise just return the object
   return val;
 }
-function getOutputAsString(val: unknown): string | null {
-  if (typeof val === 'string') {
-    return val;
-  }
+function simplifyOutputArray(val: ProviderOutput): ProviderOutput {
   if (Array.isArray(val) && val.length === 1 && typeof val[0] === 'string') {
     return val[0];
   }
-  return null;
+  return val;
 }
-function stripOutputMetadata(val: unknown): unknown {
+function stripOutputMetadata(val: ProviderOutput): ProviderOutput {
   // Get only string/file parts, ignoring function calls/responses and metadata
   const parsed = providerOutputSchema.safeParse(val);
   if (!parsed.success) {
@@ -618,7 +711,12 @@ function stripOutputMetadata(val: unknown): unknown {
     return parsed.data;
   }
   return parsed.data.filter((p) => {
-    return typeof p === 'string' || p instanceof FileReference;
+    return (
+      typeof p === 'string' ||
+      p instanceof FileReference ||
+      p.type === 'function-call' ||
+      p.type === 'function-response'
+    );
   });
 }
 
@@ -632,7 +730,7 @@ function generatePipelineVars(vars: VarSet, pipelineContext: PipelineContext) {
     ...vars,
     ...pipelineContext.vars,
     $history: pipelineContext.history,
-    $output: stripOutputMetadata(pipelineContext.history.at(-1)?.output ?? null),
+    $output: pipelineContext.history.at(-1)?.output ?? null,
   };
 }
 
@@ -687,7 +785,6 @@ function registerCompletionStep(
   pipelineState.registerStep({
     id,
     deps,
-    prompt: '', // FIXME: Make prompt optional
 
     // Inherit any model + post-prompt settings the original step
     providerLabel: step.providerLabel,
@@ -709,7 +806,6 @@ async function getNextSteps(
     const { next } = await pipelineState.markCompleteAndGetNextSteps(
       {
         id: delegateMarkCompleteToDependency,
-        prompt: '', // FIXME: Make prompt optional
         outputAs: delegateMarkCompleteToDependency,
       },
       vars,
@@ -757,4 +853,18 @@ async function getNextSteps(
 
   // Otherwise it's a normal leaf node, pass it on
   return { next, isLeaf };
+}
+
+async function transformOutputToProviderOutput(output: TransformOutput): Promise<ProviderOutput> {
+  if (typeof output === 'string') {
+    return output;
+  }
+  return Promise.all(
+    output.map((o) => {
+      if (o instanceof Blob) {
+        return blobToFileReference(o);
+      }
+      return o;
+    }),
+  );
 }

@@ -68,7 +68,7 @@ describe('PipelineEnvironment', () => {
           {
             id: 'step-0',
             deps: ['b'],
-            if: 'function execute(vars) {return vars.b?.[0]?.length < 5;}',
+            if: 'function execute(vars) {return vars.b?.length < 5;}',
             prompt: '{{b}}A',
             outputAs: 'a',
           },
@@ -251,5 +251,91 @@ describe('PipelineEnvironment', () => {
 
     expect(output.error).toBeUndefined();
     expect(output.output).toEqual(['"hello...!""world...!"', finishMeta]);
+  });
+
+  test('supports transform functions', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'step-0',
+            prompt: 'Hello {{target}}',
+            transform: 'function execute(output) { return output.toUpperCase() }',
+          },
+          { id: 'step-1', transform: 'function execute(output) { return output + "!" }' },
+          { id: 'step-2', prompt: '{{$output}} Hi {{target}}.' },
+        ],
+      },
+      { target: 'world' },
+    );
+
+    expect(output.output).toEqual(['HELLO WORLD! Hi world.', finishMeta]);
+    expect(output.error).toBeUndefined();
+  });
+
+  test('supports transform functions with no prompt', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'set-2',
+            transform: 'function execute(output) { return "2"; }',
+          },
+          {
+            id: 'mult-3',
+            transform: 'function execute(output) { return (parseInt(output)*3).toString(); }',
+          },
+          {
+            id: 'add-4',
+            transform: 'function execute(output) { return (parseInt(output)+4).toString(); }',
+          },
+        ],
+      },
+      { target: 'world' },
+    );
+
+    expect(output.output).toEqual('10');
+    expect(output.error).toBeUndefined();
+  });
+
+  test('supports state', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'set-value',
+            state: ['value'],
+            transform:
+              'function execute(output, {vars}) { return {vars: { $state: { value: vars.$state.value + 1 } } }; }',
+          },
+          {
+            id: 'print-value',
+            state: ['value'],
+            prompt: '{{$state.value}}',
+          },
+        ],
+      },
+      { $state: { value: 41 } },
+    );
+
+    expect(output.error).toBeUndefined();
+    expect(output.output).toEqual(['42', finishMeta]);
+  });
+
+  test('cannot read state without declaration', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'print-value',
+            prompt: 'Value: {{$state.value}}',
+          },
+        ],
+      },
+      { $state: { value: 42 } },
+    );
+
+    expect(output.output).toEqual(['Value: ', finishMeta]);
+    expect(output.error).toBeUndefined();
   });
 });

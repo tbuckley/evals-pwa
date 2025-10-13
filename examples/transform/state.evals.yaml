@@ -1,0 +1,54 @@
+providers:
+  - echo:echo
+
+prompts:
+  - $pipeline:
+      - session: true
+        transform: |-
+          function execute() {
+            return [
+              {type: "function-call", name: "increment", args: {}, meta: null},
+              {type: "function-call", name: "increment", args: {}, meta: null},
+              {type: "function-call", name: "increment", args: {}, meta: null},
+              {type: "function-call", name: "increment", args: {}, meta: null},
+              {type: "function-call", name: "increment", args: {}, meta: null},
+              {type: "function-call", name: "increment", args: {}, meta: null},
+              {type: "function-call", name: "increment", args: {}, meta: null},
+              {type: "function-call", name: "increment", args: {}, meta: null},
+              {type: "function-call", name: "increment", args: {}, meta: null},
+              {type: "function-call", name: "increment", args: {}, meta: null},
+              {type: "function-call", name: "increment", args: {}, meta: null},
+              {type: "function-call", name: "increment", args: {}, meta: null},
+            ];
+          }
+      - prompt: '{{$state.value}}'
+        state: ['value']
+      - id: increment
+        state: ['value']
+        deps: ['$fn:increment']
+        transform: |-
+          async function execute(output, context) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            const value = context.vars.$state.value + context.vars.increment;
+            return {
+              // Output just for debugging
+              output: `increment(${context.vars.increment}) -> ${value}`,
+              // Update the state value
+              vars: {
+                $state: {
+                  ...context.vars.$state,
+                  value
+                },
+              },
+            };
+          }
+
+tests:
+  - vars:
+      $state:
+        value: 0
+      increment: 1
+    assert:
+      - type: equals
+        vars:
+          value: '12'

@@ -6,7 +6,7 @@ import type { Semaphore } from './utils/semaphore';
 
 const varSchema = z.any();
 
-const varSetSchema = z.record(z.string(), varSchema);
+export const varSetSchema = z.record(z.string(), varSchema);
 
 const assertionSchema = z.object({
   // Required
@@ -31,12 +31,14 @@ export const providerSchema = z.union([z.string(), normalizedProviderSchema]);
 
 export interface NormalizedPipelineStep {
   id: string;
-  prompt: string;
+  prompt?: string;
   outputAs?: string;
   if?: string | CodeReference;
   deps?: string[];
   providerLabel?: string;
   session?: string | boolean;
+  transform?: string | CodeReference;
+  state?: string[];
 }
 export interface NormalizedPipelinePrompt {
   $pipeline: NormalizedPipelineStep[];
@@ -52,11 +54,14 @@ export const pipelinePromptSchema = z.object({
       z.string(),
       z.object({
         id: z.string().optional(),
-        prompt: z.string(),
+        prompt: z.string().optional(),
         providerLabel: z.string().optional(),
         outputAs: z.string().optional(),
         if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
         deps: z.array(z.string()).optional(),
+        session: z.union([z.string(), z.boolean()]).optional(),
+        transform: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
+        state: z.array(z.string()).optional(),
       }),
     ]),
   ),
@@ -120,7 +125,7 @@ const tokenUsageSchema = z.object({
 });
 export type TokenUsage = z.infer<typeof tokenUsageSchema>;
 
-const functionCallSchema = z.object({
+export const functionCallSchema = z.object({
   type: z.literal('function-call'),
   name: z.string(),
   args: z.unknown(),
@@ -155,6 +160,18 @@ export type ProviderOutputPart = z.infer<typeof providerOutputPartSchema>;
 export const providerOutputSchema = z.union([z.string(), z.array(providerOutputPartSchema)]);
 export type ProviderOutput = z.infer<typeof providerOutputSchema>;
 export type ExtractedOutputPart = string | Blob | MetaProviderOutputPart;
+// A TransformOutput is what the transform() function returns
+export const transformOutputSchema = z.union([
+  z.string(),
+  z.array(
+    z.union([
+      z.string(),
+      z.instanceof(Blob), // Replace FileReferences with Blobs
+      metaProviderOutputPartSchema,
+    ]),
+  ),
+]);
+export type TransformOutput = z.infer<typeof transformOutputSchema>;
 
 const baseTestOutputSchema = z.object({
   // Required

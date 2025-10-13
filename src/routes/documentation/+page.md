@@ -182,14 +182,16 @@ interface Pipeline {
   $pipeline: (string | PipelinePrompt)[];
 }
 interface PipelinePrompt {
-  prompt: string;
+  prompt?: string;
   providerLabel?: string;
   // New for pipelines
   id?: string; // Just for display
   outputAs?: string; // Assign the output to a var
   deps?: string[]; // Dependencies (var names)
   if?: string | CodeReference; // Test if this step should run
-  session?: string; // Append this prompt to any previous messages in the same session
+  transform?: string | CodeReference; // Modify the output/vars with code
+  session?: string | boolean; // Append this prompt to any previous messages in the same session
+  state?: string[]; // Access synchronized state that can be edited by any step
 }
 ```
 
@@ -262,6 +264,19 @@ prompts:
         outputAs: haiku
 ```
 
+Pipelines also let you modify the output of a step or the current vars via a `transform` property. This can return just an output, or optionally modify vars too by returning `{vars?: Record<string,any>, output?: Output}`. The Output can be a `string | Array<string|Blob|Meta>`. Check out `src/lib/types.ts` for more details on the meta types, but most interestingly this can include function calls: `{type: "function-call", name: string, args: unknown}`. You can even skip the `prompt` and have `transform` run arbitrary code for a step.
+
+```yaml
+prompts:
+  - $pipeline:
+      # Write a haiku, using a transform to ensure the output is all upper case
+      - prompt: Write a haiku about {{topic}}.
+        transform: |-
+          function execute(output, { vars }) {
+            return output.toUpperCase();
+          }
+```
+
 Pipelines let you save chat history using the `session` property. A session maintains conversational state (previous prompts & outputs) for every step that is part of that session. This is useful for creating multi-turn conversations, such as simulating a dialogue between two chatbots. You can use `session:true` or choose a specific name (`string`) for a session. Each step with the same session name will share the same conversation history. (Advanced: multiple steps may share the same session, but branches / accessing the same session in parallel is not supported.)
 
 ```yaml
@@ -282,7 +297,7 @@ prompts:
         outputAs: dougMessage # Outputs as dougMessage to trigger tom's deps
 ```
 
-Finally, when using pipelines session steps also support function calling. When a step calls function `foo`, the step with dependency `$fn:foo` will be called. Any arguments will be passed as vars via the `$args` object. This function step will inherit vars from the original step, but any vars it creates will not be passed back.
+When using pipelines, session steps also support function calling. When a step calls function `foo`, the step with dependency `$fn:foo` will be called. Any arguments will be passed as vars via the `$args` object. This function step will inherit vars from the original step, but any vars it creates will not be passed back.
 
 The function response must be an object. If the output of a step is a valid JSON object, it will be parsed and used as the response. Otherwise it will be wrapped as `{"result": output}`
 
@@ -320,6 +335,41 @@ prompts:
 tests:
   - vars:
       request: 'Write a haiku about the future of AI'
+```
+
+By default, a called function only returns its result. If you also want it to edit some shared state, you can use the `state?: string[]` option. You can define initial state values for a test in `vars.$state`, or it will default to `null`. A step must define the state it wants to access, otherwise it won't get acces (this is because only one step may access state at a time). These `$state` vars may be accessed in the prompt, outputAs, or transform; but not in the `if` statement.
+
+```yaml
+prompts:
+  - $pipeline:
+      - session: true # Use sessions so we can call functions
+        state: ['value']
+        prompt: The current value is {{$state.value}}. Increment it 5 times.
+      - id: print-result
+        state: ['value']
+        transform: |-
+          function execute(output, context) {
+            return `value=${context.vars.$state.value}`;
+          }
+      - id: increment
+        state: ['value']
+        deps: ['$fn:increment']
+        transform: |-
+          async function execute(output, context) {
+            return {
+              vars: {
+                $state: {
+                  ...context.vars.$state,
+                  value: context.vars.$state.value + 1,
+                },
+              },
+            };
+          }
+
+tests:
+  - vars:
+      $state:
+        value: 0
 ```
 
 #### Handlebars Helpers (Advanced)
