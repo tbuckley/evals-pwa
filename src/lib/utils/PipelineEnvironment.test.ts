@@ -338,4 +338,25 @@ describe('PipelineEnvironment', () => {
     expect(output.output).toEqual(['Value: ', finishMeta]);
     expect(output.error).toBeUndefined();
   });
+
+  test('transforms can return Blob vars', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'create-blob',
+            transform: "function execute() { return {vars: { foo: new Blob(['hello']) } }; }",
+          },
+          {
+            id: 'print-uri',
+            transform: 'function execute(output, {vars}) { return vars.foo.file.text(); }',
+          },
+        ],
+      },
+      {},
+    );
+
+    expect(output.output).toEqual('hello');
+    expect(output.error).toBeUndefined();
+  });
 });

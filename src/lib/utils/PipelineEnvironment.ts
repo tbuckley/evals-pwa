@@ -33,6 +33,7 @@ import { ParallelTaskQueue } from './ParallelTaskQueue';
 import { PipelineState } from './PipelineState';
 import { StateManager } from './StateManager';
 import { blobToFileReference } from '$lib/storage/dereferenceFilePaths';
+import { asyncObjectDfsMap } from './objectDFS';
 
 export interface ModelConfig {
   default: ModelProvider | null;
@@ -242,7 +243,12 @@ export class PipelineEnvironment implements TestEnvironment {
           // Check if it is a structured transform with vars/output
           if (parsed.data.vars) {
             for (const key in parsed.data.vars) {
-              newPipelineVars[key] = parsed.data.vars[key];
+              newPipelineVars[key] = await asyncObjectDfsMap(parsed.data.vars[key], async (val) => {
+                if (val instanceof Blob) {
+                  return blobToFileReference(val);
+                }
+                return val;
+              });
             }
           }
           if (parsed.data.output) {
