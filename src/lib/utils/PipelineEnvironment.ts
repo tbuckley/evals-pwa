@@ -70,11 +70,20 @@ export class PipelineEnvironment implements TestEnvironment {
   models: ModelConfig;
   pipeline: NormalizedPipelinePrompt;
   cache?: ModelCache;
+  functions: Set<string>;
 
   constructor(options: Config) {
     this.models = options.models;
     this.pipeline = options.pipeline;
     this.cache = options.cache;
+    this.functions = new Set();
+
+    for (const step of this.pipeline.$pipeline) {
+      // Check if it's a function call
+      if (step.deps?.length === 1 && step.deps[0].startsWith('$fn:')) {
+        this.functions.add(step.deps[0].slice('$fn:'.length));
+      }
+    }
   }
 
   // For passing as context to assertions
@@ -154,17 +163,18 @@ export class PipelineEnvironment implements TestEnvironment {
       const newPipelineVars = { ...pipelineContext.vars };
 
       // Get the session ID
+      // We always generate a session ID to have distinct sessions per context (function calls, in future branches)
       let sessionId: string | undefined;
-      if (typeof step.session === 'string') {
-        sessionId = step.session;
-      } else if (typeof step.session === 'boolean') {
-        // First, check if there is an existing session for this step
-        const sessionKey = `$session:${step.id}`;
+      if (typeof step.session === 'string' || step.session === true) {
+        // Use the session if a string, otherwise generate one automatically for this step ID
+        const sessionKey = `$session:${step.session === true ? step.id : step.session}`;
         if (typeof pipelineContext.vars[sessionKey] === 'string') {
+          // If we have already run this session in this context, reuse the ID
           sessionId = pipelineContext.vars[sessionKey];
         } else {
+          // Otherwise, generate a new ID and pass it to future steps
           sessionId = crypto.randomUUID();
-          newPipelineVars[sessionKey] = sessionId; // Pass to future steps
+          newPipelineVars[sessionKey] = sessionId;
         }
       }
 
@@ -273,8 +283,15 @@ export class PipelineEnvironment implements TestEnvironment {
       // Do not mark as completed, it will be delegated by a virtual step
       let delegateMarkCompleteToDependency: string | null = null;
 
+      // Only run functions if we have calls + calls are supported + we are allowed to run functions
       const functionCalls = getFunctionCalls(varOutput);
-      if (functionCalls.length > 0 && sessionId !== undefined) {
+      const hasAllFunctions = functionCalls.every((call) => this.functions.has(call.name));
+      if (functionCalls.length > 0 && !hasAllFunctions) {
+        console.warn(
+          `Skipping function calls for step ${step.id} because not all functions are defined`,
+        );
+      }
+      if (functionCalls.length > 0 && sessionId !== undefined && hasAllFunctions) {
         // Create a unique suffix for virtual steps
         // TODO: consider nanoid for shorter UUIDs
         const suffix = crypto.randomUUID();
@@ -287,9 +304,16 @@ export class PipelineEnvironment implements TestEnvironment {
         const virtualOutputs = generateFunctionCallVirtualOutputs(step, suffix, functionCalls);
 
         // Create a step spoofing this step that runs when all functions are complete
+        // Note: We must pass the current session ID to the completion step. If session: true, this means storing it in history and setting the state.
+        const stepExtras: { session?: string } = {};
+        if (step.session === true) {
+          const completionSessionId = crypto.randomUUID();
+          stepExtras.session = completionSessionId;
+          newPipelineVars[`$session:${step.id}`] = completionSessionId;
+        }
         const completionStepId = registerCompletionStep(
           pipelineState,
-          step,
+          { ...step, ...stepExtras },
           [...virtualOutputs, delegateMarkCompleteToDependency],
           suffix,
         );
@@ -329,6 +353,8 @@ export class PipelineEnvironment implements TestEnvironment {
           newPipelineVars[step.outputAs] = varOutput;
         }
       }
+
+      // Strip special pipeline vars
       stripFunctionCallResults(newPipelineVars);
 
       // Update the state vars so they'll be written back
@@ -759,7 +785,6 @@ async function generateVirtualFunctionCall(
     {
       id: virtualOutput, // Doesn't really matter, just should not match a real step ID
       outputAs: `$fn:${part.name}`, // Must match dependency for function call
-      prompt: '',
     },
     // Pass global vars + pipeline vars + $args for if-testing
     stripFunctionCallResults({ ...globalVars, ...pipelineContext.vars, $args: part.args }),

@@ -233,7 +233,7 @@ describe('PipelineEnvironment', () => {
           },
           {
             id: 'fn-1',
-            session: true,
+            session: 'fn-1',
             deps: ['$fn:foo'],
             prompt: `[
                 {"type": "function-call", "name": "bar", "args": {"val": "{{$args.val}}..."}}
@@ -251,6 +251,30 @@ describe('PipelineEnvironment', () => {
 
     expect(output.error).toBeUndefined();
     expect(output.output).toEqual(['"hello...!""world...!"', finishMeta]);
+  });
+
+  test('skips calling functions if not defined', {}, async function () {
+    const output = await runPipeline(
+      {
+        $pipeline: [
+          {
+            id: 'step-0',
+            session: 'caller',
+            prompt: `[
+                {"type": "function-call", "name": "foo", "args": {"val": "hello"}}
+            ]`,
+            outputAs: 'foo',
+          },
+        ],
+      },
+      {},
+    );
+
+    expect(output.error).toBeUndefined();
+    expect(output.output).toEqual([
+      { type: 'function-call', name: 'foo', args: { val: 'hello' } },
+      finishMeta,
+    ]);
   });
 
   test('supports transform functions', {}, async function () {
