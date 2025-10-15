@@ -25,36 +25,42 @@ export const partSchema = z.union([
       mimeType: z.string(),
       data: z.string(),
     }),
+    thoughtSignature: z.string().optional(),
   }),
   z.object({
     functionCall: z.object({
       name: z.string(),
       args: z.record(z.unknown()),
     }),
+    thoughtSignature: z.string().optional(),
   }),
   z.object({
     functionResponse: z.object({
       name: z.string(),
       response: z.record(z.unknown()),
     }),
+    thoughtSignature: z.string().optional(),
   }),
   z.object({
     fileData: z.object({
       mimeType: z.string(),
       data: z.string(),
     }),
+    thoughtSignature: z.string().optional(),
   }),
   z.object({
     executableCode: z.object({
       code: z.string(),
       language: z.string(),
     }),
+    thoughtSignature: z.string().optional(),
   }),
   z.object({
     codeExecutionResult: z.object({
       outcome: z.string(),
       output: z.string(),
     }),
+    thoughtSignature: z.string().optional(),
   }),
 ]);
 export type Part = z.infer<typeof partSchema>;
@@ -118,6 +124,11 @@ const errorSchema = z.object({
   }),
 });
 
+interface SessionState {
+  messages: Content[];
+  systemInstructions: Content | null;
+}
+
 export class GeminiProvider implements ModelProvider {
   constructor(
     public model: string,
@@ -170,9 +181,11 @@ export class GeminiProvider implements ModelProvider {
   ];
 
   async run(conversation: ConversationPrompt, context: RunContext) {
-    const sessionContents = (context.session?.state ?? []) as Content[];
+    const sessionState = context.session?.state as SessionState | undefined;
+    const sessionContents = sessionState?.messages ?? [];
     const latestContents = await conversationToGemini(conversation);
-    const systemContent = await conversationToSystemContent(conversation);
+    const systemContent =
+      sessionState?.systemInstructions ?? (await conversationToSystemContent(conversation));
     const extensions: { systemInstruction?: Content } = {};
     if (systemContent) {
       extensions.systemInstruction = systemContent;
@@ -267,7 +280,10 @@ export class GeminiProvider implements ModelProvider {
         return {
           response: parsed,
           session: {
-            state: [...contents, parsed.candidates[0].content] satisfies Content[],
+            state: {
+              messages: [...contents, parsed.candidates[0].content],
+              systemInstructions: systemContent,
+            } satisfies SessionState,
           },
         };
       },
