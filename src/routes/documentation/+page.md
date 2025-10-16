@@ -191,6 +191,7 @@ interface PipelinePrompt {
   if?: string | CodeReference; // Test if this step should run
   transform?: string | CodeReference; // Modify the output/vars with code
   session?: string | boolean; // Append this prompt to any previous messages in the same session
+  functionCalls?: 'loop' | 'once' | 'never'; // How to handle function calls, defaults to "loop"
   state?: string[]; // Access synchronized state that can be edited by any step
 }
 ```
@@ -297,7 +298,7 @@ prompts:
         outputAs: dougMessage # Outputs as dougMessage to trigger tom's deps
 ```
 
-When using pipelines, session steps also support function calling. When a step calls function `foo`, the step with dependency `$fn:foo` will be called. Any arguments will be passed as vars via the `$args` object. This function step will inherit vars from the original step, but any vars it creates will not be passed back.
+When using pipelines, steps also support function calling. When a step calls function `foo`, the step with dependency `$fn:foo` will be called. Any arguments will be passed as vars via the `$args` object. This function step will inherit vars from the original step, but any vars it creates will not be passed back. By default, it will keep looping until there are no more function calls; though you can have it run functions just once or never via the `functionCalls:"once"|"never"` property.
 
 The function response must be an object. If the output of a step is a valid JSON object, it will be parsed and used as the response. Otherwise it will be wrapped as `{"result": output}`
 
@@ -323,8 +324,8 @@ providers:
 
 prompts:
   - $pipeline:
-      - session: 'orchestrator' # Session required to call functions
-        providerLabel: orchestrator # Use a provider that defines tools
+      - providerLabel: orchestrator # Use a provider that defines tools
+        functionCalls: loop # default; can change to "once" or "never"
         prompt: '{{request}}'
       # A step with a dependency on "$fn:NAME" will be triggered when that
       # function is called

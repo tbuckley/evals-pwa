@@ -176,6 +176,10 @@ export class PipelineEnvironment implements TestEnvironment {
           sessionId = crypto.randomUUID();
           newPipelineVars[sessionKey] = sessionId;
         }
+      } else {
+        // If no session, create one in case we use function calls
+        // TODO discard session if no function calls to save memory
+        sessionId = crypto.randomUUID();
       }
 
       const model = step.providerLabel
@@ -291,7 +295,8 @@ export class PipelineEnvironment implements TestEnvironment {
           `Skipping function calls for step ${step.id} because not all functions are defined`,
         );
       }
-      if (functionCalls.length > 0 && sessionId !== undefined && hasAllFunctions) {
+      const canRunFunctions = step.functionCalls !== 'never'; // default to  "loop" if undefined
+      if (functionCalls.length > 0 && hasAllFunctions && canRunFunctions) {
         // Create a unique suffix for virtual steps
         // TODO: consider nanoid for shorter UUIDs
         const suffix = crypto.randomUUID();
@@ -305,11 +310,16 @@ export class PipelineEnvironment implements TestEnvironment {
 
         // Create a step spoofing this step that runs when all functions are complete
         // Note: We must pass the current session ID to the completion step. If session: true, this means storing it in history and setting the state.
-        const stepExtras: { session?: string } = {};
-        if (step.session === true) {
+        const stepExtras: { session?: string; functionCalls?: 'never' } = {};
+        if (step.session === undefined) {
+          // Save the current session to the state
           const completionSessionId = crypto.randomUUID();
           stepExtras.session = completionSessionId;
-          newPipelineVars[`$session:${step.id}`] = completionSessionId;
+          newPipelineVars[`$session:${completionSessionId}`] = sessionId;
+        }
+        if (step.functionCalls === 'once') {
+          // If running functions only once, set completion step to never run functions
+          stepExtras.functionCalls = 'never';
         }
         const completionStepId = registerCompletionStep(
           pipelineState,
