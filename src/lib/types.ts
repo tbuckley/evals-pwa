@@ -37,6 +37,7 @@ export interface NormalizedPipelineStep {
   deps?: string[];
   providerLabel?: string;
   session?: string | boolean;
+  functionCalls?: 'loop' | 'once' | 'never';
   transform?: string | CodeReference;
   state?: string[];
 }
@@ -60,6 +61,7 @@ export const pipelinePromptSchema = z.object({
         if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
         deps: z.array(z.string()).optional(),
         session: z.union([z.string(), z.boolean()]).optional(),
+        functionCalls: z.enum(['loop', 'once', 'never']).optional(),
         transform: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
         state: z.array(z.string()).optional(),
       }),
