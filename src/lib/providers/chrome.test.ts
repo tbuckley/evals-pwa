@@ -81,6 +81,8 @@ describe('ChromeProvider', () => {
 
     expect(availabilityMock).toHaveBeenCalled();
     expect(createMock).toHaveBeenCalled();
+    const [[createOptions]] = createMock.mock.calls;
+    expect(createOptions?.expectedInputs).toEqual([{ type: 'text' }]);
     expect(mockModel.promptStreaming).toHaveBeenCalled();
     expect(promptOptions).toHaveLength(1);
     const [options] = promptOptions;
@@ -88,5 +90,22 @@ describe('ChromeProvider', () => {
     const omitResponseConstraintInput = (options as Record<string, unknown> | undefined)
       ?.omitResponseConstraintInput;
     expect(omitResponseConstraintInput).toBe(true);
+  });
+
+  test('derives mime types from expectedInputs config', () => {
+    const provider = new ChromeProvider({
+      expectedInputs: [{ type: 'audio' }, { type: 'image' }],
+    });
+
+    expect(provider.mimeTypes).toEqual([
+      'audio/wav',
+      'audio/mp3',
+      'audio/ogg',
+      'audio/flac',
+      'image/png',
+      'image/jpeg',
+      'image/webp',
+      'image/gif',
+    ]);
   });
 });
