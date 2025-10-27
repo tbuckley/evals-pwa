@@ -94,8 +94,40 @@ interface SessionState {
   model: LanguageModel;
 }
 
+const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const AUDIO_MIME_TYPES = ['audio/wav', 'audio/mp3', 'audio/ogg', 'audio/flac'];
+
+const expectedInputSchema = z
+  .object({
+    type: z.enum(['text', 'image', 'audio']),
+  })
+  .passthrough();
+
+function deriveMimeTypesFromExpectedInputs(expectedInputs: LanguageModelExpected[]) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  const pushUnique = (mime: string) => {
+    if (seen.has(mime)) return;
+    seen.add(mime);
+    result.push(mime);
+  };
+
+  for (const input of expectedInputs) {
+    if (input.type === 'image') {
+      IMAGE_MIME_TYPES.forEach(pushUnique);
+    } else if (input.type === 'audio') {
+      AUDIO_MIME_TYPES.forEach(pushUnique);
+    }
+  }
+
+  return result;
+}
+
+const DEFAULT_EXPECTED_INPUTS: LanguageModelExpected[] = [{ type: 'text' }];
+
 const configSchema = normalizedProviderConfigSchema
   .extend({
+    expectedInputs: z.array(expectedInputSchema).optional(),
     responseConstraint: z.record(z.unknown()).optional(),
     omitResponseConstraintInput: z.boolean().optional(),
   })
@@ -103,31 +135,26 @@ const configSchema = normalizedProviderConfigSchema
 export type ChromeConfig = NormalizedProviderConfig & {
   responseConstraint?: Record<string, unknown>;
   omitResponseConstraintInput?: boolean;
+  expectedInputs?: LanguageModelExpected[];
 };
 
 export class ChromeProvider implements ModelProvider {
   readonly id = 'chrome:ai';
 
-  mimeTypes = [
-    'image/png',
-    'image/jpeg',
-    'image/webp',
-    'image/gif',
-
-    'audio/wav',
-    'audio/mp3',
-    'audio/ogg',
-    'audio/flac',
-  ];
-
+  mimeTypes: string[];
+  private readonly expectedInputs: LanguageModelExpected[];
   private promptOptions?: LanguageModelPromptOptions;
 
   constructor(config: ChromeConfig = {}) {
-    const { mimeTypes, responseConstraint, omitResponseConstraintInput } =
+    const { mimeTypes, expectedInputs, responseConstraint, omitResponseConstraintInput } =
       configSchema.parse(config);
-    if (mimeTypes) {
-      this.mimeTypes = mimeTypes;
-    }
+
+    const resolvedExpectedInputs: LanguageModelExpected[] =
+      expectedInputs && expectedInputs.length > 0 ? expectedInputs : DEFAULT_EXPECTED_INPUTS;
+    this.expectedInputs = resolvedExpectedInputs;
+    const derivedMimeTypes = deriveMimeTypesFromExpectedInputs(resolvedExpectedInputs);
+    this.mimeTypes = mimeTypes ?? derivedMimeTypes;
+
     if (responseConstraint !== undefined || omitResponseConstraintInput !== undefined) {
       this.promptOptions = {
         responseConstraint,
@@ -156,6 +183,7 @@ export class ChromeProvider implements ModelProvider {
     };
     const request = await createKey(newState.messages);
     const promptOptions = this.promptOptions;
+    const expectedInputs = this.expectedInputs;
     (request as Record<string, unknown>).promptOptions = { ...promptOptions };
 
     return {
@@ -174,7 +202,7 @@ export class ChromeProvider implements ModelProvider {
           }
           const progress = generator<ProgressEvent, null>();
           const create = LanguageModel.create({
-            expectedInputs: [{ type: 'text' }, { type: 'audio' }, { type: 'image' }],
+            expectedInputs,
             initialPrompts: systemMessage ? [systemMessage] : [],
             monitor(m) {
               m.addEventListener('downloadprogress', (e) => {
