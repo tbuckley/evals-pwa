@@ -51,7 +51,7 @@
     "@sveltejs/adapter-static": "^3.0.5",
     "@types/dom-chromium-ai": "^0.0.9",
     "@types/wicg-file-system-access": "^2023.10.5",
-    "@vitest/browser": "^2.1.4",
+    "@vitest/browser": "^4.0.3",
     "clsx": "^2.1.1",
     "cmdk-sv": "^0.0.18",
     "esbuild-wasm": "^0.24.0",
