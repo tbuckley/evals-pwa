@@ -1,12 +1,13 @@
-import type {
-  ConversationPrompt,
-  ExtractedOutputPart,
-  ModelProvider,
-  ModelUpdate,
-  MultiPartPrompt,
-  NormalizedProviderConfig,
-  RunContext,
-  TokenUsage,
+import {
+  normalizedProviderConfigSchema,
+  type ConversationPrompt,
+  type ExtractedOutputPart,
+  type ModelProvider,
+  type ModelUpdate,
+  type MultiPartPrompt,
+  type NormalizedProviderConfig,
+  type RunContext,
+  type TokenUsage,
 } from '$lib/types';
 import { sse } from '$lib/utils/sse';
 import { decodeB64Blob, fileToBase64, geminiDataToWav } from '$lib/utils/media';
@@ -23,7 +24,7 @@ export const partSchema = z.union([
   z.object({
     inlineData: z.object({
       mimeType: z.string(),
-      data: z.string(),
+      data: z.string().optional(),
     }),
     thoughtSignature: z.string().optional(),
   }),
@@ -116,6 +117,8 @@ export const generateContentResponseSchema = z.object({
   }),
 });
 
+export type GenerateContentResponse = z.infer<typeof generateContentResponseSchema>;
+
 export type Request = z.infer<typeof requestSchema>;
 
 const errorSchema = z.object({
@@ -129,16 +132,28 @@ interface SessionState {
   systemInstructions: Content | null;
 }
 
+const configSchema = normalizedProviderConfigSchema
+  .extend({
+    disableStream: z.boolean().default(false),
+  })
+  .passthrough();
+
+export type GeminiConfig = z.infer<typeof configSchema>;
+
 export class GeminiProvider implements ModelProvider {
+  public config: NormalizedProviderConfig;
+  private disableStream: boolean;
   constructor(
     public model: string,
     public apiKey: string,
-    public config: NormalizedProviderConfig = {},
+    config = {},
   ) {
-    const { mimeTypes } = config;
+    const { disableStream, mimeTypes, ...request } = configSchema.parse(config);
+    this.disableStream = disableStream;
     if (mimeTypes) {
       this.mimeTypes = mimeTypes;
     }
+    this.config = request;
   }
 
   get id(): string {
@@ -202,22 +217,23 @@ export class GeminiProvider implements ModelProvider {
     const { apiKey, model } = this;
     const extractOutput = this.extractOutput.bind(this);
     const getResponseParts = this.getResponseParts.bind(this);
+    const disableStream = this.disableStream;
     return {
       request,
       runModel: async function* () {
+        const url = disableStream
+          ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+          : `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
         const resp = await exponentialBackoff(
           async () => {
-            const resp = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(request),
-                signal: context.abortSignal,
+            const resp = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
               },
-            );
+              body: JSON.stringify(request),
+              signal: context.abortSignal,
+            });
             if (!resp.ok) {
               let error;
               try {
@@ -235,47 +251,55 @@ export class GeminiProvider implements ModelProvider {
           },
           { shouldRetry: shouldRetryHttpError },
         );
-        const stream = resp.body;
-        const fullResponse: Part[] = [];
 
-        let lastResponseJson: unknown;
-        if (!stream) throw new Error(`Failed to run model: no response`);
-        for await (const value of sse(resp)) {
-          lastResponseJson = JSON.parse(value);
-          const parts = getResponseParts(lastResponseJson);
-          for (const part of parts) {
-            // Try appending text to the last part if it's also text
-            if (
-              'text' in part &&
-              fullResponse.length > 0 &&
-              'text' in fullResponse[fullResponse.length - 1] &&
-              !('thought' in fullResponse[fullResponse.length - 1]) &&
-              !('thought' in part)
-            ) {
-              (fullResponse[fullResponse.length - 1] as { text: string }).text += part.text;
-            } else {
-              fullResponse.push(part);
+        let parsed: GenerateContentResponse;
+
+        if (disableStream) {
+          const lastResponseJson: unknown = await resp.json();
+          parsed = generateContentResponseSchema.parse(lastResponseJson);
+        } else {
+          const stream = resp.body;
+          const fullResponse: Part[] = [];
+
+          let lastResponseJson: unknown;
+          if (!stream) throw new Error(`Failed to run model: no response`);
+          for await (const value of sse(resp)) {
+            lastResponseJson = JSON.parse(value);
+            const parts = getResponseParts(lastResponseJson);
+            for (const part of parts) {
+              // Try appending text to the last part if it's also text
+              if (
+                'text' in part &&
+                fullResponse.length > 0 &&
+                'text' in fullResponse[fullResponse.length - 1] &&
+                !('thought' in fullResponse[fullResponse.length - 1]) &&
+                !('thought' in part)
+              ) {
+                (fullResponse[fullResponse.length - 1] as { text: string }).text += part.text;
+              } else {
+                fullResponse.push(part);
+              }
+            }
+
+            const output = extractOutput(lastResponseJson, false);
+            for (const part of output) {
+              if (part instanceof Blob) {
+                yield {
+                  type: 'append',
+                  output: await blobToFileReference(part),
+                } satisfies ModelUpdate;
+              } else {
+                yield { type: 'append', output: part } satisfies ModelUpdate;
+              }
             }
           }
 
-          const output = extractOutput(lastResponseJson, false);
-          for (const part of output) {
-            if (part instanceof Blob) {
-              yield {
-                type: 'append',
-                output: await blobToFileReference(part),
-              } satisfies ModelUpdate;
-            } else {
-              yield { type: 'append', output: part } satisfies ModelUpdate;
-            }
-          }
+          parsed = generateContentResponseSchema.parse(lastResponseJson);
+          parsed.candidates[0].content.parts ??= [];
+
+          parsed.candidates[0].content.parts = fullResponse;
+          parsed.candidates[0].content.role = 'model';
         }
-
-        const parsed = generateContentResponseSchema.parse(lastResponseJson);
-        parsed.candidates[0].content.parts ??= [];
-
-        parsed.candidates[0].content.parts = fullResponse;
-        parsed.candidates[0].content.role = 'model';
 
         return {
           response: parsed,
@@ -313,6 +337,15 @@ export class GeminiProvider implements ModelProvider {
         }
       }
       if ('inlineData' in part) {
+        if (!part.inlineData.data) {
+          return {
+            type: 'meta',
+            title: 'Inline Data',
+            icon: 'other',
+            message: JSON.stringify(part.inlineData, null, 2),
+          };
+        }
+
         const byteArray = decodeB64Blob(part.inlineData.data);
 
         // If it's audio (ex from TTS), convert to wav
