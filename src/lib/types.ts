@@ -22,12 +22,17 @@ export const normalizedProviderConfigSchema = z.object({
 });
 export type NormalizedProviderConfig = z.infer<typeof normalizedProviderConfigSchema>;
 const normalizedProviderSchema = z.object({
-  id: z.string(),
+  id: z.union([z.string(), z.instanceof(CodeReference)]),
   labels: z.array(z.string()).optional(),
   config: normalizedProviderConfigSchema.passthrough().optional(),
+  env: z.array(z.string()).optional(),
   prompts: z.array(z.string()).optional(),
 });
-export const providerSchema = z.union([z.string(), normalizedProviderSchema]);
+export const providerSchema = z.union([
+  z.string(),
+  z.instanceof(CodeReference),
+  normalizedProviderSchema,
+]);
 
 export interface NormalizedPipelineStep {
   id: string;

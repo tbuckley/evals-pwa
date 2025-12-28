@@ -51,17 +51,27 @@ function initIframe() {
                         try {
                             // Dynamically import the code module
                             const module = await import(code);
-                            const execute = module.default ?? module.execute;
-                            if (typeof execute !== 'function') {
-                                codePort.postMessage({ type: 'error', error: 'Module does not export a function' });
-                                return;
-                            }
                             // Listen for function calls on the codePort
                             codePort.onmessage = async (event) => {
-                                const { args, port } = event.data;
+                                const { args, port, name } = event.data;
                                 const callPort = port;
                                 try {
-                                    const result = await execute(...args);
+                                    const execute =
+                                      name !== undefined && name !== null
+                                        ? module[name] ??
+                                          (typeof module.default === 'object' && module.default !== null
+                                            ? module.default[name]
+                                            : undefined)
+                                        : module.default ?? module.execute;
+                                    let result;
+                                    if (typeof execute === 'function') {
+                                        result = await execute(...args);
+                                    } else {
+                                        if (args?.length) {
+                                            throw new Error('Module export is not a function');
+                                        }
+                                        result = execute;
+                                    }
                                     callPort.postMessage({ type: 'result', result });
                                 } catch (e) {
                                     callPort.postMessage({
@@ -96,10 +106,17 @@ function initIframe() {
 }
 
 export function bind(code: string): (...args: unknown[]) => Promise<unknown> {
+  const call = bindModule(code);
+  return (...args: unknown[]) => call(undefined, ...args);
+}
+
+export function bindModule(
+  code: string,
+): (name: string | undefined, ...args: unknown[]) => Promise<unknown> {
   let codePortPromise: Promise<MessagePort> | null = null;
   let currentInstance: number;
 
-  return async (...args: unknown[]) => {
+  return async (name: string | undefined, ...args: unknown[]) => {
     while (currentInstance !== instance) {
       currentInstance = instance;
       codePortPromise = bindPort(code);
@@ -124,7 +141,7 @@ export function bind(code: string): (...args: unknown[]) => Promise<unknown> {
       if (instance !== currentInstance) {
         throw new Error('Attempt to call bound function after destroy');
       }
-      codePort.postMessage({ args, port: callPortChannel.port2 }, [callPortChannel.port2]);
+      codePort.postMessage({ name, args, port: callPortChannel.port2 }, [callPortChannel.port2]);
     });
   };
 }
