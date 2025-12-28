@@ -20,6 +20,7 @@ const jsResultSchema = assertionResultSchema.extend({
   outputs: z.record(z.string(), z.union([z.boolean(), z.number()])).optional(),
 });
 type JsResult = z.infer<typeof jsResultSchema>;
+export type JavascriptAssertionArgs = z.infer<typeof argsSchema>;
 
 export function createJavascriptAssertion(
   args: unknown,

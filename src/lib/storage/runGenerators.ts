@@ -4,7 +4,7 @@ import { getFileExtension } from '$lib/utils/path';
 import { CodeReference, toCodeReference } from './CodeReference';
 import { FileReference } from './FileReference';
 
-interface Generator {
+export interface Generator {
   '=gen': string | CodeReference;
   args?: unknown[];
 }
