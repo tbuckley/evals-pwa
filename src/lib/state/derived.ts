@@ -14,6 +14,8 @@ import { getVarNamesForTests } from '$lib/utils/testCase';
 import { summarizeResults } from '$lib/utils/summarizeResults';
 import { alertStore } from './ui';
 import { AnnotationManager } from './annotations';
+import { CodeReference } from '$lib/storage/CodeReference';
+import { getCodeProviderEnv } from '$lib/providers/code-reference';
 
 function parseEnvText(env: string): Record<string, string> {
   // Given a series of key=value pairs separated by newlines, create an object
@@ -40,49 +42,99 @@ export const parsedEnvStore = derived(envStore, ($env) => {
   return parseEnvText($env);
 });
 
-export const requiredEnvStore = derived(configStore, ($config) => {
-  const requiredEnvVars = new Set<string>();
-  const providers = $config?.providers ?? [];
-  const mgr = new ProviderManager({});
-
-  for (const provider of providers) {
-    const providerId = typeof provider === 'string' ? provider : provider.id;
-    try {
-      const envVars = mgr.getRequiredEnvVars(providerId);
-      for (const envVar of envVars) {
-        requiredEnvVars.add(envVar);
-      }
-    } catch {
-      alertStore.set({
-        title: 'Invalid provider',
-        description: [`The provider '${providerId}' is not available. Please check your config.`],
-        callback: () => {
-          console.log('closed');
-        },
-        cancelText: null,
-      });
-      return [];
+export const codeProviderEnvStore = derived(
+  configStore,
+  ($config, set) => {
+    const cancellation = { cancelled: false };
+    set([]);
+    if (!$config) {
+      return;
     }
-  }
 
-  const tests = $config?.tests ?? [];
-  for (const test of tests) {
-    const asserts = test.assert;
-    for (const assertion of asserts) {
-      const vars = assertion.vars;
-      if ('provider' in vars && typeof vars.provider === 'string') {
-        // TODO support other types of provider
-        const providerId = vars.provider;
+    const providers = $config.providers;
+    void (async () => {
+      const envVars = new Set<string>();
+      await Promise.all(
+        providers.map(async (provider) => {
+          if (provider.id instanceof CodeReference) {
+            const codeEnv = await getCodeProviderEnv(provider.id);
+            for (const envVar of codeEnv) {
+              envVars.add(envVar);
+            }
+          }
+        }),
+      );
+
+      if (!cancellation.cancelled) {
+        set(Array.from(envVars).sort());
+      }
+    })();
+
+    return () => {
+      cancellation.cancelled = true;
+    };
+  },
+  [] as string[],
+);
+
+export const requiredEnvStore = derived(
+  [configStore, codeProviderEnvStore],
+  ([$config, $codeEnv]) => {
+    const requiredEnvVars = new Set<string>();
+    const providers = $config?.providers ?? [];
+    const mgr = new ProviderManager({});
+
+    for (const provider of providers) {
+      const providerId = provider.id;
+      if (typeof provider === 'object' && 'env' in provider && provider.env) {
+        for (const envVar of provider.env) {
+          requiredEnvVars.add(envVar);
+        }
+      }
+      if (providerId instanceof CodeReference) {
+        continue;
+      }
+      try {
         const envVars = mgr.getRequiredEnvVars(providerId);
         for (const envVar of envVars) {
           requiredEnvVars.add(envVar);
         }
+      } catch {
+        alertStore.set({
+          title: 'Invalid provider',
+          description: [`The provider '${providerId}' is not available. Please check your config.`],
+          callback: () => {
+            console.log('closed');
+          },
+          cancelText: null,
+        });
+        return [];
       }
     }
-  }
 
-  return Array.from(requiredEnvVars).sort();
-});
+    const tests = $config?.tests ?? [];
+    for (const test of tests) {
+      const asserts = test.assert;
+      for (const assertion of asserts) {
+        const vars = assertion.vars;
+        if ('provider' in vars && typeof vars.provider === 'string') {
+          // TODO support other types of provider
+          const providerId = vars.provider;
+          const envVars = mgr.getRequiredEnvVars(providerId);
+          for (const envVar of envVars) {
+            requiredEnvVars.add(envVar);
+          }
+        }
+      }
+    }
+
+    for (const envVar of $codeEnv) {
+      requiredEnvVars.add(envVar);
+    }
+
+    return Array.from(requiredEnvVars).sort();
+  },
+);
 
 export const validEnvStore = derived([requiredEnvStore, parsedEnvStore], ([$requiredEnv, $env]) => {
   for (const key of $requiredEnv) {
