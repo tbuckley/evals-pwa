@@ -48,7 +48,7 @@ test.describe('Configuration editor', () => {
 
     // await expect(page.locator('[data-sonner-toaster]')).toHaveCount(0);
     await page.getByText('Share via link').click();
-    // await expect(page.locator('[data-sonner-toaster]')).toHaveCount(1);
+    await expect(page.locator('[data-sonner-toaster]')).toHaveCount(1);
 
     // Read clipboard data
     const clipboardText = await page.evaluate(async () => {

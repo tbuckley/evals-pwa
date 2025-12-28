@@ -489,7 +489,7 @@ export class PipelineEnvironment implements TestEnvironment {
       })
       .finally(() => {
         const sessions = [...sessionManager.values()];
-        Promise.all(sessions.map((s) => s.session.close?.())).catch((e: unknown) => {
+        Promise.all(sessions.map(async (s) => await s.session.close?.())).catch((e: unknown) => {
           console.error('Error closing pipeline sessions:', e);
         });
       });
@@ -901,9 +901,9 @@ async function transformOutputToProviderOutput(output: TransformOutput): Promise
     return output;
   }
   return Promise.all(
-    output.map((o) => {
+    output.map(async (o) => {
       if (o instanceof Blob) {
-        return blobToFileReference(o);
+        return await blobToFileReference(o);
       }
       return o;
     }),

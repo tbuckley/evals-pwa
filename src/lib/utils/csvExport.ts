@@ -128,7 +128,7 @@ export function generateCsvContent(run: LiveRun, options: CsvExportOptions = {})
 
   // Convert to CSV
   const csv = allRows
-    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','))
     .join('\n');
 
   return csv;

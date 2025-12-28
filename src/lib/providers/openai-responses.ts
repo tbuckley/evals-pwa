@@ -125,7 +125,7 @@ export class OpenaiResponsesProvider implements ModelProvider {
         // }
 
         // FIXME: Catch errors thrown here if stream ended prematurely
-        if (!chunk || chunk.type !== 'response.completed') {
+        if (chunk?.type !== 'response.completed') {
           throw new Error('Failed to run model: no response');
         }
         return {
@@ -159,11 +159,12 @@ export class OpenaiResponsesProvider implements ModelProvider {
     if (!isResponse(response)) {
       throw new Error('Unexpected response format');
     }
-    if (!response.response.usage) {
+    const usage = response.response.usage;
+    if (!usage) {
       return {};
     }
 
-    const { input_tokens, output_tokens, total_tokens } = response.response.usage;
+    const { input_tokens, output_tokens, total_tokens } = usage;
     return {
       inputTokens: input_tokens,
       outputTokens: output_tokens,
