@@ -8,7 +8,7 @@
   <title>CodeReference Types</title>
 </svelte:head>
 
-<div class="prose prose-invert max-w-none">
+<div class="prose max-w-none">
   <h1>CodeReference Types</h1>
   <p>
     Copy the TypeScript definitions below or
