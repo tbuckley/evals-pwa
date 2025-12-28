@@ -12,6 +12,7 @@ import { extractAllJsonObjects } from '$lib/utils/extractAllJson';
 import { PipelineEnvironment } from '$lib/utils/PipelineEnvironment';
 import { makeSingleStepPipeline } from '$lib/utils/pipelinePrompt';
 import { z } from 'zod';
+import { CodeReference } from '$lib/storage/CodeReference';
 
 const argsSchema = z.object({
   criteria: z.string(),
@@ -32,9 +33,11 @@ export function createConsistencyAssertion(
 
   const { criteria, prompt, provider: providerOptions } = parsedArgs.data;
   const provider =
-    typeof providerOptions === 'string'
+    providerOptions instanceof CodeReference
       ? { id: providerOptions, config: {} }
-      : (providerOptions ?? { id: DEFAULT_LLM_ASSERTION_PROVIDER, config: {} });
+      : typeof providerOptions === 'string'
+        ? { id: providerOptions, config: {} }
+        : (providerOptions ?? { id: DEFAULT_LLM_ASSERTION_PROVIDER, config: {} });
   const model = providerManager.getProvider(provider.id, provider.config);
   const env = new PipelineEnvironment({
     models: { default: model },

@@ -7,6 +7,7 @@ import type {
 } from '$lib/types';
 import type { FsConfig, FsPipelinePrompt, FsPrompt, FsTestCase } from './types';
 import yaml from 'yaml';
+import { CodeReference } from './CodeReference';
 
 export function normalizeConfig(config: FsConfig): NormalizedConfig {
   return {
@@ -70,6 +71,8 @@ function normalizeProviders(providers: FsConfig['providers']): NormalizedProvide
   const normalized: NormalizedProvider[] = [];
   for (const provider of providers) {
     if (typeof provider === 'string') {
+      normalized.push({ id: provider });
+    } else if (provider instanceof CodeReference) {
       normalized.push({ id: provider });
     } else {
       normalized.push(provider);

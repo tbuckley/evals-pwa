@@ -1,12 +1,44 @@
 import { describe, test, expect } from 'vitest';
 import { PipelineEnvironment } from './PipelineEnvironment';
 import { EchoProvider } from '$lib/providers/echo';
-import type { NormalizedPipelinePrompt, VarSet } from '$lib/types';
+import { conversationToSinglePrompt } from '$lib/providers/legacyProvider';
+import type {
+  ConversationPrompt,
+  ExtractedOutputPart,
+  MetaProviderOutputPart,
+  ModelProvider,
+  NormalizedPipelinePrompt,
+  RunContext,
+  TokenUsage,
+  VarSet,
+} from '$lib/types';
 
 async function runPipeline(pipeline: NormalizedPipelinePrompt, vars: VarSet) {
   const env = new PipelineEnvironment({
     models: {
       default: new EchoProvider('echo'),
+    },
+    pipeline,
+  });
+
+  const abortController = new AbortController();
+  const generator = env.run(vars, { abortSignal: abortController.signal });
+
+  let next = await generator.next();
+  while (!next.done) {
+    next = await generator.next();
+  }
+  return next.value;
+}
+
+async function runPipelineWithProvider(
+  pipeline: NormalizedPipelinePrompt,
+  vars: VarSet,
+  provider: ModelProvider,
+) {
+  const env = new PipelineEnvironment({
+    models: {
+      default: provider,
     },
     pipeline,
   });
@@ -109,6 +141,49 @@ describe('PipelineEnvironment', () => {
     );
 
     expect(output.output).toEqual(['>AB>A>ABAB>A>ABA>AB>A>ABABAB', finishMeta]);
+    expect(output.error).toBeUndefined();
+  });
+
+  test('does not require sessions for legacy providers by default', {}, async function () {
+    class LegacyProvider implements ModelProvider {
+      readonly id = 'legacy:test';
+
+      run(conversation: ConversationPrompt, _context: RunContext) {
+        const prompt = conversationToSinglePrompt(conversation);
+        return {
+          request: { input: prompt },
+          runModel: async function* () {
+            yield '';
+            await Promise.resolve();
+            return { response: { prompt } };
+          },
+        };
+      }
+
+      extractOutput(response: unknown): ExtractedOutputPart[] {
+        const prompt = response as { prompt: string[] };
+        const meta: MetaProviderOutputPart = {
+          type: 'meta',
+          title: 'Finish Reason',
+          icon: 'other',
+          message: 'SUCCESS',
+        };
+        return [JSON.stringify(prompt), meta];
+      }
+
+      extractTokenUsage(): TokenUsage {
+        return { inputTokens: 0, outputTokens: 0, totalTokens: 0, costDollars: 0 };
+      }
+    }
+
+    const output = await runPipelineWithProvider(
+      {
+        $pipeline: [{ id: 'step-0', prompt: 'hello' }],
+      },
+      {},
+      new LegacyProvider(),
+    );
+
     expect(output.error).toBeUndefined();
   });
 

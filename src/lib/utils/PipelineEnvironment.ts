@@ -207,12 +207,14 @@ export class PipelineEnvironment implements TestEnvironment {
       const session = sessionId ? sessionManager.get(sessionId) : undefined;
       let modelResult: RunModelResult | undefined;
       if (prompt) {
+        const requiresSession = typeof step.session === 'string' || step.session === true;
         modelResult = await runModel(
           model,
           prompt,
           this.cache,
           session,
           sessionId ? (value: SessionState) => sessionManager.set(sessionId, value) : undefined,
+          requiresSession,
           context,
           count,
           (value: ModelUpdate) => {
@@ -612,6 +614,7 @@ async function runModel(
   cache: ModelCache | undefined,
   session: SessionState | undefined,
   setSession: ((value: SessionState) => void) | undefined,
+  requireSession: boolean,
   context: RunContext,
   count: number,
   yieldUpdate: (value: ModelUpdate) => void,
@@ -629,7 +632,7 @@ async function runModel(
     // TODO: If multiple steps share a prompt, use different cache keys
   };
   const generator = maybeUseCache(cache, cacheKey, runModel, model.requestSemaphore, {
-    requireSession: setSession !== undefined, // If setSession is defined, we expect a session
+    requireSession,
   });
   let nextRes = await generator.next();
   while (!nextRes.done) {
@@ -646,9 +649,12 @@ async function runModel(
 
   if (setSession) {
     if (!resSession) {
-      throw new Error('Provider does not support sessions');
+      if (requireSession) {
+        throw new Error('Provider does not support sessions');
+      }
+    } else {
+      setSession({ session: resSession, provider: model });
     }
-    setSession({ session: resSession, provider: model });
   } else {
     await resSession?.close?.();
   }
