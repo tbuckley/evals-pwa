@@ -34,6 +34,15 @@ export interface FunctionResponse {
 }
 export type FunctionTool = FunctionCall | FunctionResponse;
 
+export interface MetaMessagePart {
+  type: 'meta';
+  title: string;
+  icon: 'thinking' | 'search' | 'code' | 'other';
+  message: string;
+  data?: unknown;
+}
+export type MetaProviderOutputPart = MetaMessagePart | FunctionCall | FunctionResponse;
+
 export type PromptPart = { text: string } | { file: File } | FunctionTool;
 export type MultiPartPrompt = PromptPart[];
 export interface RolePromptPart {
@@ -41,10 +50,18 @@ export interface RolePromptPart {
   content: MultiPartPrompt;
 }
 export type ConversationPrompt = RolePromptPart[];
+export type ProviderOutputPart = string | FileReference | MetaProviderOutputPart;
+export type ProviderOutput = string | ProviderOutputPart[];
 
 export interface JavascriptAssertionArgs {
   code: string | CodeReference;
   row?: boolean;
+}
+export interface JavascriptAssertionResult {
+  pass: boolean;
+  message?: string;
+  visuals?: (string | Blob)[];
+  outputs?: Record<string, boolean | number>;
 }
 
 export type ProviderId = string | CodeReference;
@@ -60,67 +77,111 @@ export interface ProviderDefinition {
 }
 export type Provider = string | CodeReference | ProviderDefinition;
 
-export interface FsProviderDefinition {
-  id: ProviderId;
-  labels?: string[];
-  config?: Record<string, unknown>;
-  env?: string[];
-  prompts?: string[];
-}
-export type FsProvider = string | CodeReference | FsProviderDefinition;
+export type Var = unknown;
+export type VarSet = Record<string, Var>;
 
-export type FsConvoPrompt = ({ system: string } | { user: string } | { assistant: string })[];
-
-export interface FsPipelineStep {
+export interface AssertionResult {
+  pass: boolean;
+  message?: string;
+  visuals?: (string | FileReference)[];
+  outputs?: Record<string, boolean | number>;
   id?: string;
-  prompt?: string | FsConvoPrompt;
-  transform?: string | CodeReference;
-  providerLabel?: string;
+}
+
+export interface TokenUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  costDollars?: number;
+}
+
+export interface TestOutput {
+  rawPrompt: unknown;
+  rawOutput?: unknown;
+  output?: ProviderOutput;
+  latencyMillis?: number;
+  tokenUsage?: TokenUsage;
+  error?: string;
+}
+
+export interface NormalizedPipelineStep {
+  id: string;
+  prompt?: string;
   outputAs?: string;
   if?: string | CodeReference;
   deps?: string[];
+  providerLabel?: string;
   session?: string | boolean;
   functionCalls?: 'loop' | 'once' | 'never';
+  transform?: string | CodeReference;
   state?: string[];
 }
-
-export interface FsPipelinePrompt {
-  $pipeline: (string | FsConvoPrompt | FsPipelineStep)[];
+export interface NormalizedPipelinePrompt {
+  $pipeline: NormalizedPipelineStep[];
 }
-
-export type FsPrompt =
+export type NormalizedPrompt =
   | string
   | { prompt: string; providerLabel?: string }
-  | FsConvoPrompt
-  | FsPipelinePrompt;
+  | NormalizedPipelinePrompt;
 
-export interface FsAssertion {
-  type: string;
-  description?: string;
-  vars?: Record<string, unknown>;
-  id?: string;
+export interface HistoryItem {
+  id: string;
+  prompt: ConversationPrompt;
+  output: ProviderOutput;
+}
+export interface PipelineVars extends VarSet {
+  $output: ProviderOutput | null;
+  $history: HistoryItem[];
+  $state?: VarSet;
+  $args?: unknown;
 }
 
-export interface FsTestCase {
-  vars?: Record<string, unknown>;
-  description?: string;
-  assert?: FsAssertion[];
-  only?: boolean;
-  repeat?: number;
+export type TransformOutput = string | (string | Blob | MetaProviderOutputPart)[];
+export interface TransformResult {
+  vars?: VarSet;
+  output?: TransformOutput;
 }
 
-export interface FsConfig {
-  description?: string;
-  providers?: FsProvider[];
-  prompts?: FsPrompt[];
-  tests?: FsTestCase[];
-  defaultTest?: FsTestCase;
-  options?: {
-    maxConcurrency?: number;
-  };
+export interface ProviderConfigContext {
+  env: Record<string, string>;
+  config: Record<string, unknown>;
 }
 
-export interface Generator {
-  '=gen': string | CodeReference;
-  args?: unknown[];
+export type MaybePromise<T> = T | Promise<T>;
+
+export type PromptTransformHandler = (
+  output: ProviderOutput,
+  context: { vars: PipelineVars },
+) => MaybePromise<TransformOutput | TransformResult>;
+
+export type PromptIfHandler = (vars: PipelineVars) => MaybePromise<boolean>;
+
+export type ProviderPrepareHandler = (
+  prompt: ConversationPrompt,
+  context: ProviderConfigContext,
+) => MaybePromise<unknown>;
+
+export type ProviderRunOutput = string | (string | Blob | MetaProviderOutputPart)[];
+
+export type ProviderRunHandler = (
+  key: unknown,
+  context: ProviderConfigContext,
+) => MaybePromise<ProviderRunOutput>;
+
+export type ProviderEnvHandler = () => MaybePromise<string[]>;
+
+export interface AssertionCellContext {
+  provider: { id: string | CodeReference | null; labeled?: Record<string, { id: string }> };
+  prompt: NormalizedPrompt;
 }
+export interface AssertionRowContext {
+  prompts: NormalizedPrompt[];
+}
+export type AssertionCellHandler = (
+  output: ProviderOutput,
+  context: AssertionCellContext,
+) => MaybePromise<JavascriptAssertionResult>;
+export type AssertionRowHandler = (
+  results: TestOutput[],
+  context: AssertionRowContext,
+) => MaybePromise<JavascriptAssertionResult[]>;

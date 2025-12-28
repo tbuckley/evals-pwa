@@ -1,20 +1,19 @@
 import type { JavascriptAssertionArgs } from '$lib/assertions/javascript';
 import type { CodeReference, Executable, ModuleExecutable } from '$lib/storage/CodeReference';
-import type { Generator } from '$lib/storage/runGenerators';
+import type { FileReference } from '$lib/storage/FileReference';
 import type {
-  FsConfig,
-  FsPipelinePrompt,
-  FsPrompt,
-  FsProvider,
-  FsTestCase,
-} from '$lib/storage/types';
-import type {
+  AssertionResult,
   ConversationPrompt,
   MultiPartPrompt,
   NormalizedPipelineStep,
+  NormalizedPrompt,
+  ProviderOutput,
+  ProviderOutputPart,
   PromptPart,
   Provider,
   RolePromptPart,
+  TestOutput,
+  TransformOutput,
 } from '$lib/types';
 import type * as DocTypes from './codeReferenceTypes';
 
@@ -35,15 +34,20 @@ interface CodeReferencePublic {
 interface CodeReferenceMarker {
   readonly __codeReference: unique symbol;
 }
+interface FileReferenceMarker {
+  readonly __fileReference: unique symbol;
+}
 type ReplaceCodeReference<T> = T extends CodeReference | DocTypes.CodeReference
   ? CodeReferenceMarker
-  : T extends File
-    ? File
-    : T extends (infer U)[]
-      ? ReplaceCodeReference<U>[]
-      : T extends object
-        ? { [K in keyof T]: ReplaceCodeReference<T[K]> }
-        : T;
+  : T extends FileReference | DocTypes.FileReference
+    ? FileReferenceMarker
+    : T extends File
+      ? File
+      : T extends (infer U)[]
+        ? ReplaceCodeReference<U>[]
+        : T extends object
+          ? { [K in keyof T]: ReplaceCodeReference<T[K]> }
+          : T;
 
 type _CodeReferenceActual = Assert<IsAssignable<CodeReference, CodeReferencePublic>>;
 type _CodeReferenceDoc = Assert<IsAssignable<DocTypes.CodeReference, CodeReferencePublic>>;
@@ -124,32 +128,50 @@ type _PromptPartShape = Assert<IsAssignable<DocTypes.PromptPart, PromptPartShape
 type _Provider = Assert<
   IsMutuallyAssignable<ReplaceCodeReference<DocTypes.Provider>, ReplaceCodeReference<Provider>>
 >;
-type _FsProvider = Assert<
-  IsMutuallyAssignable<ReplaceCodeReference<DocTypes.FsProvider>, ReplaceCodeReference<FsProvider>>
->;
-type _FsPrompt = Assert<
-  IsMutuallyAssignable<ReplaceCodeReference<DocTypes.FsPrompt>, ReplaceCodeReference<FsPrompt>>
->;
-type _FsPipelinePrompt = Assert<
-  IsMutuallyAssignable<
-    ReplaceCodeReference<DocTypes.FsPipelinePrompt>,
-    ReplaceCodeReference<FsPipelinePrompt>
-  >
->;
-type _FsConfig = Assert<
-  IsMutuallyAssignable<ReplaceCodeReference<DocTypes.FsConfig>, ReplaceCodeReference<FsConfig>>
->;
-type _FsTestCase = Assert<
-  IsMutuallyAssignable<ReplaceCodeReference<DocTypes.FsTestCase>, ReplaceCodeReference<FsTestCase>>
->;
 type _JavascriptAssertionArgs = Assert<
   IsMutuallyAssignable<
     ReplaceCodeReference<DocTypes.JavascriptAssertionArgs>,
     ReplaceCodeReference<JavascriptAssertionArgs>
   >
 >;
-type _Generator = Assert<
-  IsMutuallyAssignable<ReplaceCodeReference<DocTypes.Generator>, ReplaceCodeReference<Generator>>
+interface ExpectedJavascriptAssertionResult {
+  pass: boolean;
+  message?: string;
+  visuals?: (string | Blob)[];
+  outputs?: Record<string, boolean | number>;
+}
+type _JavascriptAssertionResult = Assert<
+  IsMutuallyAssignable<DocTypes.JavascriptAssertionResult, ExpectedJavascriptAssertionResult>
+>;
+type _ProviderOutput = Assert<
+  IsAssignable<ReplaceCodeReference<DocTypes.ProviderOutput>, ReplaceCodeReference<ProviderOutput>>
+>;
+type _ProviderOutputPart = Assert<
+  IsAssignable<
+    ReplaceCodeReference<DocTypes.ProviderOutputPart>,
+    ReplaceCodeReference<ProviderOutputPart>
+  >
+>;
+type _TransformOutput = Assert<
+  IsAssignable<
+    ReplaceCodeReference<DocTypes.TransformOutput>,
+    ReplaceCodeReference<TransformOutput>
+  >
+>;
+type _TestOutput = Assert<
+  IsAssignable<ReplaceCodeReference<DocTypes.TestOutput>, ReplaceCodeReference<TestOutput>>
+>;
+type _NormalizedPrompt = Assert<
+  IsAssignable<
+    ReplaceCodeReference<DocTypes.NormalizedPrompt>,
+    ReplaceCodeReference<NormalizedPrompt>
+  >
+>;
+type _AssertionResult = Assert<
+  IsAssignable<
+    ReplaceCodeReference<DocTypes.AssertionResult>,
+    ReplaceCodeReference<AssertionResult>
+  >
 >;
 type _PipelineIf = Assert<
   IsMutuallyAssignable<
@@ -162,4 +184,61 @@ type _PipelineTransform = Assert<
     ReplaceCodeReference<DocTypes.PipelineTransform>,
     ReplaceCodeReference<NormalizedPipelineStep['transform']>
   >
+>;
+
+type ExpectedPromptTransformHandler = (
+  output: DocTypes.ProviderOutput,
+  context: { vars: DocTypes.PipelineVars },
+) =>
+  | DocTypes.TransformOutput
+  | DocTypes.TransformResult
+  | Promise<DocTypes.TransformOutput | DocTypes.TransformResult>;
+
+type ExpectedPromptIfHandler = (vars: DocTypes.PipelineVars) => boolean | Promise<boolean>;
+
+type ExpectedProviderPrepareHandler = (
+  prompt: DocTypes.ConversationPrompt,
+  context: DocTypes.ProviderConfigContext,
+) => DocTypes.MaybePromise<unknown>;
+
+type ExpectedProviderRunHandler = (
+  key: unknown,
+  context: DocTypes.ProviderConfigContext,
+) =>
+  | string
+  | (string | Blob | DocTypes.MetaProviderOutputPart)[]
+  | DocTypes.MaybePromise<string | (string | Blob | DocTypes.MetaProviderOutputPart)[]>;
+
+type ExpectedProviderEnvHandler = () => DocTypes.MaybePromise<string[]>;
+
+type ExpectedAssertionCellHandler = (
+  output: DocTypes.ProviderOutput,
+  context: DocTypes.AssertionCellContext,
+) => DocTypes.MaybePromise<DocTypes.JavascriptAssertionResult>;
+
+type ExpectedAssertionRowHandler = (
+  results: DocTypes.TestOutput[],
+  context: DocTypes.AssertionRowContext,
+) => DocTypes.MaybePromise<DocTypes.JavascriptAssertionResult[]>;
+
+type _PromptTransformHandler = Assert<
+  IsMutuallyAssignable<DocTypes.PromptTransformHandler, ExpectedPromptTransformHandler>
+>;
+type _PromptIfHandler = Assert<
+  IsMutuallyAssignable<DocTypes.PromptIfHandler, ExpectedPromptIfHandler>
+>;
+type _ProviderPrepareHandler = Assert<
+  IsMutuallyAssignable<DocTypes.ProviderPrepareHandler, ExpectedProviderPrepareHandler>
+>;
+type _ProviderRunHandler = Assert<
+  IsMutuallyAssignable<DocTypes.ProviderRunHandler, ExpectedProviderRunHandler>
+>;
+type _ProviderEnvHandler = Assert<
+  IsMutuallyAssignable<DocTypes.ProviderEnvHandler, ExpectedProviderEnvHandler>
+>;
+type _AssertionCellHandler = Assert<
+  IsMutuallyAssignable<DocTypes.AssertionCellHandler, ExpectedAssertionCellHandler>
+>;
+type _AssertionRowHandler = Assert<
+  IsMutuallyAssignable<DocTypes.AssertionRowHandler, ExpectedAssertionRowHandler>
 >;
