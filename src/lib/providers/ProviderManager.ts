@@ -11,11 +11,16 @@ import { DalleProvider } from './dalle';
 import { ComfyuiProvider } from './comfyui';
 import { EchoProvider } from './echo';
 import { GeminiLiveProvider } from './gemini-live';
+import { CodeReferenceProvider } from './code-reference';
+import { CodeReference } from '$lib/storage/CodeReference';
 
 export class ProviderManager {
   constructor(public env: Record<string, string>) {}
 
-  getProvider(id: string, config: object = {}): ModelProvider {
+  getProvider(id: string | CodeReference, config: Record<string, unknown> = {}): ModelProvider {
+    if (id instanceof CodeReference) {
+      return new CodeReferenceProvider(id, this.env, config);
+    }
     // id is in the format providerId:modelName, for example gemini:gemini-1.5-pro-latest
     const index = id.indexOf(':');
     if (index === -1) {
@@ -76,7 +81,10 @@ export class ProviderManager {
     throw new Error(`Unknown provider: ${providerId}`);
   }
 
-  getRequiredEnvVars(id: string): string[] {
+  getRequiredEnvVars(id: string | CodeReference): string[] {
+    if (id instanceof CodeReference) {
+      return [];
+    }
     const index = id.indexOf(':');
     if (index === -1) {
       throw new Error(`Invalid provider id: ${id}`);
