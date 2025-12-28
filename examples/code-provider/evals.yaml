@@ -1,0 +1,11 @@
+description: Code provider example
+
+providers:
+  - file:///provider.js
+
+prompts:
+  - Say hello to {{name}}
+
+tests:
+  - vars:
+      name: Ada
