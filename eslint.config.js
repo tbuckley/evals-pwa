@@ -37,7 +37,7 @@ export default ts.config(
         ...globals.nodeBuiltin,
       },
       parserOptions: {
-        projectService: true,
+        project: true,
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.svelte'],
       },
