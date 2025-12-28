@@ -25,6 +25,7 @@ export default execute;`;
 }
 
 export type Executable = (...args: unknown[]) => Promise<unknown>;
+export type ModuleExecutable = (name: string | undefined, ...args: unknown[]) => Promise<unknown>;
 
 type Bundle = { result?: string } & (
   | { readonly mode: 'ts'; readonly storage: ReadonlyFileStorage }
@@ -56,6 +57,9 @@ export class CodeReference extends FileReference {
       this.#execute = CodeSandbox.bind(await this.getCode());
     }
     return this.#execute;
+  }
+  async bindModule(): Promise<ModuleExecutable> {
+    return CodeSandbox.bindModule(await this.getCode());
   }
   async getCode() {
     if (this.#bundle.result) return this.#bundle.result;

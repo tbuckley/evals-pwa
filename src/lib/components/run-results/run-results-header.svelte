@@ -2,6 +2,7 @@
   import type { RowHeight } from '$lib/state/settings';
   import type { Env } from '$lib/types';
   import type { Readable } from 'svelte/store';
+  import { formatProviderLabel } from '$lib/utils/providerDisplay';
 
   export let env: Env;
   export let height: Readable<RowHeight>;
@@ -11,13 +12,12 @@
   function getProviderSummary(env: Env): string {
     const parts: string[] = [];
     if (env.provider) {
-      parts.push(typeof env.provider === 'string' ? env.provider : env.provider.id);
+      parts.push(formatProviderLabel(env.provider));
     }
     if (env.labeledProviders) {
       parts.push(
         ...Object.entries(env.labeledProviders).map(
-          ([label, provider]) =>
-            `${label}: ${typeof provider === 'string' ? provider : provider.id}`,
+          ([label, provider]) => `${label}: ${formatProviderLabel(provider)}`,
         ),
       );
     }
