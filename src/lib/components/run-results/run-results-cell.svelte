@@ -49,11 +49,7 @@
   }
 
   async function copy() {
-    if (
-      $testResult.output &&
-      $testResult.output.length === 1 &&
-      typeof $testResult.output[0] === 'string'
-    ) {
+    if ($testResult.output?.length === 1 && typeof $testResult.output[0] === 'string') {
       await navigator.clipboard.writeText($testResult.output[0]);
     }
   }
@@ -122,7 +118,7 @@
 
     <!-- Buttons -->
     <div class="absolute right-0 top-0 flex">
-      {#if ['success', 'error'].includes($testResult.state) && $testResult.output && $testResult.output.length === 1 && typeof $testResult.output[0] === 'string'}
+      {#if ['success', 'error'].includes($testResult.state) && $testResult.output?.length === 1 && typeof $testResult.output[0] === 'string'}
         <Button on:click={copy} variant="ghost" size="icon" class="float-right text-gray-500">
           <Copy class="h-5 w-5"></Copy>
         </Button>
