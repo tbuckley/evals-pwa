@@ -2,6 +2,7 @@ import type { LiveRun } from '../types';
 import type { AnnotationManager } from '../state/annotations';
 import { get } from 'svelte/store';
 import { FileReference } from '$lib/storage/FileReference';
+import { formatProviderLabel } from './providerDisplay';
 
 export interface CsvExportOptions {
   includeNotes?: boolean;
@@ -21,12 +22,7 @@ export function generateCsvContent(run: LiveRun, options: CsvExportOptions = {})
 
   // Add environment headers with notes columns
   for (const env of run.envs) {
-    let envHeader = 'unknown';
-    if (typeof env.provider === 'string') {
-      envHeader = env.provider;
-    } else if (env.provider !== null) {
-      envHeader = env.provider.id;
-    }
+    const envHeader = formatProviderLabel(env.provider);
     headers.push(envHeader);
 
     // Add Notes column after each environment if annotations exist and includeNotes is true
@@ -41,13 +37,7 @@ export function generateCsvContent(run: LiveRun, options: CsvExportOptions = {})
     providerRow.push(''); // Empty cells for var columns
   }
   for (const env of run.envs) {
-    let providerName = 'unknown';
-    if (typeof env.provider === 'string') {
-      providerName = env.provider;
-    } else if (env.provider !== null) {
-      providerName = env.provider.id;
-    }
-    providerRow.push(providerName);
+    providerRow.push(formatProviderLabel(env.provider));
 
     if (includeNotes && annotations) {
       providerRow.push(''); // Empty cell for notes column
@@ -128,7 +118,7 @@ export function generateCsvContent(run: LiveRun, options: CsvExportOptions = {})
 
   // Convert to CSV
   const csv = allRows
-    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','))
     .join('\n');
 
   return csv;

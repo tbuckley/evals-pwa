@@ -23,13 +23,18 @@ export type FsAssertion = z.infer<typeof fsAssertionSchema>;
 
 export const fsExpandedProviderSchema = z
   .object({
-    id: z.string(),
+    id: z.union([z.string(), z.instanceof(CodeReference)]),
     labels: z.array(z.string()).optional(),
     config: z.object({}).passthrough().optional(),
+    env: z.array(z.string()).optional(),
     prompts: z.array(z.string()).optional(),
   })
   .strict();
-export const fsProviderSchema = z.union([z.string(), fsExpandedProviderSchema]);
+export const fsProviderSchema = z.union([
+  z.string(),
+  z.instanceof(CodeReference),
+  fsExpandedProviderSchema,
+]);
 
 export const fsConvoPromptSchema = z.array(
   z.union([
