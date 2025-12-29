@@ -9,8 +9,8 @@ import {
   type TestOutput,
 } from '$lib/types';
 import { extractAllJsonObjects } from '$lib/utils/extractAllJson';
-import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
-import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
+import { PipelineEnvironment } from '$lib/utils/PipelineEnvironment';
+import { makeSingleStepPipeline } from '$lib/utils/pipelinePrompt';
 import { z } from 'zod';
 import { CodeReference } from '$lib/storage/CodeReference';
 
@@ -39,9 +39,9 @@ export function createConsistencyAssertion(
         ? { id: providerOptions, config: {} }
         : (providerOptions ?? { id: DEFAULT_LLM_ASSERTION_PROVIDER, config: {} });
   const model = providerManager.getProvider(provider.id, provider.config);
-  const env = new SimpleEnvironment({
-    model,
-    promptFormatter: new HandlebarsPromptFormatter(prompt ?? CONSISTENCY_PROMPT),
+  const env = new PipelineEnvironment({
+    models: { default: model },
+    pipeline: makeSingleStepPipeline(prompt ?? CONSISTENCY_PROMPT),
   });
   // TODO also populate placeholders in the rubric
   // TODO make rubric optional if prompt is provided

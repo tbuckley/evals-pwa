@@ -123,6 +123,32 @@ test.describe('File System', () => {
     }
   });
 
+  test('loads examples/top-level-step without errors', async ({ page }) => {
+    await chooseDirectory(page, '../examples/top-level-step');
+
+    // Ensure no error dialog is visible
+    await expect(page.locator('#alert-dialog')).toHaveCount(0);
+
+    // Check the configuration
+    await page.getByText('Configuration').click();
+    await page.waitForLoadState('networkidle');
+
+    const lines = [
+      '"description": "Top-level step prompt example"',
+      '"id": "reverser:whatever"',
+      '"prompt": "Hello, {{word}}!"',
+      '"functionCalls": "loop"',
+      '"outputAs": "greeting"',
+      '"session": true',
+      '"state": [',
+      '"greeting"',
+      'function execute(output, context)',
+    ];
+    for (const line of lines) {
+      await expect(page.locator('pre')).toContainText(line);
+    }
+  });
+
   test('loads examples/errors with a visible error', async ({ page }) => {
     await chooseDirectory(page, '../examples/errors');
 
