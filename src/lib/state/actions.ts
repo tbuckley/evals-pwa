@@ -26,8 +26,6 @@ import {
 import { UiError } from '$lib/types/errors';
 import { type FileStorage } from '$lib/types/storage';
 import { ProviderManager } from '$lib/providers/ProviderManager';
-import { SimpleEnvironment } from '$lib/utils/SimpleEnvironment';
-import { HandlebarsPromptFormatter } from '$lib/utils/HandlebarsPromptFormatter';
 import { ParallelTaskQueue } from '$lib/utils/ParallelTaskQueue';
 import { AssertionManager } from '$lib/assertions/AssertionManager';
 import { parsedEnvStore } from './derived';
@@ -43,6 +41,7 @@ import { FileSystemCache } from '$lib/storage/FileSystemCache';
 import { useCacheStore } from './settings';
 import { PipelineEnvironment } from '$lib/utils/PipelineEnvironment';
 import { LabelNotFoundError, permuteLabeled } from '$lib/utils/permuteLabeled';
+import { makeSingleStepPipeline } from '$lib/utils/pipelinePrompt';
 import { toast } from 'svelte-sonner';
 
 const folder = await idb.get<FileSystemDirectoryHandle>('folder');
@@ -468,7 +467,7 @@ function getRunEnvs(providers: NormalizedProvider[], prompts: NormalizedPrompt[]
         return true;
       });
       for (const provider of matchingProviders) {
-        envs.push({ provider, prompt: prompt.prompt });
+        envs.push({ provider, prompt });
       }
     } else if (typeof prompt === 'object' && '$pipeline' in prompt) {
       // Pipeline
@@ -519,12 +518,12 @@ function createEnvironments(
         throw new Error('Cannot run test without a provider');
       }
       const model = providerManager.getProvider(provider.id, provider.config);
+      const pipeline = makeSingleStepPipeline(prompt);
+      console.log(prompt, pipeline);
       envs.push(
-        new SimpleEnvironment({
-          model,
-          promptFormatter: new HandlebarsPromptFormatter(
-            typeof prompt === 'string' ? prompt : prompt.prompt,
-          ),
+        new PipelineEnvironment({
+          models: { default: model },
+          pipeline,
           cache,
         }),
       );
@@ -650,7 +649,7 @@ async function runTest(
   }
   const testResult = next.value;
 
-  // FIXME: We should guarantee that SimpleEnvironment returns an array
+  // FIXME: We should guarantee that PipelineEnvironment returns an array
   let arrayOutput: LiveResult['output'];
   if (testResult.output) {
     arrayOutput = Array.isArray(testResult.output) ? testResult.output : [testResult.output];

@@ -35,7 +35,10 @@ function normalizePrompt(prompt: FsPrompt): NormalizedPrompt {
     return yaml.stringify(prompt);
   }
   if (typeof prompt === 'object' && 'prompt' in prompt) {
-    return prompt;
+    return {
+      ...prompt,
+      prompt: Array.isArray(prompt.prompt) ? yaml.stringify(prompt.prompt) : prompt.prompt,
+    };
   }
   return { $pipeline: prompt.$pipeline.map((step, index) => normalizePipelineStep(step, index)) };
 }

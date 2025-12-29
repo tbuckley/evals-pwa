@@ -51,8 +51,16 @@ export interface NormalizedPipelinePrompt {
 }
 const simplePromptSchema = z.string();
 const objectPromptSchema = z.object({
+  id: z.string().optional(),
   prompt: z.string(),
   providerLabel: z.string().optional(),
+  outputAs: z.string().optional(),
+  if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
+  deps: z.array(z.string()).optional(),
+  session: z.union([z.string(), z.boolean()]).optional(),
+  functionCalls: z.enum(['loop', 'once', 'never']).optional(),
+  transform: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
+  state: z.array(z.string()).optional(),
 });
 export const pipelinePromptSchema = z.object({
   $pipeline: z.array(
@@ -88,7 +96,7 @@ export type NormalizedProvider = z.infer<typeof normalizedProviderSchema>;
 export type Provider = z.infer<typeof providerSchema>;
 export type NormalizedPrompt =
   | string
-  | { prompt: string; providerLabel?: string }
+  | (Omit<NormalizedPipelineStep, 'id'> & { id?: string; prompt: string })
   | NormalizedPipelinePrompt;
 export type NormalizedAssertion = Assertion & Required<Pick<Assertion, 'vars'>>;
 

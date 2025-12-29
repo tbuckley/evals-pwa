@@ -1,0 +1,21 @@
+description: Top-level step prompt example
+
+providers:
+  - reverser:whatever
+
+prompts:
+  - id: top-step
+    prompt: 'Hello, {{word}}!'
+    functionCalls: loop
+    transform: |
+      function execute(output, context) {
+        return output;
+      }
+    outputAs: greeting
+    session: true
+    state:
+      - greeting
+
+tests:
+  - vars:
+      word: world
