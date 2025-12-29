@@ -1,11 +1,19 @@
-import type { NormalizedPipelinePrompt } from '$lib/types';
+import type { NormalizedPipelinePrompt, NormalizedPipelineStep } from '$lib/types';
 
-export function makeSingleStepPipeline(prompt: string): NormalizedPipelinePrompt {
+type SingleStepInput = string | (Omit<NormalizedPipelineStep, 'id'> & { id?: string });
+
+export function makeSingleStepPipeline(step: SingleStepInput): NormalizedPipelinePrompt {
+  const baseStep =
+    typeof step === 'string'
+      ? { prompt: step }
+      : {
+          ...step,
+        };
   return {
     $pipeline: [
       {
-        id: 'step-0',
-        prompt,
+        id: baseStep.id ?? 'step-0',
+        ...baseStep,
       },
     ],
   };

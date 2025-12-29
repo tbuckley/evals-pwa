@@ -67,9 +67,22 @@ export const fsPipelinePromptSchema = z
   .strict();
 export const fsPromptSchema = z.union([
   z.string(),
-  z.object({ prompt: z.string(), providerLabel: z.string().optional() }).strict(),
   fsConvoPromptSchema,
   fsPipelinePromptSchema,
+  z
+    .object({
+      id: z.string().optional(),
+      prompt: z.union([z.string(), fsConvoPromptSchema]),
+      providerLabel: z.string().optional(),
+      outputAs: z.string().optional(),
+      if: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
+      deps: z.array(z.string()).optional(),
+      session: z.union([z.string(), z.boolean()]).optional(),
+      functionCalls: z.enum(['loop', 'once', 'never']).optional(),
+      transform: z.union([z.string(), z.instanceof(CodeReference)]).optional(),
+      state: z.array(z.string()).optional(),
+    })
+    .strict(),
 ]);
 export type FsPipelinePrompt = z.infer<typeof fsPipelinePromptSchema>;
 export type FsPrompt = z.infer<typeof fsPromptSchema>;

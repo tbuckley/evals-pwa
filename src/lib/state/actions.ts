@@ -467,7 +467,7 @@ function getRunEnvs(providers: NormalizedProvider[], prompts: NormalizedPrompt[]
         return true;
       });
       for (const provider of matchingProviders) {
-        envs.push({ provider, prompt: prompt.prompt });
+        envs.push({ provider, prompt });
       }
     } else if (typeof prompt === 'object' && '$pipeline' in prompt) {
       // Pipeline
@@ -518,11 +518,12 @@ function createEnvironments(
         throw new Error('Cannot run test without a provider');
       }
       const model = providerManager.getProvider(provider.id, provider.config);
-      const promptText = typeof prompt === 'string' ? prompt : prompt.prompt;
+      const pipeline = makeSingleStepPipeline(prompt);
+      console.log(prompt, pipeline);
       envs.push(
         new PipelineEnvironment({
           models: { default: model },
-          pipeline: makeSingleStepPipeline(promptText),
+          pipeline,
           cache,
         }),
       );
