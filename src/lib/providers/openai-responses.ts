@@ -256,6 +256,14 @@ async function convertOutputItem(
       .flatMap((c) => c.text) // TODO handle annotations too
       .join('');
   } else if (item.type === 'reasoning') {
+    if (
+      item.summary
+        .map((s) => s.text)
+        .join('\n')
+        .trim() === ''
+    ) {
+      console.log('reasoning summary is empty', item);
+    }
     return {
       type: 'meta',
       title: 'Reasoning',

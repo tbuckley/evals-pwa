@@ -107,7 +107,16 @@ providers:
 
 **Gemini Config**
 
-Any config will be included as additional properties in the API request. See <https://ai.google.dev/api/generate-content#request-body>
+You can disable streamed responses with the `disableStreaming` config option, which is necessary for some features such as image segmentation:
+
+```yaml
+providers:
+  - id: gemini:gemini-2.5-flash
+    config:
+      disableStreaming: true
+```
+
+Any other config will be included as additional properties in the API request. See <https://ai.google.dev/api/generate-content#request-body>
 
 For Gemini 2.0 Flash image generation (currently experimental as of 2025-04-02), you can enable it with the following config:
 
