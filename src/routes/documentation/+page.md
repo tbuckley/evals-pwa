@@ -10,6 +10,8 @@ _**Want AI to write your evals?** Check out [our llms.txt](/llms.txt). You can c
 
 _**Looking for a reference for configuration files?** Check [here](/documentation/config)._
 
+_**Need the full CodeReference TypeScript definitions?** Grab the copy/download-ready file [here](/documentation/code-reference-types)._
+
 First, create a folder where your evaluation data and output will be stored. Create an `evals.yaml` file inside it and add the following:
 
 ```yaml

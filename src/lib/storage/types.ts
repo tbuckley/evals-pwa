@@ -35,6 +35,7 @@ export const fsProviderSchema = z.union([
   z.instanceof(CodeReference),
   fsExpandedProviderSchema,
 ]);
+export type FsProvider = z.infer<typeof fsProviderSchema>;
 
 export const fsConvoPromptSchema = z.array(
   z.union([
