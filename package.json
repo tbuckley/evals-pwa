@@ -68,7 +68,7 @@
     "tailwind-merge": "^2.5.2",
     "tailwind-variants": "^0.2.1",
     "wavefile": "^11.0.0",
-    "yaml": "^2.5.1",
+    "yaml": "^2.8.3",
     "zod": "^3.23.8"
   }
 }
